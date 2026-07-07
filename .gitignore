@@ -1,0 +1,58 @@
+# Environment / secrets
+.env
+*.env
+outputs/.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# RAG embedding/cache files
+outputs/cache/
+outputs/cache_v1/
+outputs/cache_v2/
+*.npy
+*.pkl
+
+# Raw/private data
+data/raw/
+month_04/
+month_05/
+month_06/
+
+# Logs
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Large/private intermediate outputs
+data/
+work/
+outputs/rejected/
+outputs/jd_final_safe_qa_refined_category.csv
+outputs/sample_100_jd_qa.csv
+outputs/*.csv
+
+# Local preprocessing scripts/old outputs not included in first commit
+outputs/anonymize_qa_data.py
+outputs/anonymize_qa_data_v2.py
+outputs/category_statistics.py
+outputs/dedup_incremental_jd_questions.py
+outputs/extract_jd_context_qa.py
+outputs/extract_jd_turn_based_qa.py
+outputs/filter_short_keyword_questions.py
+outputs/final_safety_clean_qa.py
+outputs/parse_jd_chat_txt.py
+outputs/rebuild_jd_context_qa.py
+outputs/refine_categories.py

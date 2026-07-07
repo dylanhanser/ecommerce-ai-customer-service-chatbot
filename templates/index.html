@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JD Customer Service RAG Demo</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="chat-card">
+        <header class="chat-header">
+          <div>
+            <h1>JD 客服 RAG Demo (V2)</h1>
+            <p>混合检索：历史 QA + 审核话术知识库，Top 5 检索后生成客服回答。</p>
+          </div>
+          <span class="status-pill">FastAPI</span>
+        </header>
+
+        <section class="chat-window" id="chatWindow">
+          <div class="message bot">
+            <div class="avatar">AI</div>
+            <div class="bubble">
+              你好，我是店铺客服 RAG 原型。你可以试试：
+              <br />
+              “可以退货吗”、“鞋子偏大可以换吗”、“发什么快递”、“尺码怎么选”。
+            </div>
+          </div>
+        </section>
+
+        <form class="composer" id="chatForm">
+          <input
+            id="questionInput"
+            name="question"
+            type="text"
+            autocomplete="off"
+            placeholder="请输入用户问题..."
+          />
+          <button id="sendButton" type="submit">发送</button>
+        </form>
+      </section>
+
+      <aside class="debug-card">
+        <div class="debug-header">
+          <h2>调试信息</h2>
+          <div class="flag-group">
+            <div id="invalidFlag" class="backend-flag">Invalid input: -</div>
+            <div id="skipFlag" class="backend-flag">Skip retrieval: -</div>
+            <div id="queryTypeFlag" class="backend-flag">Query type: -</div>
+            <div id="backendFlag" class="backend-flag">Requires backend API: -</div>
+          </div>
+        </div>
+
+        <section class="debug-section">
+          <h3>AI final answer</h3>
+          <pre id="finalAnswer">等待输入问题...</pre>
+        </section>
+
+        <section class="debug-section">
+          <h3>Top 5 retrieved context</h3>
+          <div id="retrievedResults" class="result-list empty">暂无检索结果</div>
+        </section>
+
+        <section class="debug-section">
+          <h3>Reranked context</h3>
+          <div id="rerankedResults" class="result-list empty">暂无重排结果</div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="/static/main.js"></script>
+  </body>
+</html>
