@@ -1,0 +1,521 @@
+﻿source_file,platform,source_type,category,title,content,priority,allowed_for_answer,needs_backend_api,risk_note,original_key,original_group
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"未分组 baiy,1",亲亲百亿补贴商品是打折商品是无法加入购物车的呢，喜欢可以直接拍的呢亲亲,70,TRUE,FALSE,,"baiy,1",未分组
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"未分组 baiy,2",百亿补贴的链接不参与任何满减呢，因为本身就是最低活动价呢,70,TRUE,FALSE,,"baiy,2",未分组
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码不合适 banxing,1",每个人的脚型和每双鞋的版型都不一样哦 不能保证每个人的尺码都合适的呢,80,TRUE,FALSE,,"banxing,1",尺码不合适
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码不合适 banxing,2",我们这边只是提供我们这边试穿的信息呢 个人脚型不同的哦 仅供参考哦,80,TRUE,FALSE,,"banxing,2",尺码不合适
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码不合适 banxing,3",尺码会因人而异的嗷，有的人脚瘦穿正常码的会觉得大了一点，有的人脚宽穿正常码的会觉得小了 我们一般都是按照大部分买家反馈的数据和厂家提供给的数据卖的，一般大部分都是合适的，但是不保证所有人都合适嗷~,80,TRUE,FALSE,,"banxing,3",尺码不合适
+data/raw/jd/京东话术.txt,JD,policy_rule,尺码问题,"尺码不合适 banxing,4",这款是运动鞋尺码正码的呢，但是每个人脚型不同哦，这款大都客户反映是正码的呢，我们都是按自己试穿结果和大都客户建议的呢。具体的是需要您自己选择的呢。您觉得不合适我们也可以给您提供7天无理由退换的呢~,90,TRUE,TRUE,需要结合商品信息,"banxing,4",尺码不合适
+data/raw/jd/京东话术.txt,JD,product_info,尺码问题,"尺码不合适 banxing,5",因为每个人脚掌情况不同的呢 有高有宽的 鞋子款式不同也会存在宽和高的情况 无法每个人契合度都完美的，鞋子一般都会越穿越宽松的，您可以调整下鞋带松紧试下看看会不会好一些呢,80,TRUE,FALSE,,"banxing,5",尺码不合适
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码不合适 banxing,6","亲亲可以废报纸揉成一团,用水弄湿(轻微)再拿一张报纸包上,然后塞进鞋子挤脚的地方 一定要塞紧了哦 撑个几天后就不会了呢",80,TRUE,FALSE,,"banxing,6",尺码不合适
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"包装问题 baozhuang,1",这是政府提倡的环保包装，也是为了减少包装垃圾，我们发出去的时候都是包装完整的，有些破了，是因为快递员需要撕掉包装里面的那个面单，他们需要签收，但是鞋子都是完好的，如果鞋子有破损麻烦您赶紧拍照给我看一下哈，谢谢,90,TRUE,FALSE,,"baozhuang,1",包装问题
+data/raw/jd/京东话术.txt,JD,backend_rule,换货,"包装问题 baozhuang,2",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"baozhuang,2",包装问题
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"包装问题 bc,3",亲亲 小客服最多可以给您申请到 元补偿哈 超出的话需要小客服自己承担的呢 抱歉呢,70,FALSE,FALSE,需要人工处理,"bc,3",包装问题
+data/raw/jd/京东话术.txt,JD,backend_rule,物流发货,"包装问题 bf,4",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"bf,4",包装问题
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"勃肯鞋泛白问题 bkx,1",亲亲 泛白不是质量问题，牛反绒的材质部位大部分都是这样子哈， 保证不了这么精准哦，这种的话属于正常现象哈,90,TRUE,FALSE,,"bkx,1",勃肯鞋泛白问题
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"勃肯鞋泛白问题 bkx,2","反绒材质鞋面清洗方式：反绒皮材质的鞋面，不宜水洗哦！
+建议使用反绒皮/麂皮绒专用刷清理擦拭，既可去污，又可保护鞋面不受损伤哦~（8-10元一把刷子）",80,TRUE,FALSE,,"bkx,2",勃肯鞋泛白问题
+data/raw/jd/京东话术.txt,JD,script_template,其他,"勃肯鞋泛白问题 bkx,3",反绒皮、猪巴戈(革)可用专用鞋粉来打理，切忌水洗！先用软毛刷将鞋子的表面灰尘刷掉，然后用鞋粉笔顺着一个方向涂抹;鞋子须保持干燥，雨天不宜穿着，若被弄湿受湖将其置于阴凉通凤处自然吹干，用于布轻擦去污哦亲~,70,TRUE,FALSE,,"bkx,3",勃肯鞋泛白问题
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"勃肯鞋泛白问题 bkx,4",这个鞋垫左右两侧 ，为了保证鞋型的美观，是有用胶粘固定鞋垫 ，可能时间久了就胶粘的效果减弱，这个不属于质量问题呢。,90,TRUE,FALSE,,"bkx,4",勃肯鞋泛白问题
+data/raw/jd/京东话术.txt,JD,script_template,质量问题,"勃肯鞋泛白问题 ds,1",亲，理解您对掉色的担心～勃肯新鞋初期会有一点自然浮色，属于正常的工艺现象，不影响品质和使用,70,TRUE,FALSE,,"ds,1",勃肯鞋泛白问题
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"勃肯鞋泛白问题 ds,2",亲，勃肯鞋新鞋初期出现轻微掉色是正常工艺现象，不属于质量问题，也不符合 7 天无理由退货标准,90,TRUE,FALSE,,"ds,2",勃肯鞋泛白问题
+data/raw/jd/京东话术.txt,JD,script_template,其他,"道歉话术 bq,2",实在是很抱歉给您添麻烦了,70,TRUE,FALSE,,"bq,2",道歉话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"道歉话术 bq,1",真是抱歉！给您添麻烦啦！,70,TRUE,FALSE,,"bq,1",道歉话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"道歉话术 bq,3",实在是很抱歉呢，影响到您的购买体验了呢,70,TRUE,FALSE,,"bq,3",道歉话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"道歉话术 bq,4",非常抱歉给亲亲造成的困扰，很抱歉出现这样的问题，同时也感谢亲亲的及时反馈，我们会第一时间把这个问题反映给厂家让他们改进呢,70,TRUE,FALSE,,"bq,4",道歉话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"道歉话术 bq,5",亲，给您添麻烦了，我们也很过意不去，希望您也不要因为我们一次的过失对我们失去信心，我们也会不断改进，希望您多多包涵哈,70,TRUE,FALSE,,"bq,5",道歉话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"道歉话术 bq,6",亲，很抱歉让您有不好的感受，我们店铺对于客户的意见是非常重视的，我们会将您说的情况尽快反映给相关部门去做改进,70,TRUE,FALSE,,"bq,6",道歉话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"白条 bt,1",亲亲白条相当于信用卡，跟花呗差不多还款模式，首单白条一般都是有大额优惠的，到时候记得及时还款就可以了，也是很方便的，您可以选择白条或者其他支付方式都行，平台不强制的哈，请放心~,70,TRUE,FALSE,,"bt,1",白条
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"补偿话术 buc,2",鞋子是消耗品的呐亲亲，商品在穿着过程中摩擦等因素都会影响到鞋子的寿命，订单拍下到手价格也是非常划算的，考虑到您是店铺优质客户，订单为您特殊申请元补偿，还望您谅解好吗,70,TRUE,TRUE,,"buc,2",补偿话术
+data/raw/jd/京东话术.txt,JD,backend_rule,换货,"补偿话术 buc,1",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"buc,1",补偿话术
+data/raw/jd/京东话术.txt,JD,backend_rule,价格补偿,"补偿话术 buc,4",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"buc,4",补偿话术
+data/raw/jd/京东话术.txt,JD,policy_rule,退货退款,"补偿话术 buc,6",每个人穿鞋方式不同哦，我们家确保正品的，您收到后有问题可以第一时间和我们联系，我们都可以给您退换，但是您穿过后才出现的问题，每个人穿鞋方式不同哦，我们只能给您补偿处理的呢，影响第二次销售的鞋子都不支持退换的哦。,90,FALSE,FALSE,需要人工处理,"buc,6",补偿话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"补偿话术 buc,5",理解您的心情亲亲，您联系过来咱也想和您协商处理好，因鞋子的寿命和个人穿着习惯以及养护都是息息相关的，订单为您申请补偿 元可以吗,70,TRUE,TRUE,,"buc,5",补偿话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"补偿话术 by,1",定期清洁鞋子，用湿布轻拭(注意不要用太多的水)，污垢多的地方可以挤些牙膏在上面，再用牙刷清洁 一下，清洁应将鞋面擦干，切勿用刷子猛刷。,70,TRUE,FALSE,,"by,1",补偿话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"补偿话术 by,2",避免鞋子浸水、曝晒及火烤，以免造成鞋子变形及鞋面断裂。 切忌鞋子接触酸、碱、油等腐蚀性溶剂。,70,TRUE,FALSE,,"by,2",补偿话术
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 bz,1",这个是标准码呢 正常拍就可以呢,80,TRUE,FALSE,,"bz,1",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 bz,2",亲爱的 这款是标准码的，正常码数的哈 正码正拍就行的哦~,80,TRUE,TRUE,需要结合商品信息,"bz,2",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 bz,5",脚宽、脚胖、脚背高建议大一码选择哈~,80,TRUE,FALSE,,"bz,5",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 bz,3","这款是标准的运动尺码呢，是正常的尺码哈，按您平常的习惯选择哦,脚宽、脚胖、脚背高的 建议大一码选择哈",80,TRUE,TRUE,需要结合商品信息,"bz,3",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 c,1",不偏码呢,80,TRUE,TRUE,需要结合商品信息,"c,1",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 c,2",写了标准码的拍正常码，写了偏小一码的要拍大一码，写了请选大一码的拍大一码，啥都没写的拍正常码,80,TRUE,FALSE,,"c,2",尺码
+data/raw/jd/京东话术.txt,JD,product_info,尺码问题,"尺码 c,3",按照脚长和鞋底长度买鞋子是不准的呢 按照平时的码数就行,80,TRUE,FALSE,,"c,3",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 c,4",麻烦您提供一下平时鞋码 这边给您参考下哦～,80,TRUE,TRUE,需要结合商品信息,"c,4",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 cm,2",可以拍 的呢 就相差5mm 相差不大哦 可以穿的呢,80,TRUE,TRUE,需要结合商品信息,"cm,2",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 cm,3",尺码合适男女都可以穿的呢,80,TRUE,FALSE,,"cm,3",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 cm,4",一个码数相差0.5cm 您根据自己的试穿效果决定换多大码数呢,80,TRUE,FALSE,,"cm,4",尺码
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"尺码 cmb,1",这是咱家的尺码表呢 您可以参考下,80,TRUE,FALSE,,"cmb,1",尺码
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"细微工艺区别 cb,1",亲，鞋头这种细微差别是正常工艺现象，每双鞋子在生产、定型、车缝时会有微小差异，不属于质量问题，不影响穿着和美观哦,90,TRUE,FALSE,,"cb,1",细微工艺区别
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"细微工艺区别 cb,2",亲，鞋子属于轻工制品，国标允许鞋头、鞋舌等部位存在微小差异，只要不影响穿着和功能，都属于正常合格范围，不是质量问题哈。,90,TRUE,FALSE,,"cb,2",细微工艺区别
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催付话术 cf,1",亲 早拍早享受哦，您现在拍下这边联系仓库优先给您安排发货哈,90,TRUE,FALSE,,"cf,1",催付话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"催付话术 cf,2",看您还没有付款呢 您是在犹豫什么问题吗？方便的话我来帮您解答哈,70,TRUE,FALSE,,"cf,2",催付话术
+data/raw/jd/京东话术.txt,JD,policy_rule,换货,"催付话术 cf,3","您喜欢就拍下吧，如果收到不满意的话在不影响我们二次销售的情况下，我们是支持7天无理由退换货的哦， 收到有任何问题及时联系我们都会优先帮您安排处理的，请您放心购买呢！
+~",90,TRUE,FALSE,,"cf,3",催付话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"催付话术 cuifu,1",您还有什么疑问的吗 合适的话您早点拍下付款的呢 ~好尽快安排发出的哦,70,TRUE,FALSE,,"cuifu,1",催付话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催付话术 cuifu,7",喜欢就早点拍下呢 早拍早发货的哦,90,TRUE,FALSE,,"cuifu,7",催付话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催付话术 cuifu,4",宝贝 您早点下单呢 下单后这边安排仓库优先给您发货呢,90,TRUE,FALSE,,"cuifu,4",催付话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"催付话术 cuifu,3",亲爱的，我们鞋子的面料、做工都很精细，而且出厂前都经过严格质检，喜欢的话可以拍下来穿看看效果~,80,TRUE,FALSE,,"cuifu,3",催付话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催付话术 cuifu,2",亲，您看的宝贝很不错哟，喜欢的话就尽早拍下付款吧，我们也好尽早为您安排发货哦,90,TRUE,FALSE,,"cuifu,2",催付话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催付话术 cuifu,5",亲爱哒，还在吗~不知道什么原因让您停住了脚步呢，我们已经在安排发货了，看到您的订单还没有支付，这边提醒您尽快付款我们会优先安排发出的哦,90,TRUE,TRUE,,"cuifu,5",催付话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,换货,"催付话术 cuifu,7",心动不如行动，喜欢就付款哦，光看图片怎么能知道适不适合自己呐？先买到家试试在说，对不对？真要是不合适的话咱家也是支持退换货的，解决您的后顾之忧，您这边付款后，我们这边会尽快给您发货的哦~,90,TRUE,FALSE,,"cuifu,7",催付话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"催付话术 dd,1",这边看您还没有下单呢 是有什么问题吗 有问题随时问我哦,70,TRUE,FALSE,,"dd,1",催付话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"催付话术 dd,2",这边看您取消了订单呢 是有什么问题吗 有问题随时来问我哦,70,TRUE,TRUE,,"dd,2",催付话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"差价话术 cj,3",亲亲 差价在京东--我的--客户服务---价格保护里面申请哦,70,TRUE,FALSE,,"cj,3",差价话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"差价话术 cj,1",亲亲，已为您加急催促发货，仓库会尽快处理，请您稍等。,90,FALSE,TRUE,需要人工处理,"cj,1",差价话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"差价话术 cj,2",亲亲 已经催促仓库尽快安排发货了呢 您稍等哈~,90,FALSE,TRUE,需要人工处理,"cj,2",差价话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催快递话术 ckd,1",快递公司的效率我们也控制不了 不能确保到货时间呢 我们给您催催的哈,90,FALSE,FALSE,需要人工处理,"ckd,1",催快递话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催快递话术 ckd,2",这边联系快递帮您催促下哈~,90,FALSE,TRUE,需要人工处理,"ckd,2",催快递话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催快递话术 ckd,3",已经帮您联系快递了呢,90,FALSE,TRUE,需要人工处理,"ckd,3",催快递话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催快递话术 ckd,5",实在不好意思让您久等了，我这边马上帮您联系快递核实最新物流，有消息第一时间通知您～,90,FALSE,TRUE,需要人工处理,"ckd,5",催快递话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"催快递话术 ckd,6",亲亲 实在是抱歉呢 小客服也想尽快给您送到呢 不是小客服给您派件呢 已经在催促了哈,90,TRUE,FALSE,,"ckd,6",催快递话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"材质 cq,1",超纤皮全称是“超细纤维增强PU皮革”。他具有极其优异的耐磨性能，优异的耐寒、透气、耐老化性能,80,TRUE,FALSE,,"cq,1",材质
+data/raw/jd/京东话术.txt,JD,product_info,质量问题,"材质 cz,1",材质和质量您这边看商品详情都有写的哦 您可以仔细参考一下哦,70,TRUE,FALSE,,"cz,1",材质
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"材质 eva,1",EVA材质主要是用于登山鞋底，运动鞋底等，最大的功效就是耐磨，耐热，耐冷性能超强，也就是保证了车轮的使用寿命和安全性，而实心轮增加了胎壁的厚度，所以也能兼顾避震效果。,80,TRUE,FALSE,,"eva,1",材质
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"材质 hcg,1",亲亲，这个鞋面的话是合成革的材质不会硬的穿着轻便柔软，不会硌脚的,80,TRUE,TRUE,需要结合商品信息,"hcg,1",材质
+data/raw/jd/京东话术.txt,JD,product_info,质量问题,"材质 hcg,2","鞋面采用革面具有良好的舒适特性，耐穿耐脏良好的弹性，款式新颖，质量过关
+牛皮革明确指 “以牛的原皮为原料加工制成的皮革”，属于真皮的核心类别，与 “合成革”“人造革”（非动物皮材质）完全不同。
+简单说：牛皮革是真皮的一种，且是目前皮具、鞋履等领域最常用的真皮材质之一。",70,TRUE,FALSE,,"hcg,2",材质
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"到货话术 daohuo,3",快递时效保证不了呢 具体以到货时间为准哈~,90,TRUE,FALSE,,"daohuo,3",到货话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"到货话术 daohuo,5",按照正常时效的话 是后天呢 但是我们也不敢一定保证 毕竟运输途中万一出现什么意外呢,90,TRUE,FALSE,,"daohuo,5",到货话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"到货话术 daohuo,2",一般2-3天左右到呢,90,TRUE,FALSE,,"daohuo,2",到货话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"掉单话术 dd,3",亲亲 实在是抱歉呢 可能是仓库那边掉单了呢 这边给您重新打单发出下可以吗,90,TRUE,FALSE,,"dd,3",掉单话术
+data/raw/jd/京东话术.txt,JD,script_template,物流发货,"掉单话术 dg,2",您是想要多高的呢,70,FALSE,FALSE,需要结合上下文,"dg,2",掉单话术
+data/raw/jd/京东话术.txt,JD,script_template,物流发货,"掉单话术 dg,1",这个 cm左右呢，这个高度可以吗 亲亲,70,FALSE,FALSE,需要商品信息,"dg,1",掉单话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"掉单话术 dh,2",这边收到货就会给您发货的呢,90,TRUE,FALSE,,"dh,2",掉单话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,退货退款,"掉单话术 dh,1",这边收到货验收后就会给您退款的呢,90,TRUE,FALSE,,"dh,1",掉单话术
+data/raw/jd/京东话术.txt,JD,script_template,换货,"掉单话术 dh,3",亲亲 换货是系统收到自动换出的呢 客服操作不了提前换出呢 抱歉呢,70,TRUE,FALSE,,"dh,3",掉单话术
+data/raw/jd/京东话术.txt,JD,script_template,物流发货,"掉单话术 dm,1",亲亲 新鞋刚穿会有点浮毛呢 这个不是掉毛呢 后续就不会了哈,70,TRUE,FALSE,,"dm,1",掉单话术
+data/raw/jd/京东话术.txt,JD,script_template,物流发货,"掉单话术 f,1",鞋子收到合适吗 您不退不换的话这边给您返哈,70,TRUE,FALSE,,"f,1",掉单话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"鞋底打滑话术 fangh,4",鞋子是比较防滑，这款我们也是卖出很多的，其他客户都是表示不错的哦，但是每个地板的材质，和每个人的走路的姿势是不同的，穿的时候也要注意一下的呢，就像小孩子调皮穿再好的鞋子也会摔跤的呢,80,TRUE,FALSE,,"fangh,4",鞋底打滑话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"鞋底打滑话术 fangh,2",亲爱哒，您放心，咱们家鞋子鞋底是有防滑纹路设计的呢。但是在有水的光滑地面亲亲，也要注意哦~,80,TRUE,FALSE,,"fangh,2",鞋底打滑话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"鞋底打滑话术 fangh,4",亲爱的，这个是防滑鞋底的哈，我们鞋底都是有纹路设计的，可以增加与地面的摩檫力，从而减少打滑的现象，您可以放心购买哦~,80,TRUE,FALSE,,"fangh,4",鞋底打滑话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"鞋底打滑话术 fangh,1",我们的鞋子底部是精心制作防滑纹路的制作完后经过测试再测试然后批量生产的，您放心呢，防滑效果好。,80,TRUE,FALSE,,"fangh,1",鞋底打滑话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"鞋底打滑话术 fangh,5",亲亲您可以使用磨砂纸或砂纸摩擦鞋底。这样可以增加摩擦力和抓地力。也可以试试在鞋底贴胶带或胶布。这样可以增大鞋底的摩擦力的,80,TRUE,FALSE,,"fangh,5",鞋底打滑话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"鞋底打滑话术 fangh,6",新鞋打滑的原因是鞋底没有受到任何摩擦，所以比较光滑。一旦鞋底变软，形成一些细小的缝隙和擦痕，鞋子穿起来就会更防滑。一般多穿几次鞋底经过一些摩擦之后就会加大防滑力的，正常的地面是没有问题的，有水有油或者湿滑的地面您稍微小心一些的哈,80,TRUE,FALSE,,"fangh,6",鞋底打滑话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"鞋底打滑话术 fc,1",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"fc,1",鞋底打滑话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"发错 fc,2",亲亲 实在抱歉呢 可能是厂家出厂的时候不小心装错鞋盒了呢 您试下可以穿吗 留下的话可以给您申请 元补偿呢，不合适也可以退换的呢,90,TRUE,FALSE,,"fc,2",发错
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"发货 fh,1",每个订单都将根据付款时间来安排发货，您拍下付款后我们会尽快为您安排，麻烦您耐心等待一下哈,90,TRUE,TRUE,,"fh,1",发货
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"发货 fh,4",亲，显示宝贝已经发货了，正在等快递揽件呢。快递站点扫描后就会更新物流信息的哦，麻烦您再耐心等待一下~,90,TRUE,TRUE,,"fh,4",发货
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"发货 fh,2",您好！我们这边一般是24小时内发货的哦，不出意外的话都是当天17点之前的订单是当天安排发货的呢！！特殊情况是48小时之内发货哦的呢。一般是先拍下先发货的嗯，按照顺序的呢,90,TRUE,FALSE,,"fh,2",发货
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"发货 fh,3","仓库春节期间，正常发货，时效48小时
+具体安排： 初1、3、5休息，初2、4、6上班",90,FALSE,FALSE,时效性话术,"fh,3",发货
+data/raw/jd/京东话术.txt,JD,backend_rule,价格补偿,"返现话术 fl,1",已经给您返了，1-3个工作日到账，是返到您的京东余额（京东APP-我的-我的钱包-余额，若余额为0，表示已流转至小金库），谢谢！,90,FALSE,TRUE,"涉及返现,需要人工处理","fl,1",返现话术
+data/raw/jd/京东话术.txt,JD,backend_rule,价格补偿,"返现话术 fl,2",已经给您打款了，预计2-3分钟后到账呢，是返到您的京东余额（京东APP-我的-我的钱包-余额，若余额为0，表示已流转至小金库），谢谢！,90,FALSE,TRUE,"涉及返现,需要人工处理","fl,2",返现话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"返现话术 fx,3",我们是京东平台 只能返京东余额呢 其他的都是违规操作呢,70,TRUE,FALSE,,"fx,3",返现话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"返现话术 fx,2",京东余额是可以下次购物组合支付的,70,TRUE,FALSE,,"fx,2",返现话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"返现话术 fx,4",我们这边会在24小时之内给您安排返款的 您稍等哦,70,FALSE,FALSE,"涉及返现,需要人工处理","fx,4",返现话术
+data/raw/jd/京东话术.txt,JD,backend_rule,价格补偿,"返现话术 fx,6",余额是现金，支持提现和支付抵扣的，没有使用期限的哈，下次购物的时候支付勾选下余额就可以使用，现在给您打款【】元您看可以吗,90,FALSE,TRUE,"涉及返现,需要人工处理","fx,6",返现话术
+data/raw/jd/京东话术.txt,JD,backend_rule,价格补偿,"返现话术 fx,7",我给您打款哈，是到平台零钱余额里面的哈，可以提现到您的银行卡和抵扣使用，现在申请打款的，您看可以吧,90,FALSE,TRUE,"涉及返现,需要人工处理","fx,7",返现话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"返现话术 fx,5",好的，给您发红包哈，需开通京东小金库后领取呢，领取后可以提现也可以购物使用哈，现在给您发红包可以吗,70,FALSE,FALSE,"涉及返现,需要人工处理","fx,5",返现话术
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"返现话术 fm,1",亲亲 新鞋收到刚穿会有点浮毛呢，这个不是掉毛呢，您多抖下呢后续就不会的呢,70,TRUE,FALSE,,"fm,1",返现话术
+data/raw/jd/京东话术.txt,JD,script_template,电子发票开具说明,"发票话术 fp,2",店铺支持开具电子发票。开票通常需要提供发票抬头、税号等必要信息，电子发票一般会通过平台或指定方式发送。具体开票进度和接收方式需要人工客服核实处理。,70,TRUE,TRUE,原始话术包含收集邮箱和人工登记开票操作，已改写为通用开票规则及人工核实边界。,"fp,2",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,电子发票开具说明,"发票话术 fp,1",收货后联系我们开发票呢,70,TRUE,TRUE,,"fp,1",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"发票话术 fp,3",打开京东App右下角我的——点击全部——找到鞋子的订单———点查看发票——点进去后申请开票就可以了哦！,70,TRUE,TRUE,,"fp,3",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"发票话术 g,2",明早9点联系我们改呢 现在改不了呢,70,TRUE,FALSE,,"g,2",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"发票话术 g,3",下午5点之后的订单京东系统暂时不支持修改呢，您可以明早9点联系我们改呢，或者您现在重新下单下呢，您看怎么方便呢,70,TRUE,TRUE,,"g,3",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,商品咨询,"发票话术 gej,1",非常感谢您选择本店的产品，型与鞋型吻合程度因人而异，磨脚和您鞋子磨合度，脚部脚型穿着方式等等有关的，新鞋建议您配合穿着柔软厚实的袜子，或者鞋垫，辛苦您试下,80,TRUE,FALSE,,"gej,1",发票话术
+data/raw/jd/京东话术.txt,JD,policy_rule,质量问题,"发票话术 gf,1",按官方的质保时间呢，官方那边会根据售价和产品来定，具体的以官方说法为准呢~,90,TRUE,FALSE,,"gf,1",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"发票话术 h,2",这款是厚底的呢 舒适加高不累脚，显高显瘦显腿长~,70,FALSE,FALSE,需要商品信息,"h,2",发票话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"发票话术 hd,1",货到付款发京东快递呢,90,TRUE,FALSE,,"hd,1",发票话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"发票话术 hd,2",您可以选货到付款发京东快递呢 会快一些哦,90,TRUE,FALSE,,"hd,2",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,其他,"发票话术 hd,3",下单的时候选货到付款呢 在提交订单的页面呢 价格和在线支付是一样的呢,70,TRUE,TRUE,,"hd,3",发票话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"发票话术 hd,4","鞋子往前滑话术：
+鞋子穿着往前滑有很多因素，这个不是质量问题哦
+1.‌鞋子尺码不合适‌：尺码过大或过小都会导致滑动。应选择合脚的鞋子，购买前准确测量脚长和脚宽
+2.行走姿势‌：不正确的行走姿势也可能导致凉鞋滑动。保持重心稳定，步伐均匀‌
+3.‌脚部出汗‌：出汗使脚部与鞋子间的摩擦力减小。可使用吸汗的鞋垫，保持脚部干燥‌
+‌解决凉鞋往前滑的方法包括‌：
+1.使用半垫‌：在凉鞋前端加一个半垫，减小前后的高差，防止往前滑‌
+‌2.穿连裤袜‌：穿透明肤色的连裤袜，增加腿部线条的紧致度，增大凉鞋的摩擦力‌
+3.使用止汗喷雾‌：用止汗喷雾减少脚部出汗，从而减少滑动‌
+4.涂防滑膏或垫防滑垫‌：在脚趾处涂防滑膏或垫防滑垫，增加凉鞋的抓地力‌",90,TRUE,FALSE,,"hd,4",发票话术
+data/raw/jd/京东话术.txt,JD,script_template,换货,"换货 hh,1",您好，申请换货大概在3-4天左右呢~,70,TRUE,FALSE,,"hh,1",换货
+data/raw/jd/京东话术.txt,JD,shipping_rule,换货,"换货 hh,2",亲亲，如果您比较着急的话，可以申请退货重新下单呢，这样比较快的呢，下单这边安排仓库加急给您发出呢~,90,TRUE,FALSE,,"hh,2",换货
+data/raw/jd/京东话术.txt,JD,script_template,质量问题,"换货 huil,1",回力鞋业创建于1927年，距今已有88年的历史。“回力”商标注册于1935年，1997年被认定为上海市著名商标；1999年被认定为中国驰名商标。“回力”鞋类产品历获国家质量银质奖、化工部及上海市优质产品奖，连续数年获上海市名牌产品称号和上海市出口免 检证书，并荣获第21届西班牙国际质量奖,70,TRUE,FALSE,,"huil,1",换货
+data/raw/jd/京东话术.txt,JD,product_info,换货,"换货 hz,2",亲亲 鞋盒就是为了在运输过程中保护鞋子的呢，我们售卖的是鞋子，不是鞋盒呢。,70,TRUE,FALSE,,"hz,2",换货
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 j,4",下单后才知道是哪个仓库发的呢 亲亲 系统就近安排的呢,90,TRUE,FALSE,,"j,4",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jaz,1","聚氨酯鞋底通常在生产中会形成各种气泡，具有弹性.质轻,耐磨,耐折,耐油,耐化学品.防腐蚀等特点,以微孔聚氨酯弹性体为主的PU鞋材手感柔软,穿着舒适,保暖,富有弹性,防震.防滑。",80,TRUE,FALSE,,"jaz,1",自营店
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"自营店 jb,1",有价保哦 现在下单降价可以返差价哦,70,FALSE,FALSE,时效性话术,"jb,1",自营店
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"自营店 jb,2",亲亲您点开我的订单-服务中心-价格保护，价保申请在系统自动审核通过后，如申请成功会原返或者退钱包余额，百亿补贴和月黑风高活动不支持价保。,70,TRUE,TRUE,,"jb,2",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 jd,4",亲亲可以尝试联系几次官方客服，我们也会积极配合解决您的问题。,70,TRUE,FALSE,,"jd,4",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 jg,1",您可以先加入购物车 然后一起结算的呢,70,TRUE,FALSE,,"jg,1",自营店
+data/raw/jd/京东话术.txt,JD,product_info,尺码问题,"自营店 jg,2",您选择好颜色尺码 分别加入购物车 一起付款就可以的哈,80,TRUE,FALSE,,"jg,2",自营店
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"自营店 jg,3",这个百亿补贴活动呢 不能加购哦 直接下单就可以哈,70,FALSE,FALSE,时效性话术,"jg,3",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jh,1",亲亲 这个质检是仓库处理的呢 重新寄回仓库质检不合格的话会二次退回的哈 具体以仓库为准哈 客服做不了主呢,90,TRUE,FALSE,,"jh,1",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,退货退款,"自营店 jh,2",亲亲 可以重新申请售后的话您可以重新寄回试下哈 具体还是要以仓库的质检为准呢 客服无法保证哈,90,TRUE,TRUE,,"jh,2",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jiaoc,1",亲爱的，这个鞋子采用不臭脚的材质制成，不会臭脚的，这个您放心下单呢。,80,TRUE,FALSE,,"jiaoc,1",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jiaoc,2",鞋子是比较透气的 ，至于会不会臭脚取决于每个人的脚汗出得多少的问题。有些人天生就会有脚气，会臭脚是难免的了。另一方面还要看这双鞋子是不是被连续穿好几天。一般建议2双以上的鞋子轮流穿，这样既可以不臭脚又可以延长鞋子的寿命。,80,TRUE,FALSE,,"jiaoc,2",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jiaoc,3",亲爱的，放心，我们家鞋子都是有一定透气性，一般不会臭脚的哈,80,TRUE,FALSE,,"jiaoc,3",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jiaoc,4",小主，这款透气性比较好的，一般没有脚气的情况下是不会臭脚的，穿着时候建议穿纯棉袜也可以防止味道的，平常您勤换勤晒哈,80,TRUE,FALSE,,"jiaoc,4",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jiaoc,5",亲亲因为运动鞋不透气，易出汗。出汗后鞋内空气变少，开始闷热，黏糊糊，达到了一定的湿度在鞋内，在密封空间中，细菌和脚底的汗液，及汗液所含乳酸尿素等融合变成脚臭。您可以更换的鞋垫，建议您勤换洗呢 穿过之后放到通风处晾晒呢,80,TRUE,FALSE,,"jiaoc,5",自营店
+data/raw/jd/京东话术.txt,JD,script_template,质量问题,"自营店 jiaoq,1",亲亲，非常抱歉给您带来不好的穿着体验。脚部不适、脱皮或疑似脚气等情况可能由多种原因引起，仅凭图片或描述无法准确判断原因。为了您的健康，建议您优先咨询正规医院皮肤科或专业医生。如您怀疑与商品质量有关，可以联系人工客服，结合订单信息、商品情况和平台售后规则进一步核实处理。,70,TRUE,TRUE,原始话术包含疑似医学诊断和直接否认质量问题，已改写为就医建议与人工售后核实边界。,"jiaoq,1",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 jiaoq,2",亲非常抱歉给您带来不好的穿着体验！脚气是由皮肤真菌感染引起，和个人足部环境、出汗、鞋袜搭配、公共环境接触等多种因素相关，鞋子出厂经过消杀质检，本身不会自带真菌诱发脚气。,70,FALSE,TRUE,原始话术包含疑似医学诊断和直接否认质量问题，已改写为就医建议与人工售后核实边界。,"jiaoq,2",自营店
+data/raw/jd/京东话术.txt,JD,policy_rule,换货,"自营店 jiaoq,3",实在理解您脚部难受的心情！脚气致病菌广泛存在于澡堂、拖鞋、地面、旧鞋袜等环境，不是鞋子直接造成。产品出厂都有清洁灭菌工序，质检合规。出于客户体验考虑，我们可以给到 元补偿作为贴心安抚，无法因脚气问题做退换货，还请多多谅解。,90,FALSE,TRUE,原始话术包含疑似医学诊断和直接否认质量问题，已改写为就医建议与人工售后核实边界。,"jiaoq,3",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 jiaot,1",亲亲因为每个人的脚型、行走习惯以及每个人的感官舒适度都不同呢 有些人可能在穿新鞋的初期就会感到不适，也会由于长时间站立、行走或运动导致的脚部疲劳才会出现这种情况呢，小客服建议可以每天睡觉前多热水泡脚呢，第二天穿着的时候脚都会感觉轻松很多呢,70,TRUE,FALSE,,"jiaot,1",自营店
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"自营店 jiaox,1",咱家鞋子版型适宜多种脚型，只要选择您合适穿的尺码，上脚都是非常合脚舒适的呢，您可以放心下单购买哟~,80,TRUE,FALSE,,"jiaox,1",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 jiaox,2","立体显瘦鞋型 鞋面设计层次丰'富，触感细腻,上脚视觉显瘦,细节感强",70,TRUE,FALSE,,"jiaox,2",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jj,1",亲爱哒~鞋子喜欢的话，建议您现在拍下~我这边让仓库帮您安排加急优先发出嗷~早拍早收货的呢~,90,TRUE,FALSE,,"jj,1",自营店
+data/raw/jd/京东话术.txt,JD,policy_rule,质量问题,"自营店 jj,2",我们这个产品累计已经有很多人购买了，都反馈质量不错呢！ 京东支持7天无理由退换货，保障您的权益！,90,TRUE,FALSE,,"jj,2",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jj,3",亲，在吗？这边看到您还有未支付的订单，您喜欢的话就赶紧下单哦，我可以早点给您安排发货的,90,TRUE,TRUE,,"jj,3",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,换货,"自营店 jj,4",心动不如行动，喜欢就付款哦，光看图片怎么能知道适不适合自己呐？先买到家试试在说，对不对？真要是不合适的话咱家也是支持退换货的，解决您的后顾之忧，您这边付款后，我们这边会尽快给您发货的哦~,90,TRUE,FALSE,,"jj,4",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jj,5",您好，看到您咨询的商品还没下单哦，咱家是按照订单的付款顺序发货的呢，早拍早发货哦~,90,TRUE,TRUE,,"jj,5",自营店
+data/raw/jd/京东话术.txt,JD,script_template,运费,"自营店 jkd,1",可以选第三方自己寄回 更便宜划算呢 京东上门取件是比较贵的呢,70,TRUE,FALSE,,"jkd,1",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jr,1",这个不加绒呢 您是想要加绒的吗,80,TRUE,TRUE,需要商品信息,"jr,1",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jr,2",这个不加绒的呢 但也是加厚的呢 保暖很好的不会冷呢,80,TRUE,TRUE,需要商品信息,"jr,2",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jr,3",加绒加厚的呢 保暖很好的呢,80,TRUE,TRUE,需要商品信息,"jr,3",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 jr,4",选项里面标注了加绒就是加绒的哈，没有标注加绒就不加绒哦,80,TRUE,FALSE,,"jr,4",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,退货退款,"自营店 js,1",您不要的话 ，您到时拒收一下就可以了哈 ， 拒收后 有退回的物流 我们这边直接退款给您,90,TRUE,TRUE,,"js,1",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,退货退款,"自营店 js,2",派件的时候你和快递员说您不要 退回就可以 有退回信息联系我们处理退款哈 麻烦您了呢,90,TRUE,FALSE,,"js,2",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 js,4",亲 我们发货都会检查仔细 您这边也没有联系客服反馈 商品有问题的记录 其次我们收到您退回来的鞋子是有问题的,90,TRUE,FALSE,,"js,4",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,退货退款,"自营店 js,5",亲这个是仓库核实了您这边是影响二次销售拒收的呢 具体的以仓库为准 小客服这边做不了主的 抱歉哈,90,TRUE,FALSE,,"js,5",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,退货退款,"自营店 js,3",亲亲 不要的话联系快递拒收下哈 不支持仅退款呢,90,TRUE,FALSE,,"js,3",自营店
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"自营店 js,6",买家退回商品经我方验货发现，鞋子鞋底有明显穿着痕迹及磨损，已严重影响二次销售，不符合七天无理由退货及售后退货标准。根据平台规则，已影响二次销售的商品商家有权不予退换,90,TRUE,FALSE,,"js,6",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jt,1",现在下单一般是今天发货呢 早下单早发货呢~,90,TRUE,FALSE,,"jt,1",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jt,2",现在下单一般是今天发货呢,90,TRUE,FALSE,,"jt,2",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jx,1",江西南昌发货呢,90,TRUE,FALSE,,"jx,1",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jx,2",亲爱的，江西南昌发货的，我们发货速度和物流都很快哈，不用担心距离太远的哦~,90,TRUE,TRUE,,"jx,2",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 jx,3",本仓是从江西南昌发货的呢！少部分是温州 泉州 阜阳随机发出~,90,TRUE,FALSE,,"jx,3",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 k,1",这边帮您看下呢,70,TRUE,TRUE,需要上下文,"k,1",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 k,2",一双大概400克左右呢,70,FALSE,TRUE,需要商品信息,"k,2",自营店
+data/raw/jd/京东话术.txt,JD,backend_rule,价格补偿,"自营店 kaij,1",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"kaij,1",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 kaij,2",您这边看确实是有开缝的情况，不过您放心，里面有加固的，您可以用手掰下，不会开的呢,70,TRUE,FALSE,,"kaij,2",自营店
+data/raw/jd/京东话术.txt,JD,script_template,价格补偿,"自营店 kaij,3",看到的亲亲，非常抱歉出现这样的情况，这个用胶水粘下就可以呢，这边给您申请了 元补偿，您买个树脂胶粘下好吗,70,TRUE,FALSE,"涉及补偿金额,需要人工处理","kaij,3",自营店
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"自营店 kaij,5",本店支持正规售后质保，轻微开胶属于可售后维修范围，商品无严重质量破损，只是轻微开胶不影响正常穿着，不支持售后退换呢。,90,TRUE,FALSE,,"kaij,5",自营店
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"自营店 kaij,4","这个位置的开胶是可以修复的，并不影响鞋子的整体结构和正常使用，所以这边不支持办理退换货哈。
+我们深知您介意，所以特意为您申请了 元补偿，您拿去修补一下，几乎看不出痕迹的。这点小事我们帮您解决，您消消气～",90,FALSE,FALSE,"涉及补偿金额,需要人工处理","kaij,4",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 kap,1",亲亲 建议您直接扫码咨询下工作人员就可以的呢,70,TRUE,FALSE,,"kap,1",自营店
+data/raw/jd/京东话术.txt,JD,aftersales_rule,退货退款,"自营店 kd,2",请不要发EMS、顺丰·百世汇通和到付者直接拒收，谢谢您的配合,90,TRUE,FALSE,,"kd,2",自营店
+data/raw/jd/京东话术.txt,JD,script_template,其他,"自营店 kd,1",您好，在线支付发圆通 中通 申通 韵达 邮政 随机发的呢,70,TRUE,FALSE,,"kd,1",自营店
+data/raw/jd/京东话术.txt,JD,shipping_rule,物流发货,"自营店 kdf,1",具体看您那边的快递怎么收费呢 不是我们收取您的快递费哦 亲亲~,90,TRUE,FALSE,,"kdf,1",自营店
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"自营店 kj,4",注意保养清洗的时候不易长期浸泡和爆嗮，一般是不会出现开胶的情况的哈~,90,TRUE,FALSE,,"kj,4",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 kj,2",这款鞋子耐穿耐脏非常好清洗，而且鞋子轻便上脚，穿的柔软舒适，鞋子还有防滑耐磨功能哈,80,TRUE,FALSE,,"kj,2",自营店
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"自营店 kj,3",这款鞋子非常经典耐穿的，款式百搭时尚，穿着非常轻便透气舒服的哈！,80,TRUE,FALSE,,"kj,3",自营店
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"自营店 kj,1",不易脱胶断底踏底的，品牌老店，正品保障，鞋子有3包质量保证呐~,90,TRUE,FALSE,,"kj,1",自营店
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 kl,1",鞋面为人造革，走路摩擦脚部弯曲或暴晒会导致材质变硬、失去弹性，进而开裂或起皮。,90,TRUE,FALSE,,"kl,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 kl,2",亲，鞋面弯折处是鞋子活动最频繁的位置，走路时会持续反复折叠，皮料在长期受力、弯折后出现轻微裂皮，是正常使用磨损现象，不属于质量问题哈。,90,TRUE,FALSE,,"kl,2",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 kl,3",亲非常理解您的心情，鞋子弯折区属于高频受力部位，就像衣服关节处容易磨损一样，反复折叠后皮面出现裂皮是正常使用损耗，不是鞋子本身质量问题，还请您理解～,90,TRUE,FALSE,,"kl,3",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,回应感谢,"鞋面开裂话术 kq,1",不用客气呢,90,TRUE,FALSE,,"kq,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 l,1",亲亲上面的按钮旋转可以调紧 拉起按钮就可以调松的哈,90,FALSE,TRUE,需要商品信息,"l,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,backend_rule,退货退款,"鞋面开裂话术 lanj,1",尊敬的客户您好，商品已经发出，暂无法支持到直接退款，已联系物流拦截，烦请您耐心等待物流拦截，拦截失败的话麻烦您拒收一下，有退回物流后在申请退款，感谢您的理解与支持，谢谢,90,FALSE,TRUE,原始话术包含“已联系物流拦截”“已反馈拦截”“尽快退款”等依赖后台操作和订单状态的表述，已合并并改写为通用售后规则及后台核实边界。,"lanj,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,backend_rule,退货退款,"鞋面开裂话术 lj,5",您要退掉的话我们先联系快递拦截 试试 拦截成功的话到时候给您退款 如果不成功 快递就会发到您那边 到时候还要麻烦您拒收呢,90,FALSE,TRUE,原始话术包含“已联系物流拦截”“已反馈拦截”“尽快退款”等依赖后台操作和订单状态的表述，已合并并改写为通用售后规则及后台核实边界。,"lj,5",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"鞋面开裂话术 lj,2",您可以重新下单一个呢 这个帮您尝试拦截可以吗,90,FALSE,TRUE,原始话术包含“已联系物流拦截”“已反馈拦截”“尽快退款”等依赖后台操作和订单状态的表述，已合并并改写为通用售后规则及后台核实边界。,"lj,2",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 lj,3",您需要哪款呢 可以麻烦您发个网页链接过来哈~~ 我好帮助您 麻烦您了,90,TRUE,FALSE,,"lj,3",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,backend_rule,退货退款,"鞋面开裂话术 lj,4",商品发出后通常无法直接取消发货或立即退款，需要先根据物流状态尝试拦截。若拦截成功，包裹退回后可按平台规则处理退款；若拦截失败，包裹可能会继续派送，顾客可在收到派送时选择拒收，待物流退回后再申请或处理退款。具体拦截结果、退款进度和订单状态需要人工客服结合后台信息核实。,80,TRUE,TRUE,原始话术包含“已联系物流拦截”“已反馈拦截”“尽快退款”等依赖后台操作和订单状态的表述，已合并并改写为通用售后规则及后台核实边界。,"lj,4",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 lj,6",亲亲 您可以下单试下 万一特殊情况到不了的话 可以拒收退回再退款呢,90,FALSE,TRUE,原始话术包含“已联系物流拦截”“已反馈拦截”“尽快退款”等依赖后台操作和订单状态的表述，已合并并改写为通用售后规则及后台核实边界。,"lj,6",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"鞋面开裂话术 lj,1",亲亲 已反馈拦截呢 物流显示退回后可以退款呢 请您耐心等下哈,90,FALSE,TRUE,原始话术包含“已联系物流拦截”“已反馈拦截”“尽快退款”等依赖后台操作和订单状态的表述，已合并并改写为通用售后规则及后台核实边界。,"lj,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 lp,1",您好，很抱歉呢，我们没有礼品送呢，有的话一定会送给您的呢,90,TRUE,FALSE,,"lp,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 lp,2",我们把心意都放在价格上哈 所以没有什么小礼品的呢,90,TRUE,FALSE,,"lp,2",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"鞋面开裂话术 lx,1",这边稍后返您京东余额呢，返好了联系您呢~,90,FALSE,FALSE,"涉及返现,需要人工处理","lx,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"鞋面开裂话术 md,1",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"md,1",鞋面开裂话术
+data/raw/jd/京东话术.txt,JD,script_template,商品咨询,"磨脚话术 mj,2","1：用胶布在鞋与脚相磨的地方贴上，过一段时间就不会太磨脚了
+2：把磨脚的那一块往里面折一下，凹进去，就像穿拖鞋那个姿式踩一下，然后放几天就会好很多。
+3：用湿布将磨脚的地方盖住，然后用小锤子轻轻的反复砸一砸，让其变得软和，再穿上就不磨脚了。",80,TRUE,FALSE,,"mj,2",磨脚话术
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"磨脚话术 mj,4",亲亲 脚型与鞋型吻合程度因人而异，磨脚和您鞋子磨合度，脚部脚型穿着方式等等有关的，新鞋建议您配合穿着柔软厚实的袜子。码数合适一般是不会磨脚的呢,80,TRUE,FALSE,,"mj,4",磨脚话术
+data/raw/jd/京东话术.txt,JD,backend_rule,价格补偿,"磨脚话术 mj,5",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"mj,5",磨脚话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨脚话术 mj,6",非常感谢您选择本店的产品！脚型与鞋型吻合程度因人而异，磨脚和您鞋子磨合度，脚部脚型穿着方式等等有关的，磨脚非质量问题哈,90,TRUE,FALSE,,"mj,6",磨脚话术
+data/raw/jd/京东话术.txt,JD,product_info,商品咨询,"磨脚话术 mj,3",因为每个人的脚型、皮肤等不同，所以同样的鞋子有的顾客穿上不磨脚，有的会磨脚，这个我们无法预知顾客穿上购买的款式是否会磨脚，就算商场的名牌鞋子也不能保证顾客穿上都不磨脚呢亲,80,TRUE,FALSE,,"mj,3",磨脚话术
+data/raw/jd/京东话术.txt,JD,script_template,尺码问题,"磨脚话术 mj,1",尺码合适一般不会磨脚的呢 亲亲,80,TRUE,FALSE,,"mj,1",磨脚话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 ms,1",由于人的走路习惯，运动方式强度不同，路况不同，踢碰到会导致材质损耗的呢 鞋底和地面摩擦及接触产生磨损，属于正常使用损耗,90,TRUE,FALSE,,"ms,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 ms,2",亲实在抱歉让您不满意啦！鞋头位置是日常走路最容易磕碰、蹭地面的部位，鞋面白色材质轻微剐蹭、脏污属于正常穿着损耗，不属于出厂质量瑕疵哦。,90,TRUE,FALSE,,"ms,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 mt,1",现在下单一般是明天发货呢 早下单早发货呢~,90,TRUE,FALSE,,"mt,1",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 mt,2",现在下单一般是明天发货呢,90,TRUE,FALSE,,"mt,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 mz,1",款式的名字而已 没有什么特殊含义哈 以下单时候的图片为准就可以呢,90,TRUE,FALSE,,"mz,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 n,1",您申请下呢,50,FALSE,FALSE,上下文依赖过强，缺少订单/物流状态，不适合作为独立知识片段,"n,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 paiz,1",麻烦您拍下照呢 这边核实下呢,50,FALSE,FALSE,需要人工处理,"paiz,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 paiz,2","亲亲方便拍下照吗？这边需要核实呢，辛苦您啦
+麻烦您把商品问题的那个位置拍照发我，这边给您优先处理哈",90,TRUE,FALSE,,"paiz,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 paiz,4",亲亲没有凭证 确实无法处理不了，已经穿了您这边退货 仓库也是会拒收的 确实商品存在问题 我们也愿意给您处理，还请您帮忙配合 拍照 这边核实后 给您解决呢,90,TRUE,FALSE,,"paiz,4",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 paiz,3",麻烦收到的快递面单和鞋盒侧边白色标签有字的那面都拍照看下呢 亲亲,90,TRUE,FALSE,,"paiz,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 paiz,5",亲亲 给您带来不好的购物体验了，您方便的话，帮忙拍下鞋盒盖内侧的质检章图片给我们下哦。,90,TRUE,FALSE,,"paiz,5",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"pc,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"pc,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"pc,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"pc,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"pc,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"pd,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"pd,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pj,2",祝您身体棒棒，心情好好，百事顺顺，好运滚滚，有问题您随时联系小妹哦~(๑′ᴗ‵๑),90,TRUE,FALSE,,"pj,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pm,4",这款是皮面的呢 一般不会进水的哈,90,TRUE,FALSE,,"pm,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pm,3",亲爱的，这个是皮面的，防水面料哈，不用担心下雨会进水的哈，可以放心购买的哈。,90,TRUE,FALSE,,"pm,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pm,1",防水性强，不渗水，鞋底也是防滑耐磨的，穿着透气非常的舒适，绝对回力正品，质量有保证呢！,90,TRUE,FALSE,,"pm,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pm,4",可以碰水的呢但是不能一直泡水哦亲,90,TRUE,FALSE,,"pm,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pm,6",皮质的鞋面是比较防水的，布面鞋子的鞋头有胶的也不容易沾水的。雨比较大建议还是穿着雨鞋的好一些的哈~,90,TRUE,FALSE,,"pm,6",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pm,2",防雨布鞋面具备基础防水能力，防雨布的材质本身经过防水涂层处理，面对日常的小雨、溅水，能有效阻挡水分渗透，避免鞋面快速浸湿。适合短时间在雨中行走，或者穿过潮湿路面的场景,90,TRUE,FALSE,,"pm,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pu,1",鞋底pu是指鞋底的材质是聚氨酯的、聚氨酯鞋底具有诸多优点：密度低，质地柔软，穿着舒适轻便；尺寸稳定性好，储存寿命长；优异的耐磨性能、耐挠曲性能等。,90,TRUE,FALSE,,"pu,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,FALSE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"px,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,2",运动鞋一般比皮鞋要大一码拍呢 【例如：皮鞋穿38，运动鞋就穿39的呢】,90,TRUE,FALSE,,"px,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 px,3",不同鞋款尺码可能存在偏大或偏小情况。建议结合具体商品详情页尺码说明、脚长脚宽以及平时穿着习惯选择；脚宽、脚胖或脚背高的顾客通常可考虑拍大一码。如不确定，建议提供脚长或咨询人工客服确认。,70,TRUE,FALSE,原始话术同时包含偏大和偏小规则，疑似来自不同鞋款，已改写为通用保守尺码建议。,"px,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pz,1",所有产品在入库之前都会经过好几轮严格质检，保证发出的每一件都是优质的，所以请您放心购买呢～,90,TRUE,FALSE,,"pz,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pz,4",我们的产品均是正品，保证品质，您可以放心购买！,90,TRUE,FALSE,,"pz,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pz,6",质保期内质量问题包退换呢 您放心购买哦,90,TRUE,FALSE,,"pz,6",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pz,3",我们几十年的老品牌质量您完全可以放心，都是有保障的，后续穿着有任何问题都可以随时联系我们呐！ ~‎‎,90,TRUE,FALSE,,"pz,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 pz,5",咱家质量都是很好的呢 您有任何问题也可以联系我们呢 有专业的售后团队为您服务呢 请您放心购买呢！,90,TRUE,FALSE,,"pz,5",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 pz,2",商品生产流程严格监督，发货前都有检查，保障商品质量~,90,TRUE,FALSE,,"pz,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qj,2",您去取件就可以呢,90,FALSE,TRUE,上下文依赖过强，缺少订单/物流状态，不适合作为独立知识片段,"qj,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 qjm,1",亲亲 客服这边没有取件码呢 这边联系快递给您发下取件码哈,90,TRUE,FALSE,,"qjm,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qt,1",咱们家支持7天无理由退换货，您可以放心购买哦~ ~‎‎,90,TRUE,FALSE,,"qt,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qt,2",7天无理由是说在不影响二次销售的情况下支持7天无理由退换呢，不是说承担鞋子运费的意思呢,90,TRUE,FALSE,,"qt,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qt,3",可以进店铺看下其他的款式呢，有很多好看的呢，质量都是很不错的呢~,90,TRUE,FALSE,,"qt,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qt,4","您放心,本店是支持七天无理由退换的哈 ,如果不喜欢不合适的话，鞋子不影响二次销售的话可以直接申请售后退换货哈",90,TRUE,TRUE,,"qt,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qx,1","雪地靴保养小知识:
+1.如果有大块的粘附污迹用软刷先剧刷掉
+2.用白色湿布摸湿整个靴子，不要直接拿水中
+3,有高级清洁剂的用 没有的不要紧，可以自制: 一半水+一半白醋
+4.用海绵沾上清洁液擦洗靴子表面
+5.拿到笼头下快速冲洗(记住是快速，不能湿了里面)，或用布擦掉清洁液
+6.洗完靴子可能会软掉，在靴子里塞上报纸
+7:记住是自然风干，不要直接烘烤或太阳暴晒，会变形的 关于特殊清理1.油迹可以先用白色粉笔涂抹放一晚上，让粉笔吸除油迹 2.其他污迹可用橡皮擦3.不小心温了，可折叠靴子让温的那面和干的那边轻经摩擦4.有毛毛的，可以在靴子80%干的时候，拿吹风机加梳子梳一梳
+8.靴子里面去味儿，可放一勺苏打粉然后摇晃再放一晚上抖落里面的粉
+9,切记不可洗衣机直接洗,
+10.颜色问题，记得用白色湿布擦
+11.洗完不要直接上暖气或热风烘烤会变形”",90,TRUE,FALSE,,"qx,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qx,2","网面鞋子清洗小妙招：
+1.网面喷上酒精分解渗透污渍
+挤点牙膏，肥皂沫，一点小苏打，用热水化开，将化开的溶液用鞋刷拍打在鞋子上面，等待5分钟左右，用手顶住网面鞋刷蘸取溶液直接刷洗，用刷柄反复刮试网面部分【不要用尖锐的刮试哦】",90,TRUE,FALSE,,"qx,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 qx,2","德训鞋简易清洗步骤：
+1.干刷除尘
+鞋子先保持干燥，用软毛刷 / 麂皮刷顺着一个方向轻刷，把浮灰、泥土刷掉。
+局部去污（重点）
+2.日常脏：用中性清洁剂 + 少量水打出泡沫，用软毛刷蘸泡沫轻刷；
+油渍 / 顽固脏：用翻毛皮专用清洁剂，或少量白醋水（1:10）点擦；
+光面皮：可用湿毛巾拧干擦拭。
+3.擦净 + 吸干
+用拧干的湿毛巾擦干净泡沫，再用干布吸干水分，不要留水渍。
+4.阴干 + 定型
+鞋内塞纸巾 / 报纸，放在阴凉通风处自然晾干，严禁暴晒、吹风机吹、暖气烘，否则会发黄、开胶、变形。
+5.恢复毛感
+干透后用麂皮刷再顺向轻刷一遍，恢复蓬松感。",90,TRUE,FALSE,,"qx,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 rd,1",这款宝贝鞋底柔软轻便，上脚透气舒适，做工细致，不会臭脚，款型百搭哦 鞋底防滑耐磨~,90,TRUE,FALSE,,"rd,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 rd,2",鞋底轻便舒适，弹性高，减轻行走压力不累脚~,90,TRUE,FALSE,,"rd,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 rd,4",我们的鞋子都是以舒适性为主，老客户特别多，口碑也是非常好的，功能性都是挺不错。请放心购买哈~,90,TRUE,FALSE,,"rd,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 rd,4",您好，这款鞋子不重呢，属于轻便型的，穿起来柔软舒适不累脚，并且鞋底还防滑耐磨哦~,90,TRUE,FALSE,,"rd,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,人工查询订单过渡话术,京东APP-我的-客户服务-在线客服-转人工,90,TRUE,FALSE,,"rg,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 rm,1",这款鞋子是咱们家的热卖款的呢 销量很好的哦 客户反馈也很好呢 喜欢就早点拍下呢,90,TRUE,FALSE,,"rm,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,人工查询订单过渡话术,订单、聊天记录或售后处理情况需要人工客服结合后台信息核实，当前 demo 无法直接查询订单或历史处理记录。,50,TRUE,TRUE,,"s,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,人工查询订单过渡话术,订单、聊天记录或售后处理情况需要人工客服结合后台信息核实，当前 demo 无法直接查询订单或历史处理记录。,50,TRUE,TRUE,,"s,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 s,4",亲亲目前在线咨询人数太多，客服小妹已经键盘擦出火了，请您耐心等待下，小妹会一个一个回复的哈,90,TRUE,FALSE,,"s,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sb,2",鞋类商品的“三包”有效期：50元以上100元以下(含50元)的鞋类“三包”有效期限为30天;100元以上(含100元)的鞋类“三包”有效期限为90天;300元以上(含300元)的鞋类“三包”有效期限为120天,90,TRUE,FALSE,,"sb,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sb,3",鞋类发生左右脚尺寸大小不一、顺脚、断帮、断 底、皮面脱落、严重脱浆、开胶、开线、掉根的情况，这样是可以算质量问题的,90,TRUE,FALSE,,"sb,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sb,6","咱家提供30天的售后质保，出现开胶，支持售后；出现断底，免费换新。
+运费由我们承担。放心购买，售后无忧哟~",90,TRUE,FALSE,,"sb,6",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sb,1",鞋子质保期是一个月，但是我们店铺给您承诺3个月呢。,90,TRUE,FALSE,,"sb,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sb,4",咱家宝贝质保90天~有任何质量问题您随时联系我们，亲放心购买使用噢~,90,TRUE,FALSE,,"sb,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sc,1",由于拍摄光线，拍摄器材以及显示器等因素的影响可能会导致色差的产生，参考平铺细节颜色 ，最终以实物为准的哦亲,90,TRUE,FALSE,,"sc,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sc,2",我们家100%实物拍摄 挑最还原实物色彩的照片描述给您 但网上购物由于不同的显示器和每个人视觉感官不同有些许色差问题是难免的呢 您觉得不合适不喜欢我们也可以提供7天无理由退换的呢~,90,TRUE,FALSE,,"sc,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sc,3",嗯嗯可能是拍照光线不一样的所以咱们肉眼感官可能不太一样的呢 所以有一点色差的呢,90,TRUE,FALSE,,"sc,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 scd,2",全国都有厂家生产的呢 不好保证发的是哪个厂家的呢 咱家是保证正品和质量的呢 每件产品都是检查好发出的呢 请您放心购买呢！,90,TRUE,FALSE,,"scd,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 scd,1",我们的总部是上海回力，我们是江西的总代理，是江西分仓，鞋子生产地是全国各地都有的，上海、浙江、福建、广东等等请您不用担心！绝对正品！假一罚十！,90,TRUE,FALSE,,"scd,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 scd,3",回力在全国很多地方都有生产商，不同的产品系列会有不同的地区生产，鞋盒上面都是有标注产地的，以收到的实物包装上标注生产地为准哦~,90,TRUE,FALSE,,"scd,3",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 sf,2",京东和顺丰速度差不多呢 京东包邮不要运费的呢 京东快递可以吗,90,TRUE,FALSE,,"sf,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sf,2",顺丰要补20元呢 可以吗,90,FALSE,FALSE,,"sf,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sg,2",这个现在参加百亿补贴活动呢 现在下单很划算的 不要错过最低优惠哦,90,FALSE,FALSE,,"sg,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sg,1",您看的这款已经享受百亿补贴价格了呢 已经是最低价格了 不能再优惠了哈,90,FALSE,FALSE,,"sg,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sh,2",不好意思售后目前不在线呢，稍后给您解决可以吗,90,FALSE,FALSE,,"sh,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sh,1",我们已经按规定为您处理过一次售后问题了，处理完成后订单就已完结。再次以相同理由要求处理，不符合平台售后规则，实在无法为您再次处理，实在是抱歉哈,90,TRUE,TRUE,,"sh,1",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 sh,1",售后申请进度需要人工客服查询后台后处理，并按平台规则执行。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:后台操作已完成,"sh,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 shaoj,1",亲亲 这款鞋子 我们鞋头做了透气孔的设计 截止目前还没有遇到顾客反馈这个情况 鞋子已经上脚穿着 无法支持到退货退款，考虑到您的购物体验 这边给您申请补偿 元 您去买个舒适点的袜子呢,90,FALSE,FALSE,,"shaoj,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 shouhou,1",稍后会有售后帮您通过的呢 您稍等下,90,FALSE,FALSE,,"shouhou,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sj,1",升级款做工更精致 鞋底更软 用料等级更高哦,90,TRUE,FALSE,,"sj,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sj,4",升级款鞋底更软更舒适 更耐磨 不闷脚不臭脚 质保更久,90,TRUE,FALSE,,"sj,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sj,3","升级款是二次发泡的 至尊版的话是三次发泡的 鞋底具有较好的柔软性、弹性和舒适度,同时还有较强的耐磨性和稳定",90,TRUE,FALSE,,"sj,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sj,4",升级款材质是PVC+复合材质的哈脚感更好更舒适的,90,TRUE,FALSE,,"sj,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sj,2",亲亲咱们升级版外观区别不了，但是咱们升级版除了在材质方面做了改进之外，还在提供了升级服务，质保180天的 您也可以买个安心呢,90,TRUE,FALSE,,"sj,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sj,6",亲， 升级版的相对普通的 做工和细节处理方面更好一些的哦，外观区别不明显的。对宝贝要求较严格的建议您考虑升级版的呢,90,TRUE,FALSE,,"sj,6",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 skm,1",亲，您保存下您的收款嘛发我下哈 我扫给您呢,90,FALSE,FALSE,,"skm,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 skm,2",报销运费是在线发红包，需开通小金库，若您觉得麻烦的话建议您考虑哈,90,TRUE,FALSE,,"skm,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 sm,1",上门取件没人的话麻烦打一下京东物流950616 找人工客服催一下哈，我们店铺这里也联系不到，是您们当地的快递的,90,TRUE,TRUE,,"sm,1",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 sm,3",售后服务单显示的是上门取件，京东快递员会在3个工作日内联系您上门取件的哈，上门前会发一条短信告诉您准备好要寄的东西，没有收到短信说明还没有排到您，请您耐心等待哈，谢谢~,90,TRUE,TRUE,,"sm,3",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 sm,4",如需送货上门，通常需要结合快递公司和收货片区的派送规则确认。部分地区可能默认派送至驿站或快递柜，当前 demo 无法直接联系快递或核实具体片区派送情况，建议转人工客服进一步处理。,90,TRUE,TRUE,原始话术包含“已联系快递”和具体片区不支持上门派送，依赖后台或快递反馈，已改写为人工核实边界话术,"sm,4",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 sm,6",如需送货上门，通常需要结合快递公司和收货片区的派送规则确认。部分地区可能默认派送至驿站或快递柜，当前 demo 无法直接联系快递或核实具体片区派送情况，建议转人工客服进一步处理。,90,TRUE,TRUE,原始话术包含“已联系快递”和具体片区不支持上门派送，依赖后台或快递反馈，已改写为人工核实边界话术,"sm,6",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 sm,5",亲亲 这边联系快递反馈下是否可以给您送货上门哈 尽量帮您协调呢~,90,TRUE,FALSE,,"sm,5",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 sq,1",售后申请进度需要人工客服查询后台后处理，并按平台规则执行。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:后台操作已完成,"sq,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sq,2",您是退货退款 还是换货 是自己寄件 还是上门取件呢 我帮您申请可以么,90,TRUE,FALSE,,"sq,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sq,3",亲亲 申请不了的话联系京东官方客服帮您申请下退款呢 这边没有权限帮您申请呢,90,TRUE,FALSE,,"sq,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 ss,1",现在就是双十一的价格呢 喜欢就早点下单呢~,90,FALSE,FALSE,,"ss,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sw,1",我们店铺的图片都是实物拍摄的呢，没有特别的PS处理，但是图片拍摄过程中由于光照原因的影响可能造成实物和图片有一点点差异，但是您请放心，鞋子质量是很不错的呢~ ~‎‎ ~,90,TRUE,FALSE,,"sw,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sy,1",鞋子大小合适正常穿着的话一般是不会发出声音的呢，如果在瓷砖上面行走都是会发出一点摩擦的声音的哈，但是不影响正常使用的，您可以放心购买的呢~,90,TRUE,FALSE,,"sy,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sy,3",亲亲，鞋底与地面接触保持较好的摩擦系数是为了保证产品的止滑效果，这时可能会产生轻微摩擦异响，属于正常现象的哈，,90,TRUE,FALSE,,"sy,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sy,3",脚部和鞋底走路摩擦有空气挤压产生声音这个是正常的,90,TRUE,FALSE,,"sy,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sy,4","鞋子走路有声音的解决方法如下：
+1. 清洁鞋底
+用湿布擦拭鞋底，去除灰尘和油渍，可减少摩擦噪音。
+2. 撒爽身粉
+在鞋垫或鞋底撒爽身粉、苏打粉等，减少内部摩擦。
+3. 调整鞋带
+过紧的鞋带会增加摩擦，适当放松可降低声音。",90,TRUE,FALSE,,"sy,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 sy,5","1.新皮鞋的鞋面皮革较硬，或内衬、鞋垫材质偏光滑，走路时脚部活动会让鞋面和内衬、鞋垫之间产生相对滑动，进而发出 “吱呀” 的摩擦声。
+解决办法：可以在鞋面内侧或者鞋垫背面薄涂一层爽身粉、滑石粉，减少接触面的摩擦力；也能涂抹少量皮革护理油软化鞋面，降低摩擦概率。
+2.一些硬质皮革（比如牛巴革、打蜡皮）制成的皮鞋，新鞋阶段弯折时，皮革纤维会因受力产生轻微的拉伸或挤压声，属于正常现象。
+解决办法：多穿几次让皮革自然软化，同时定期涂抹皮革护理剂，加速皮革适应弯折的状态。",90,TRUE,FALSE,,"sy,5",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 t,1",鞋子全新不影响二次销售年后可以联系我们退换哈,90,TRUE,FALSE,,"t,1",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 tf,1","因广东第18号超强台风“桦加沙”（17级台风级）于23日凌晨正面袭击海南和广东，
+由于台风强度极强，具有非常强的破坏性，并伴有特大暴雨，会导致多地内涝，因此会有延误等情况，物流时效不保呢",90,FALSE,FALSE,,"tf,1",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 th,1",亲亲，鞋子物流已经显示签收了，您需要退掉的话麻烦撤销一下退款，申请退货退款哈！,90,TRUE,TRUE,,"th,1",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 th,2",已经显示代收了哦 您不要的话可以申请上门取件然后让快递员去驿站取件退回呢,90,TRUE,FALSE,,"th,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 th,4",京东客服问什么原因退换的话 您就说不喜欢或者不合适 反正不要说质量问题原因哈 麻烦您了~,90,TRUE,FALSE,,"th,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 th,3",亲亲 联系京东官方客户帮您申请下呢 这边没有权限呢 申请的原因选7天无理由哈（不喜欢/不合适)都可以哈 不要选质量问题呢 麻烦您了~,90,TRUE,FALSE,,"th,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 thh,2",确认收货后在京东---我的---退换售后里面申请呢,90,TRUE,FALSE,,"thh,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 thh,4",亲亲，鞋子物流已经显示签收了，您需要退掉的话麻烦撤销一下退款，申请退货退款哈！,90,TRUE,TRUE,,"thh,4",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 thh,6","您放心,本店是支持七天无理由退换的哈 ,如果不喜欢不合适的话，鞋子不影响二次销售的话可以直接申请售后退换货哈【仓库会质检，不要影响二次销售，否则拒收】",90,TRUE,TRUE,,"thh,6",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 tk,3",货到付款的退款是退到顾客的京东账户。在线支付的退款是原支付方式退款的，退款到账时效，储蓄卡：1-7个工作日内，信用卡：1-15个工作日内，微信零钱/白条：1-3个工作日内，若仍未收到可建议客户联系银行咨询,90,TRUE,TRUE,,"tk,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tk,1",退款都是原路退回的呢,90,TRUE,FALSE,,"tk,1",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 tk,2",您好！已经给您退款成功了，1-7个工作日到账，您当时用什么支付的就退到哪里，谢谢！,90,TRUE,TRUE,,"tk,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tk,4",退款没收到的话，您当时申请退款了我们一般是直接审核通过的 ，通过后是京东系统给您处理返款， 返款去向一般都是原返 ，如果您现在还没收到 ，您可以咨询京东官方客服 核实下去向,90,TRUE,FALSE,,"tk,4",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 tk,5",如果尚未还款的话，那会直接退还至白条账户，之前消费的额度会恢复回来，如果您当期白条账单已经还款了，那一般会退款到最近一次用于还款的银行卡或京东小金库里，通常会在1到15个工作日内到账。,90,TRUE,TRUE,,"tk,5",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 tp,1",这个是因为链接主图图片变了，所以您那边显示的不一样呢，发货还是按您下单的发出的哈，不用担心呢,90,TRUE,FALSE,,"tp,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tq,3",鞋子采用网面透气鞋面，触感舒适，不易闷脚，轻盈透气,90,TRUE,FALSE,,"tq,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tq,2",面料舒适透气，柔软舒适内里，不会闷脚哒~,90,TRUE,FALSE,,"tq,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tq,1",这款鞋子适合现在穿的呢，面料舒适透气，柔软舒适内里，鞋内空气流通，不会闷热哒~,90,TRUE,FALSE,,"tq,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tq,4",亲亲 这是织物面料 不分单双网之分呢 只有一层面料呢 透气不闷脚的可以放心拍呢,90,TRUE,FALSE,,"tq,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 ts,1",您发下呢 只能改同省同市的呢,90,TRUE,FALSE,,"ts,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 ts,2","温馨提示：
+尊敬的顾客，本产品已通过严格的质量检测，符合标准。加厚鞋垫两侧分开属正常的生产工艺，非质量问题;不影响穿着体验，请放心穿着~",90,TRUE,FALSE,,"ts,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 tuihuan,2",鞋子不影响二次销售，没有穿过和洗过可以退换哈，穿洗了寄回仓库会拒收的----，您拍鞋底照片给我们看一下哈,90,TRUE,FALSE,,"tuihuan,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 tuihuan,3",亲亲麻烦您把鞋底拍照给我看一下可以吗？仓库这边退换货需要拍照给他们留底，方便给您退换，请支持下我们的工作，谢谢！,90,TRUE,FALSE,,"tuihuan,3",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 tuihuan,4",穿过（如是试穿轻微的脏，请顾客自己擦拭干净后寄回）影响二次销售的穿过不能寄回（鞋底很脏、明显穿过的痕迹、鞋面很脏等），不支持退换货！（如果寄回，仓库会直接拒收，运费自己承担！谢谢）,90,TRUE,FALSE,,"tuihuan,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 tuihuan,5",鞋子收到以后可以在干净的地面进行试穿，确认鞋子是否合脚，并且检查好鞋子的质量，检查好尺码合适以后再进行外穿。已经穿脏了影响二次销售不支持退换的呢。,90,TRUE,FALSE,,"tuihuan,5",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tuihuan,6",每个人穿鞋方式不同哦，我们家确保正品的，您收到后有问题可以第一时间和我们联系，我们都可以给您退换，但是您穿过后才出现的问题，每个人穿鞋方式不同哦，我们只能给您补偿处理的呢，影响第二次销售的鞋子都不支持退换的哦。,90,TRUE,FALSE,,"tuihuan,6",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tuihuan,1",您好！在不影响二次销售的情况下，我们是支持7天无理由退换的呢~ ~【不要影响二次销售，否则拒收】‎‎,90,TRUE,FALSE,,"tuihuan,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tuihuan,7","亲，很抱歉给您带来了不好的体验。
+根据我们的售后政策，商品需保持全新未试穿、包装 / 吊牌完整、无穿着痕迹及污渍，才能办理无理由退货。您这双鞋鞋底已有明显穿着痕迹和脏污，已影响二次销售，因此无法为您办理退货哈",90,TRUE,FALSE,,"tuihuan,7",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tuihuan,7",根据我们的售后政策，商品需保持全新未试穿、包装 / 吊牌完整、无穿着痕迹及污渍，才能办理无理由退货。您这双鞋鞋底已有明显穿着痕迹和脏污，已影响二次销售，因此无法办理退货,90,TRUE,FALSE,,"tuihuan,7",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 tuihuo,1",您先京东申请售后 ，退货申请售后退货 ，换货申请售后换货 ， 寄件方式选择上门取件等人来取 或者第三方寄件 您自己找快递寄，劳烦了,90,TRUE,TRUE,,"tuihuo,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 tx,1",按脚长选呢 可以适当的加0.5cm或1cm呢【因为每个人尺码脚型不同这边就不做推荐的呢您按照尺码选购即可】,90,TRUE,FALSE,,"tx,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 tx,2",童鞋不看尺码的呢，按脚长+0.5/1cm下单即可呢，不同款式尺码是不一样的呢,90,TRUE,FALSE,,"tx,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 tx,3",按脚长选呢 可以适当的加0.5cm或1cm呢,90,TRUE,FALSE,,"tx,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 tx,4",京东余额是实名认证 ，绑定银行卡后，就可以提现或者下单抵扣的哦亲亲,90,TRUE,FALSE,,"tx,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 wd,1",您可以将柠檬片放在鞋子内，或者将橘子皮放在鞋子内，一般隔一两个晚上之后，鞋味基本上就能够被除去，而且还会有一些清香味儿。,90,TRUE,FALSE,,"wd,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 wd,2",实体店的鞋子陈列比较久了，味道相对不会那么重。而我们做的是直销，产品从工厂出货后就直接到买家手中了，时间间隔比较短，存有味道是正常的，这和鞋子的好坏无关。麻烦您把鞋子放在通风的地方晾一晾，味道就会慢慢消失的呢,90,TRUE,FALSE,,"wd,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 wh,1",亲亲 没库存的商品具体补货时间这边暂时不清楚的呢~ 不好意思的呢，可以看下别的款式颜色的哈,90,TRUE,FALSE,,"wh,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 wh,2",亲亲 实在是抱歉呢 这个暂时没有呢 您看下其它的款式您有喜欢的吗 或者这边给您退款可以吗,90,TRUE,TRUE,,"wh,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 wh,3",亲，真的抱歉呢！刚仓库同事在帮您配货的时候检查发现有比较严重的瑕疵的，您在我们店铺购买就是相信我们的产品的呢，所以我们也不能为了发货给您发一件带有瑕疵的产品的呢，真的真的非常抱歉呢！ 亲您可以看下我们店里有其他价格相同您喜欢的款式么？有的话可以给您换款发出的呢，或者亲也可以直接申请仅退款选择物流快递一直为送到呢，我这边帮您处理下退款呢，很再次向您致歉。亲，麻烦您了呢,90,TRUE,TRUE,,"wh,3",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 wh,4",亲，非常抱歉！仓库质检时发现这款有瑕疵，不符合发货标准已返回工厂，暂时发不了呢， 您看下其它的款式您有喜欢的吗 或者这边给您退款可以吗,90,TRUE,TRUE,,"wh,4",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 wl,1",亲亲 这边暂时退不了呢 显示签收呢 这边帮您联系京东快递处理哈 请您保持手机畅通呢,90,TRUE,TRUE,,"wl,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 wx,1","方法 1：防磨贴 / 后跟贴应急修复（最省事）
+把磨损的位置用酒精棉片擦干净，擦干晾干。
+选一块尺寸合适的防磨贴（硅胶 / 布面的都可以），撕掉背胶，直接贴在破损的位置，用手压牢边缘。
+静置 10 分钟再穿，既能挡住破损，也能防止继续磨脚。
+方法 2：皮革 / 毛毡布 + 补鞋胶加固修复（更耐用）
+裁剪一块比破损位置大一圈的软皮革（或毛毡布），边缘剪成圆角，避免硌脚。
+把鞋子内部和补丁的接触面都用酒精擦干净，晾干。
+在两面都均匀涂上一层补鞋胶，晾到胶水半透明不粘手的状态。
+把补丁对准位置贴上去，用手指用力按压，边缘和角落多压一会儿，用皮筋或重物固定住。
+静置 24 小时让胶水完全干透，之后就能正常穿了。
+方法 3：线下修鞋店专业修复（效果最好）
+找本地的修鞋店，师傅会把磨损的内衬部分清理干净，再给你换一块完整的内衬布，用专用的鞋线和胶水固定，修复后基本看不出痕迹，也不会影响鞋子的穿着和使用。",90,TRUE,FALSE,,"wx,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xbx,1","小白鞋是我们日常最常见的时常单品，但它最大的通病就是久了容易发黄。非常介意者请慎拍。小力为大家总结几条方法：
+1.避免：每次洗好后，一定要用纸巾把鞋子全包起来放在通风处，不要直接太阳晒。
+2.白色牙膏法：鞋边发黄后，用白色牙膏在发黄处反复擦刷，再用清水清洗，最后用纸巾全包，放通风处晾干。
+3.可用专业白鞋粉，这个TB有售，可淘一下，很便宜。
+4.小苏打，不管是发黄的球鞋还是衣服，统统秒杀，只要把一勺小苏打溶解在一小盆清水里，然后把要洗的鞋浸泡进去一会，再涂上肥皂洗，如果黄的很顽固，就用热水兑小苏打来泡鞋，保证鞋鞋白回来。",90,TRUE,FALSE,,"xbx,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xbx,2",白色鞋子打理稍微费点心思哈，小白鞋帆布鞋用清水正常洗涤就可以，不要用洗衣粉洗衣液或者肥皂，实在太脏就用肥皂擦薄薄的一层，洗完之后用卫生纸包裹鞋子晾晒，能有效减少发黄的概率哟，正常也要看个人的穿着和维护的哈~,90,TRUE,FALSE,,"xbx,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xc,1",亲亲非常抱歉呢，这双鞋子确实有瑕疵，您是想退还是想换呢？鞋子退换货比较麻烦呢，这个也不会影响穿着的呢，您愿意接受的话我们这边给您补偿 元您看可以么？,90,TRUE,FALSE,,"xc,1",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 xc,2",亲亲 鞋子是新的呢 可能是仓库打包的时候不小心弄到了呢 您愿意留下的话这边给您申请补偿 元 您看可以吗,90,FALSE,FALSE,,"xc,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xd,1",您放心拍哦 收货后有任何问题都可以联系我们处理哈~,90,TRUE,FALSE,,"xd,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xd,2",MD底是复合底，RB是橡胶，TPR是橡胶，EVA是泡沫（泡棉），PVC是塑胶,90,TRUE,FALSE,,"xd,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xd,3",您好，鞋底的工艺是这样的，您放心，鞋子不会漏水的。可以寄回来这边补配件的呢。,90,TRUE,FALSE,,"xd,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xd,4","鞋垫滑走怎么办：
+1.增加鞋垫与鞋底的摩擦力‌
+‌使用防滑喷雾或双面胶‌：在鞋垫背面涂抹一层薄薄的双面胶或使用防滑喷雾，可以有效增加鞋垫与鞋底之间的摩擦力。
+‌临时解决方案‌：在鞋垫和鞋底之间放置一片卷纸或布料，以增加摩擦力，但这种方法仅适用于紧急情况，长期使用可能对鞋子造成损害。‌
+2.使用固定带或贴片式鞋垫‌：市面上有专门用于固定鞋垫的带子或贴片式鞋垫，可以将鞋垫稳固地固定在鞋子内部
+3.‌调整步态‌：注意走路时脚掌发力均匀，避免脚趾头往后勾等不良习惯，这些习惯可能导致鞋垫滑动
+4.其他实用技巧‌
+‌使用水果网套‌：将水果网套剪裁后固定在鞋垫下方，可以增加摩擦力，防止鞋垫滑动。‌
+‌足部肌肉强化训练‌：通过踮脚尖运动、提踵练习等增强足底及小腿肌肉力量，提高足部稳定性，间接防止鞋垫移位。‌",90,TRUE,FALSE,,"xd,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xd,5",亲亲 这款是TPR鞋底 密度较低 重量轻 防滑性能好 但相对于橡胶底和TPU鞋底来说，耐磨性更没那么好 您也可以了解一下 这属于正常穿着的磨损范畴呢,90,TRUE,FALSE,,"xd,5",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xh,1",鞋盒尺寸：32*23*13,90,TRUE,FALSE,,"xh,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xied,1",走路姿势或脚型（如扁平足）导致局部压力过大，反复摩擦同一位置，也会加速表层磨损。,90,TRUE,FALSE,,"xied,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xied,2",脚部出汗或鞋子遇水（如雨天）后未及时晾干，汗液中的盐分或水分会腐蚀胶水或皮质，导致分层,90,TRUE,FALSE,,"xied,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xied,3",凉鞋的鞋垫或内衬多为人造革、PU皮或真皮材质，长期接触汗液、摩擦或暴晒会导致材质变硬、失去弹性，进而开裂或起皮。,90,TRUE,FALSE,,"xied,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xied,4",亲亲，人体是有重量的呢， 穿过后鞋底都会压下去的，这个是正常现象哦,90,TRUE,FALSE,,"xied,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xiet,1",鞋舌跑偏有可能是因为：人的脚本身的问题、走路姿势的问题、鞋舌的材料的问题鞋带没有绑紧有关呢 这个并不是质量问题，您可以调整下绑鞋带的方式，就会好的呢,90,TRUE,FALSE,,"xiet,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xiet,2",关于 您反馈的鞋舌歪问题，建议使用鞋舌垫‌：在鞋舌下方放置鞋舌垫，可以提供额外的支撑力，防止鞋舌移动。市面上有很多种鞋舌垫，选择合适的可以让鞋舌更稳固‌，改变鞋带穿法‌：尝试不同的鞋带穿法，如“十字交叉”穿法，可以让鞋带均匀分布在鞋面上，从而固定鞋舌。此外，将鞋带在内部交叉，由外向内穿过鞋孔，也能有效固定鞋舌‌,90,TRUE,FALSE,,"xiet,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xiet,3","亲，懒人鞋本身没有鞋带固定，鞋舌走路轻微跑偏是款式正常通病，不属于质量问题哈～
+给您两个简单小方法，马上就能改善：
+把鞋舌摆正，往后拉顺，贴合脚背再穿；
+鞋舌内侧贴一小块双面胶 / 防滑贴，固定住就不会乱跑；
+穿厚一点的袜子，填满脚背空隙，也能稳住鞋舌",90,TRUE,FALSE,,"xiet,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xiet,4","亲，鞋舌跑偏是很常见的情况哦，给您分享几个超实用的解决方法：
+1：懒人急救法（不用改鞋带，立刻见效）
+把跑偏的鞋舌手动拉回正中间，用手捏住鞋舌根部（靠近鞋带孔的位置）。
+把鞋带穿过鞋舌上的固定孔（如果有），或者直接把鞋带在鞋舌根部绕一圈再系紧。
+系鞋带时，鞋舌左右两边的鞋带拉力要均匀，拉到一样紧，再打个死结。
+2：鞋带固定法（永久不跑偏，最推荐）
+穿鞋带时，把鞋带从鞋舌的固定孔里穿过去，让鞋舌被鞋带牢牢 “夹住”，这是厂家设计用来防跑偏的结构。
+如果鞋舌没有固定孔，可以用交叉锁边穿法：
+正常穿完前几对鞋孔，到鞋舌位置时，把鞋带从鞋舌内侧交叉穿过，把鞋舌包在中间，再继续往上穿。
+这样鞋舌会被左右鞋带死死固定住，走路也不会滑。
+3：日常使用小技巧
+穿之前把鞋舌捋正，鞋舌标朝上，不要歪着穿。
+系鞋带时，鞋舌不要压在脚面下，要完全露在外面，避免被袜子或脚蹭歪。
+穿久了的鞋子，可以把鞋舌往反方向轻轻掰几下，调整一下鞋舌的软硬度，再穿就不容易跑偏了。",90,TRUE,FALSE,,"xiet,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 xj,1",橡胶鞋底，从耐磨，耐折，舒适程度都是非常好的。塑胶鞋底从耐磨上也很好,90,TRUE,FALSE,,"xj,1",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 y,1",已拦截 7.23李,90,FALSE,FALSE,,"y,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 y,2",已hp待返运费 10.3李,90,FALSE,FALSE,,"y,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 y,3",已返运费元到wx 10.3李,90,FALSE,FALSE,,"y,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 y,4",待hp返运费 1.13李,90,FALSE,FALSE,,"y,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 ye,1",京东余额是实名认证 ，绑定银行卡后，就可以提现或者下单抵扣的哦亲亲,90,TRUE,FALSE,,"ye,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yf,1",不好意思 咱家没有运费险哦 退换货运费需要您自己承担呢,90,TRUE,FALSE,,"yf,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yf,2",运费麻烦您先垫付下哈，我们会承担的，会返给您的呢，您放心，谢谢啦,90,TRUE,FALSE,,"yf,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yf,3",寄回来的运费是您自己承担，寄给您的我们会承担的呢，大家各自承担一趟哦,90,TRUE,FALSE,,"yf,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 yf,4",亲，因为尺码或者您不喜欢的原因退换货寄出的邮费是您出的哦，我们这边给您换好后寄给您是我们出，质量问题的退换货请您先垫付运费，到时给您报销（但不报销顺丰和EMS），拒收到付及平邮，这里给您说一下哈。,90,TRUE,FALSE,,"yf,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yf,5",您好，只要鞋子不影响2次销售，店铺都是支持七天无理由退换的哦，但是非质量问题寄回运费是需要买家自己承担的哦~~ ~‎‎,90,TRUE,FALSE,,"yf,5",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 yf,6",如订单页面显示赠送运费险，退换货运费可按运费险规则处理；如订单未赠送运费险，七天无理由退换货产生的寄回运费通常需买家自行承担。具体以订单页面和平台规则为准。,90,TRUE,FALSE,原始话术存在运费险条件混杂，已改写为按订单是否赠送运费险区分。,"yf,6",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 yfx,1",如订单页面显示赠送运费险，退换货运费可按运费险规则处理；如订单未赠送运费险，七天无理由退换货产生的寄回运费通常需买家自行承担。具体以订单页面和平台规则为准。,90,TRUE,FALSE,原始话术存在运费险条件混杂，已改写为按订单是否赠送运费险区分。,"yfx,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yfx,2",亲亲，您放心，京东保险会在售后单完成之后的1-5个工作日之内把运费理赔到您的京东余额或者京东小金库的呢，您注意查收就可以哈,90,TRUE,FALSE,,"yfx,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,尺码问题,"磨损话术 yfx,4",此件我司是在约定时效内安排发出，买家也已经签收。买家试穿后称尺码不合适要求退换，我司也已经优先处理完成。但是买家反馈的运费问题，我司无法承担。此件并非因为质量问题退换。根据京东全渠道开放平台运费问题纠纷处理判责标准第一章 第一条1.2.1，我司未赠送运费险，七天无理由退换运费应由买家承担。谢谢！,90,TRUE,FALSE,,"yfx,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yfx,3",亲亲，下单的时候没有显示退换免运费就是没有运费险的呢,90,TRUE,FALSE,,"yfx,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yfx,5",本店已开通运费险，仅承担保单内理赔运费，超出运费险额度的运费差额，按规则应由买家自行承担。,90,TRUE,FALSE,,"yfx,5",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yfx,6",亲，运费险仅赔付首重基础运费，退货运费超出理赔金额的部分，需由买家自理，还请您理解哈。,90,TRUE,FALSE,,"yfx,6",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yh,3",亲亲提醒下您，如果之前支付使用了白条，退款重拍白条的优惠就没有了哈,90,TRUE,FALSE,,"yh,3",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 yh,1",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"yh,1",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 yh,2",涉及补偿、返款、报销运费或差价处理时，需要人工客服结合订单、商品状态和平台规则核实协商，不承诺具体金额。,60,TRUE,TRUE,conservative_rewrite_from_risky_original:具体补偿金额,"yh,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yh,5",有优惠下单会自动减的呢,90,TRUE,FALSE,,"yh,5",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 yh,6",调货就是从其它的仓库发货呢 也是有货的呢,90,TRUE,FALSE,,"yh,6",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yh,4",能拍下的就是有货的呢 不能下单的就是没有呢【如果有断货的情况，这边也会第一时间联系您呢】,90,TRUE,FALSE,,"yh,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yhj,1",优惠券发您了呢 下单立减的呢 您直接下单就可以呢~,90,FALSE,FALSE,,"yhj,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yj,2",我们店内宝贝都是薄利多销的价哦，没有留下议价空间哦~还希望您能 多多理解和支持！！本店确保绝对正品质量保证哦，而且相信您在考虑这个价格的同时，肯定是有在考虑质量售后等等的，这款产品绝对是物超所值的！,90,TRUE,FALSE,,"yj,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yj,1",不同的店铺不同的售价呢我们控制不了别人店铺的价格的哈，可能每个店铺的营销方式不同的呢，咱家只能保证本店所有商品均为品牌正品，支持专柜验货，假一罚十呢！！！而且相信您在考虑这个价格的同时，肯定是有在考虑质量售后等等的。这款产品绝对是物 超所值的！,90,TRUE,FALSE,,"yj,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yj,3",亲亲 不同的店铺不同的售价呢我们控制不了别人店铺的价格的哈，可能每个店铺的营销方式不同的呢，咱家只能保证本店所有商品均为品牌正品，支持专柜验货呢！！！而且相信您在考虑这个价格的同时，肯定是有在考虑质量售后等等的。这款产品绝对是物超所 值的！,90,TRUE,FALSE,,"yj,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 ys,1",运输途中退不了哦 不好意思呢,90,TRUE,FALSE,,"ys,1",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 ysq,1",江西省南昌市南昌县富山一路南1388号17栋依思Q仓库,90,FALSE,FALSE,,"ysq,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yuji,1",哪个是京东的预计时间呢 不准确的呢 亲亲,90,TRUE,FALSE,,"yuji,1",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 yuji,3",预计3个工作日到账呢,90,FALSE,TRUE,,"yuji,3",磨损话术
+data/raw/jd/京东话术.txt,JD,backend_rule,质量问题,"磨损话术 yuji,4",好的呢 预计48小时到账呢,90,FALSE,TRUE,,"yuji,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yx,1",本店已经购买了运费险，使用京东上门取件退换是免费的，您的售后有保障啦，您看好了尽快下单哈,90,TRUE,FALSE,,"yx,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yx,2",亲亲 店铺没有运费险呢 但是您是plus会员呢 京东上门退换是免运费的哦 不用担心呢,90,TRUE,TRUE,,"yx,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 yy,1",这两个一样的呢 随便拍哪个呢,90,TRUE,FALSE,,"yy,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 z,2",亲爱哒~您的眼光真不错哟，这款鞋子是很热销的哦，很多顾客都已经购买下了哦,90,TRUE,FALSE,,"z,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 z,1",亲爱的在的呢~有什么可以帮助您的吗,90,TRUE,FALSE,,"z,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 z,4",亲亲 在吗 麻烦看见信息回复下呢 这边优先给您处理哈,90,TRUE,FALSE,,"z,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 z,4",亲在吗，辛苦您看到消息尽快回复下客服小妹这边哈，我帮您优先处理呢,90,TRUE,FALSE,,"z,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zb,1",亲亲实在是抱歉呢，因为您订单已经过了售后质保期呢，已经无法处理了呢,90,TRUE,TRUE,,"zb,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zb,2",亲亲实在是抱歉呢，因为您订单已经过了售后质保期呢，已经无法处理了呢，考虑到您的购物体验，小客服给您申请了 元补偿呢，您看可以吗,90,FALSE,TRUE,,"zb,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zf,3",亲亲，您支付好运费后联系小妹给您报销哈！,90,FALSE,FALSE,,"zf,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zhengp,1",我们是正规授权，支持任何形式验货，京东通过层层审核才在平台上销售的，收到我们的产品你也可以去专柜进行对比的，我们对自己的产品是非常自信的，确保正品，有任何问题可以随时与我们联系，我们都会妥善为您处理好,90,TRUE,FALSE,,"zhengp,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zhengp,2",都是有授权书的呢 ，保证正品呢，不用担心呢~,90,TRUE,FALSE,,"zhengp,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zhib,1",亲亲，客服春节期间值班日期：2月14日-2月22日；每天工作时间：10:00-20:00；【除夕和初一】两天全员休息，有任何问题，可在客服工作时间内进行联系哟~祝您马年大吉！,90,FALSE,FALSE,,"zhib,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zhif,1",下单的时候显示可以用的支付方式就是可以呢 没有显示的就是不行呢,90,TRUE,FALSE,,"zhif,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zl,1",鞋子质量问题定界：根据《国家三包法鞋类产品三包服务明细》鞋类发生左右脚尺寸大小不一、顺脚、断帮、断 底、皮面脱落、严重脱浆、开胶、开线、掉根的情况，属于质量问题。气味、些许胶渍、肉眼在1.5米外不能明显分辨的划痕等 ，不属于质量问题。,90,TRUE,FALSE,,"zl,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zl,2",根据《国家鞋类二包详细说明》，鞋类商品自售出之日起7日内，出现质量问题，消费者有权选择退货、更换或修理。退货时，经营者应按发票价格一次性退清货款，这些质量问题包括，出现严重脱胶(有侧帮缝线的除外)、裂浆、裂面、裂帮、裂底、断(脱)跟、泛硝、表皮脱落、塌芯、开线、开裂、脱胶、坏拉锁、钉头突出、网面破裂(如旅游鞋)，或新鞋不成双及鞋号大小不同等，还有经消协认定或具有法定资质的质检部门检测鉴定有其他质量问题。,90,TRUE,FALSE,,"zl,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 zl,3","您好，首先致歉商品存在残次瑕疵，是我方发货质检失误。本店所有商品具备完整品牌授权、进货票据及质检报告，保证正品可溯源。
+
+残次质量问题≠假冒伪劣，不适用假一赔十条款。若您坚持认定假货，可自行到品牌官方出具权威鉴定报告，凭有效鉴定报告我们承担对应责任；若无鉴定报告，我们按平台售后规则为您办理退换/退款+补偿，望理解配合。",90,TRUE,FALSE,,"zl,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zp,1",均为100%正品，假一赔十。平台从源头严格把控，并且有中国人保财险提供的正品险！每一个商品都有多重保障，请您放心选购~,90,TRUE,FALSE,,"zp,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zp,3",是的呢，本店所有商品都支持专柜验货的，这个您可以放心哦。,90,TRUE,FALSE,,"zp,3",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zp,2",我们是官方授权商家，本店所有商品均为品牌正品，支持专柜验货，假一罚十呢！！请您放心购买呢~,90,TRUE,FALSE,,"zp,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 zp,4","您好，首先致歉商品存在残次瑕疵，是我方发货质检失误。本店所有商品具备完整品牌授权、进货票据及质检报告，保证正品可溯源。
+
+残次质量问题≠假冒伪劣，不适用假一赔十条款。若您坚持认定假货，可自行到品牌官方出具权威鉴定报告，凭有效鉴定报告我们承担对应责任；若无鉴定报告，我们按平台售后规则为您办理退换/退款+补偿，望理解配合。",90,TRUE,FALSE,,"zp,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zp,4",亲，不用以二维码扫不出来判定真伪，很多品牌二维码本身就有不识别、不录入的情况。本店品牌授权资质齐全，正规授权经销商，所有货品官方渠道直供，授权书可随时出示。承诺假一赔十，支持专柜、品牌官方及专业机构鉴定，绝不售假，您可放心。,90,TRUE,FALSE,,"zp,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zp,5","二维码扫码只是辅助验真方式，不是唯一标准。很多品牌老款、渠道款本身就无法扫码识别。
+咱们店铺有品牌官方盖章正品授权书，货源正规可查。支持任何官方专业鉴定，假一赔十，有任何不放心也可以随时七天无理由退换，保障您权益。",90,TRUE,FALSE,,"zp,5",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zy,4",亲我们这边是京东自营店哦，所有产品都是由咱们自己研发销售的，其他店铺的我们不了解哦。,90,TRUE,FALSE,,"zy,4",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zy,3",不好意思，这边没有权限改不了呢，您可以重新下单或者收货后再换呢，您看您怎么方便呢？,90,TRUE,FALSE,,"zy,3",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 zy,2",下单后页面会显示预计到货时间呢，您可以下单看下呢 亲,90,TRUE,FALSE,,"zy,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zyd,1",我们不是自营商家，只有京东自营才是的呢~本店所有商品均为品牌正品，支持专柜验货，质量都是有保障的哈~,90,TRUE,FALSE,,"zyd,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zyd,2",京东自营店退换货都是平台处理的呢 您可以联系京东官方客服哈,90,TRUE,FALSE,,"zyd,2",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zyd,2",自营店退换都是京东官方客服处理的呢 您联系下京东官方客服呢,90,TRUE,FALSE,,"zyd,2",磨损话术
+data/raw/jd/京东话术.txt,JD,shipping_rule,质量问题,"磨损话术 zyd,1",亲亲 理解您的心情 我们是京东自营 发货都是由京东全程配送的 这边为您反馈核实是包裹是正常的 如果您这边确实没有收到 可以联系客服热线950618 为您进一步核实,90,TRUE,FALSE,,"zyd,1",磨损话术
+data/raw/jd/京东话术.txt,JD,aftersales_rule,质量问题,"磨损话术 zyd,5","可能需要您这边联系平台客服950618再进一步核实，我们也是正常反馈到平台 再进一步确认呢，为了能让您的问题尽快得到解决 所以客服建议您直接打热线950618会更快呢
+zz,-1=这是正常的，鞋子穿着之后前部有折痕是因为行走过程中，脚运动起伏压迫鞋面造成的，您可以把鞋折痕的地方用塑料袋或者别的可塑性好的东西垫着球鞋里面使折痕那块撑起来，然后润湿球鞋，用那个加热水蒸气进行熨，利用温度升高对皮革进行再次塑形，然后冷却，暂时缓解折痕。",90,TRUE,FALSE,,"zyd,5",磨损话术
