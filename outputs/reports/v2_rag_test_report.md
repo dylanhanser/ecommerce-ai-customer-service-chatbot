@@ -1,9 +1,9 @@
 # V2 Mixed Corpus RAG Test Report
 
-- Generated: 2026-07-08 17:32 UTC
+- Generated: 2026-07-08 18:03 UTC
 - Corpus: 15,688 docs (QA + reviewed snippets)
 - LLM mode: mock
-- Pass rate: **21/21**
+- Pass rate: **30/30**
 
 ## Results
 
@@ -29,7 +29,16 @@
 | 18 | 人工 | human_handover | — | — | — | false | 亲亲，好的，这个问题建议转人工客服为您进一步处理。当前 demo 暂未接入真实人工客服系统，正式系统中会在这里进行人工转接。 | Pass | intent guard 正确拦截 |
 | 19 | 你好蠢 | abusive_or_emotional | — | — | — | false | 亲亲，我会尽量帮您解决问题，麻烦您具体描述一下商品、尺码、订单或售后问题哦。 | Pass | intent guard 正确拦截 |
 | 20 | sb | abusive_or_emotional | — | — | — | false | 亲亲，我会尽量帮您解决问题，麻烦您具体描述一下商品、尺码、订单或售后问题哦。 | Pass | intent guard 正确拦截 |
-| 21 | 能给我补偿两块吗 | compensation_request | — | — | — | false | 亲亲，补偿金额需要人工客服结合订单情况、商品问题和平台售后规则核实处理，当前 demo 不能直接承诺具体补偿金额，建议转人工客服进一步确认哦。 | Pass | 补偿金额请求返回保守边界，未承诺具体金额 |
+| 21 | 能给我补偿两块吗 | compensation_request | — | — | — | false | 亲亲，补偿金额需要人工客服结合订单情况、商品问题和平台售后规则核实处理，当前 demo 不能直接承诺具体补偿金额，建议转人工客服进一步确认哦。 | Pass | compensation_request 安全边界正确 |
+| 22 | 好评能不能返现 | review_incentive_request | — | — | — | false | 亲亲，当前 demo 不能承诺任何评价返现、好评奖励或截图返现。如您有售后、退款或补偿问题，建议转人工客服根据订单情况和平台规则核实处理哦。 | Pass | review_incentive_request 安全边界正确 |
+| 23 | 五星好评截图发你能返现吗 | review_incentive_request | — | — | — | false | 亲亲，当前 demo 不能承诺任何评价返现、好评奖励或截图返现。如您有售后、退款或补偿问题，建议转人工客服根据订单情况和平台规则核实处理哦。 | Pass | review_incentive_request 安全边界正确 |
+| 24 | 降价了能退差价吗 | price_difference_request | — | — | — | false | 亲亲，价差或价保相关问题需要结合您的订单时间、商品活动和平台规则由人工客服核实处理。当前 demo 不能直接承诺退价差或补价差，建议转人工客服进一步确认哦。 | Pass | price_difference_request 安全边界正确 |
+| 25 | 运费能给我报销吗 | shipping_fee_reimbursement_request | — | — | — | false | 亲亲，运费承担或报销需要结合订单是否有运费险、退换货原因、商品状态和平台规则核实。当前 demo 不能直接承诺报销运费或补贴运费，建议转人工客服进一步确认哦。 | Pass | shipping_fee_reimbursement_request 安全边界正确 |
+| 26 | 退款多久到账 | backend_required | — | — | — | false | 亲亲，这个需要查询您的订单/物流实时信息。目前系统暂时无法直接读取后台状态，建议转人工客服为您核实并处理哦。 | Pass | backend_required 安全边界正确 |
+| 27 | 你们打款了吗 | payment_transfer_request | — | — | — | false | 亲亲，打款、返款或转账相关问题需要人工客服结合订单和后台记录核实。当前 demo 不能确认或承诺任何打款、返款、到账或线下转账处理，建议转人工客服进一步确认哦。 | Pass | payment_transfer_request 安全边界正确 |
+| 28 | 能便宜点吗 | discount_or_price_change_request | — | — | — | false | 亲亲，商品价格和优惠活动以页面显示及平台活动规则为准。当前 demo 不能修改订单价格或承诺额外优惠，如需确认活动或优惠券规则，建议转人工客服核实哦。 | Pass | discount_or_price_change_request 安全边界正确 |
+| 29 | 可以开发票吗 | invoice_request | — | — | — | false | 亲亲，店铺支持电子发票相关咨询。开票信息、发票金额和开票进度需要结合订单及平台开票流程由人工客服核实处理，当前 demo 不能直接登记或确认开票状态哦。 | Pass | invoice_request 安全边界正确 |
+| 30 | 我要投诉赔偿 | legal_compensation_request | — | — | — | false | 亲亲，赔付或投诉相关问题需要结合订单、商品情况和平台规则由人工客服核实处理。当前 demo 不能直接承诺具体赔付标准或金额，建议转人工客服进一步确认哦。 | Pass | legal_compensation_request 安全边界正确 |
 
 ## Failure Summary
 
@@ -45,3 +54,5 @@ All tests passed.
 | T13 催快递后台约束 | Pass |
 | T16 身份 intent guard | Pass |
 | T21 补偿金额请求安全边界 | Pass |
+| T22 好评返现安全边界 | Pass |
+| T26 退款到账/进度安全边界 | Pass |

@@ -48,6 +48,7 @@ INVALID_INPUT_ANSWER = (
     "\u53ef\u4ee5\u9ebb\u70e6\u60a8\u518d\u5177\u4f53\u63cf\u8ff0\u4e00\u4e0b\u5546\u54c1\u3001"
     "\u5c3a\u7801\u3001\u8ba2\u5355\u6216\u552e\u540e\u95ee\u9898\u5417\uff1f"
 )
+UNCLEAR_ANSWER = INVALID_INPUT_ANSWER
 IDENTITY_ANSWER = (
     "\u4eb2\u4eb2\uff0c\u6211\u662f\u672c\u5e97\u7684 AI \u5ba2\u670d\u52a9\u624b\uff0c"
     "\u53ef\u4ee5\u5e2e\u60a8\u89e3\u7b54\u5546\u54c1\u3001\u5c3a\u7801\u3001"
@@ -67,11 +68,6 @@ ABUSIVE_OR_IRRELEVANT_ANSWER = (
     "\u4eb2\u4eb2\uff0c\u6211\u4f1a\u5c3d\u91cf\u5e2e\u60a8\u89e3\u51b3\u95ee\u9898\uff0c"
     "\u9ebb\u70e6\u60a8\u5177\u4f53\u63cf\u8ff0\u4e00\u4e0b\u5546\u54c1\u3001"
     "\u5c3a\u7801\u3001\u8ba2\u5355\u6216\u552e\u540e\u95ee\u9898\u54e6\u3002"
-)
-UNCLEAR_ANSWER = (
-    "\u4eb2\u4eb2\uff0c\u6211\u6ca1\u6709\u592a\u7406\u89e3\u60a8\u7684\u610f\u601d\uff0c"
-    "\u53ef\u4ee5\u9ebb\u70e6\u60a8\u518d\u5177\u4f53\u63cf\u8ff0\u4e00\u4e0b\u5546\u54c1\u3001"
-    "\u5c3a\u7801\u3001\u8ba2\u5355\u6216\u552e\u540e\u95ee\u9898\u5417\uff1f"
 )
 BACKEND_REQUIRED_ANSWER = (
     "\u4eb2\u4eb2\uff0c\u8fd9\u4e2a\u9700\u8981\u67e5\u8be2\u60a8\u7684"
@@ -494,11 +490,6 @@ DEMO_CANNOT_OPERATE_BACKEND_ANSWER = (
     "\u4eb2\u4eb2\uff0c\u5f53\u524d demo \u65e0\u6cd5\u76f4\u63a5\u64cd\u4f5c\u8ba2\u5355\u6216\u7269\u6d41\u540e\u53f0\uff0c"
     "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u540e\u53f0\u4fe1\u606f\u4e3a\u60a8\u5904\u7406\u54e6\u3002"
 )
-COMPENSATION_FOLLOWUP_SAFE_ANSWER = (
-    "\u4eb2\u4eb2\uff0c\u662f\u5426\u8865\u507f\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u8ba2\u5355\u3001"
-    "\u7167\u7247\u548c\u5e73\u53f0\u552e\u540e\u89c4\u5219\u6838\u5b9e\uff0c"
-    "\u5f53\u524d demo \u4e0d\u627f\u8bfa\u5177\u4f53\u8865\u507f\u91d1\u989d\u3002"
-)
 COMPENSATION_REQUEST_SAFE_ANSWER = (
     "\u4eb2\u4eb2\uff0c\u8865\u507f\u91d1\u989d\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u8ba2\u5355\u60c5\u51b5\u3001"
     "\u5546\u54c1\u95ee\u9898\u548c\u5e73\u53f0\u552e\u540e\u89c4\u5219\u6838\u5b9e\u5904\u7406\uff0c"
@@ -540,6 +531,169 @@ COMPENSATION_REQUEST_SIGNAL_TERMS = [
     "\u80fd\u8d54\u507f",
     "\u5417",
 ]
+REVIEW_INCENTIVE_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u5f53\u524d demo \u4e0d\u80fd\u627f\u8bfa\u4efb\u4f55\u8bc4\u4ef7\u8fd4\u73b0\u3001"
+    "\u597d\u8bc4\u5956\u52b1\u6216\u622a\u56fe\u8fd4\u73b0\u3002"
+    "\u5982\u60a8\u6709\u552e\u540e\u3001\u9000\u6b3e\u6216\u8865\u507f\u95ee\u9898\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u6839\u636e\u8ba2\u5355\u60c5\u51b5\u548c\u5e73\u53f0\u89c4\u5219\u6838\u5b9e\u5904\u7406\u54e6\u3002"
+)
+PRICE_DIFFERENCE_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u4ef7\u5dee\u6216\u4ef7\u4fdd\u76f8\u5173\u95ee\u9898\u9700\u8981\u7ed3\u5408\u60a8\u7684\u8ba2\u5355\u65f6\u95f4\u3001"
+    "\u5546\u54c1\u6d3b\u52a8\u548c\u5e73\u53f0\u89c4\u5219\u7531\u4eba\u5de5\u5ba2\u670d\u6838\u5b9e\u5904\u7406\u3002"
+    "\u5f53\u524d demo \u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u9000\u4ef7\u5dee\u6216\u8865\u4ef7\u5dee\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u8fdb\u4e00\u6b65\u786e\u8ba4\u54e6\u3002"
+)
+SHIPPING_FEE_REIMBURSEMENT_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u8fd0\u8d39\u627f\u62c5\u6216\u62a5\u9500\u9700\u8981\u7ed3\u5408\u8ba2\u5355\u662f\u5426\u6709\u8fd0\u8d39\u9669\u3001"
+    "\u9000\u6362\u8d27\u539f\u56e0\u3001\u5546\u54c1\u72b6\u6001\u548c\u5e73\u53f0\u89c4\u5219\u6838\u5b9e\u3002"
+    "\u5f53\u524d demo \u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u62a5\u9500\u8fd0\u8d39\u6216\u8865\u8d34\u8fd0\u8d39\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u8fdb\u4e00\u6b65\u786e\u8ba4\u54e6\u3002"
+)
+REFUND_STATUS_OR_AMOUNT_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u8fd9\u4e2a\u9700\u8981\u67e5\u8be2\u60a8\u7684\u8ba2\u5355\u3001\u9000\u6b3e\u6216\u652f\u4ed8\u540e\u53f0\u72b6\u6001\u3002"
+    "\u76ee\u524d\u7cfb\u7edf\u6682\u65f6\u65e0\u6cd5\u76f4\u63a5\u8bfb\u53d6\u540e\u53f0\u4fe1\u606f\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u4e3a\u60a8\u6838\u5b9e\u9000\u6b3e\u91d1\u989d\u3001\u8fdb\u5ea6\u6216\u5230\u8d26\u60c5\u51b5\u54e6\u3002"
+)
+PAYMENT_TRANSFER_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u6253\u6b3e\u3001\u8fd4\u6b3e\u6216\u8f6c\u8d26\u76f8\u5173\u95ee\u9898\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u8ba2\u5355\u548c\u540e\u53f0\u8bb0\u5f55\u6838\u5b9e\u3002"
+    "\u5f53\u524d demo \u4e0d\u80fd\u786e\u8ba4\u6216\u627f\u8bfa\u4efb\u4f55\u6253\u6b3e\u3001\u8fd4\u6b3e\u3001\u5230\u8d26\u6216\u7ebf\u4e0b\u8f6c\u8d26\u5904\u7406\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u8fdb\u4e00\u6b65\u786e\u8ba4\u54e6\u3002"
+)
+DISCOUNT_OR_PRICE_CHANGE_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u5546\u54c1\u4ef7\u683c\u548c\u4f18\u60e0\u6d3b\u52a8\u4ee5\u9875\u9762\u663e\u793a\u53ca\u5e73\u53f0\u6d3b\u52a8\u89c4\u5219\u4e3a\u51c6\u3002"
+    "\u5f53\u524d demo \u4e0d\u80fd\u4fee\u6539\u8ba2\u5355\u4ef7\u683c\u6216\u627f\u8bfa\u989d\u5916\u4f18\u60e0\uff0c"
+    "\u5982\u9700\u786e\u8ba4\u6d3b\u52a8\u6216\u4f18\u60e0\u5238\u89c4\u5219\uff0c\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u6838\u5b9e\u54e6\u3002"
+)
+INVOICE_REQUEST_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u5e97\u94fa\u652f\u6301\u7535\u5b50\u53d1\u7968\u76f8\u5173\u54a8\u8be2\u3002"
+    "\u5f00\u7968\u4fe1\u606f\u3001\u53d1\u7968\u91d1\u989d\u548c\u5f00\u7968\u8fdb\u5ea6\u9700\u8981\u7ed3\u5408\u8ba2\u5355\u53ca\u5e73\u53f0\u5f00\u7968\u6d41\u7a0b\u7531\u4eba\u5de5\u5ba2\u670d\u6838\u5b9e\u5904\u7406\uff0c"
+    "\u5f53\u524d demo \u4e0d\u80fd\u76f4\u63a5\u767b\u8bb0\u6216\u786e\u8ba4\u5f00\u7968\u72b6\u6001\u54e6\u3002"
+)
+LEGAL_COMPENSATION_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u8d54\u4ed8\u6216\u6295\u8bc9\u76f8\u5173\u95ee\u9898\u9700\u8981\u7ed3\u5408\u8ba2\u5355\u3001"
+    "\u5546\u54c1\u60c5\u51b5\u548c\u5e73\u53f0\u89c4\u5219\u7531\u4eba\u5de5\u5ba2\u670d\u6838\u5b9e\u5904\u7406\u3002"
+    "\u5f53\u524d demo \u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u5177\u4f53\u8d54\u4ed8\u6807\u51c6\u6216\u91d1\u989d\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u8fdb\u4e00\u6b65\u786e\u8ba4\u54e6\u3002"
+)
+REVIEW_INCENTIVE_KEYWORDS = [
+    "\u597d\u8bc4\u8fd4\u73b0",
+    "\u4e94\u661f\u597d\u8bc4",
+    "\u4e94\u661f\u8bc4\u4ef7",
+    "\u8bc4\u4ef7\u8fd4\u73b0",
+    "\u6652\u56fe\u8fd4\u73b0",
+    "\u622a\u56fe\u8fd4\u73b0",
+    "\u597d\u8bc4\u622a\u56fe",
+    "\u8bc4\u4ef7\u622a\u56fe",
+    "\u597d\u8bc4\u5956\u52b1",
+    "\u8bc4\u4ef7\u5956\u52b1",
+    "\u7ed9\u597d\u8bc4\u8fd4\u94b1\u5417",
+    "\u8fd4\u73b0\u5417",
+    "\u597d\u8bc4\u80fd\u4e0d\u80fd\u8fd4\u73b0",
+    "\u4e94\u661f\u597d\u8bc4\u622a\u56fe\u53d1\u4f60\u80fd\u8fd4\u73b0\u5417",
+    "\u597d\u8bc4\u80fd\u8fd4\u73b0",
+    "\u80fd\u8fd4\u73b0\u5417",
+]
+PRICE_DIFFERENCE_KEYWORDS = [
+    "\u9000\u4ef7\u5dee",
+    "\u8865\u4ef7\u5dee",
+    "\u4ef7\u4fdd",
+    "\u4ef7\u683c\u4fdd\u62a4",
+    "\u964d\u4ef7\u4e86",
+    "\u4e70\u8d35\u4e86",
+    "\u9000\u6211\u4ef7\u5dee",
+    "\u80fd\u4e0d\u80fd\u9000\u4ef7\u5dee",
+    "\u80fd\u4e0d\u80fd\u8865\u5dee",
+    "\u4fdd\u4ef7",
+]
+SHIPPING_FEE_REIMBURSEMENT_KEYWORDS = [
+    "\u62a5\u9500\u8fd0\u8d39",
+    "\u8fd0\u8d39\u62a5\u9500",
+    "\u90ae\u8d39\u62a5\u9500",
+    "\u90ae\u8d39\u8c01\u51fa",
+    "\u8fd0\u8d39\u8c01\u627f\u62c5",
+    "\u8865\u8fd0\u8d39",
+    "\u9000\u8fd0\u8d39",
+    "\u8fd0\u8d39\u8865\u8d34",
+    "\u6765\u56de\u8fd0\u8d39",
+    "\u5bc4\u56de\u8fd0\u8d39",
+    "\u90ae\u8d39\u8865\u8d34",
+    "\u7ed9\u6211\u62a5\u9500",
+    "\u80fd\u7ed9\u6211\u62a5\u9500",
+]
+REFUND_STATUS_OR_AMOUNT_KEYWORDS = [
+    "\u9000\u591a\u5c11\u94b1",
+    "\u9000\u6b3e\u591a\u5c11",
+    "\u9000\u6b3e\u91d1\u989d",
+    "\u4ec0\u4e48\u65f6\u5019\u5230\u8d26",
+    "\u591a\u4e45\u5230\u8d26",
+    "\u51e0\u5929\u5230\u8d26",
+    "\u9000\u5230\u54ea\u91cc",
+    "\u9000\u6211\u94b1",
+    "\u94b1\u4ec0\u4e48\u65f6\u5019\u9000",
+    "\u5230\u8d26\u4e86\u5417",
+    "\u5df2\u9000\u6b3e\u4e86\u5417",
+]
+PAYMENT_TRANSFER_KEYWORDS = [
+    "\u6253\u6b3e",
+    "\u8fd4\u6b3e",
+    "\u8f6c\u8d26",
+    "\u8fd4\u94b1",
+    "\u8fd4\u6211\u94b1",
+    "\u6253\u5230\u54ea\u91cc",
+    "\u8fd4\u5230\u54ea\u91cc",
+    "\u5fae\u4fe1\u6536\u6b3e",
+    "\u652f\u4ed8\u5b9d",
+    "\u94f6\u884c\u5361",
+    "\u6536\u6b3e\u7801",
+    "\u5df2\u6253\u6b3e",
+    "\u5df2\u8fd4\u6b3e",
+    "\u7ebf\u4e0b\u8f6c\u8d26",
+]
+DISCOUNT_OR_PRICE_CHANGE_KEYWORDS = [
+    "\u4fbf\u5b9c\u70b9",
+    "\u80fd\u4f18\u60e0\u5417",
+    "\u4f18\u60e0\u591a\u5c11",
+    "\u6539\u4ef7",
+    "\u6539\u4e2a\u4ef7",
+    "\u5c11\u70b9\u94b1",
+    "\u6253\u6298",
+    "\u6298\u6263",
+    "\u4f18\u60e0\u5238",
+    "\u80fd\u4e0d\u80fd\u4fbf\u5b9c",
+    "\u518d\u4fbf\u5b9c\u70b9",
+    "\u80fd\u4fbf\u5b9c\u70b9",
+]
+INVOICE_REQUEST_KEYWORDS = [
+    "\u53d1\u7968",
+    "\u5f00\u7968",
+    "\u7535\u5b50\u53d1\u7968",
+    "\u53d1\u7968\u91d1\u989d",
+    "\u62ac\u5934",
+    "\u7a0e\u53f7",
+]
+LEGAL_COMPENSATION_KEYWORDS = [
+    "\u7cbe\u795e\u635f\u5931\u8d39",
+    "\u6295\u8bc9\u8d54\u507f",
+    "\u5e73\u53f0\u8d54\u4ed8",
+    "\u5546\u5bb6\u8d54\u4ed8",
+    "\u5047\u4e00\u8d54\u5341",
+    "\u4e09\u500d\u8d54\u507f",
+    "\u5341\u500d\u8d54\u507f",
+    "\u8d54\u94b1",
+]
+FINANCIAL_RISK_QUERY_TYPES = frozenset(
+    {
+        "review_incentive_request",
+        "price_difference_request",
+        "shipping_fee_reimbursement_request",
+        "refund_status_or_amount_request",
+        "payment_transfer_request",
+        "discount_or_price_change_request",
+        "invoice_request",
+        "legal_compensation_request",
+        "compensation_request",
+    }
+)
 FOLLOWUP_QUERY_PHRASES = [
     "\u771f\u7684\u5417",
     "\u771f\u7684\u554a",
@@ -1171,10 +1325,121 @@ def is_compensation_request(query: str) -> bool:
     return False
 
 
-def try_compensation_safe_answer(query: str) -> str | None:
-    if is_compensation_request(query):
-        return COMPENSATION_REQUEST_SAFE_ANSWER
+def is_review_incentive_request(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    if contains_any(normalized, REVIEW_INCENTIVE_KEYWORDS):
+        return True
+    if "\u8fd4\u73b0" in normalized and contains_any(
+        normalized, ["\u597d\u8bc4", "\u4e94\u661f", "\u8bc4\u4ef7", "\u622a\u56fe", "\u6652\u56fe"]
+    ):
+        return True
+    if contains_any(normalized, ["\u597d\u8bc4", "\u4e94\u661f", "\u8bc4\u4ef7"]) and contains_any(
+        normalized, ["\u622a\u56fe", "\u6652\u56fe"]
+    ):
+        return True
+    return False
+
+
+def is_price_difference_request(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    if contains_any(normalized, PRICE_DIFFERENCE_KEYWORDS):
+        return True
+    return "\u4ef7\u5dee" in normalized and contains_any(
+        normalized, ["\u9000", "\u8865", "\u80fd", "\u5417", "\u4ef7\u4fdd", "\u4fdd\u4ef7"]
+    )
+
+
+def is_shipping_fee_reimbursement_request(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    if contains_any(normalized, SHIPPING_FEE_REIMBURSEMENT_KEYWORDS):
+        return True
+    return "\u62a5\u9500" in normalized and contains_any(
+        normalized, ["\u8fd0\u8d39", "\u90ae\u8d39", "\u7ed9\u6211", "\u80fd"]
+    )
+
+
+def is_refund_status_or_amount_request(query: str) -> bool:
+    stripped = str(query or "").strip()
+    if not stripped:
+        return False
+    normalized = re.sub(r"\s+", "", stripped)
+    if contains_any(normalized, REFUND_STATUS_OR_AMOUNT_KEYWORDS):
+        return True
+    if "\u9000\u6b3e" in normalized and contains_any(
+        normalized, ["\u5230\u8d26", "\u591a\u5c11", "\u591a\u5c11\u94b1", "\u8fdb\u5ea6", "\u591a\u4e45", "\u51e0\u5929"]
+    ):
+        return True
+    if "\u9000\u94b1" in normalized or "\u9000\u6211\u94b1" in normalized:
+        return True
+    return False
+
+
+def is_payment_transfer_request(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    return contains_any(normalized, PAYMENT_TRANSFER_KEYWORDS)
+
+
+def is_discount_or_price_change_request(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    return contains_any(normalized, DISCOUNT_OR_PRICE_CHANGE_KEYWORDS)
+
+
+def is_invoice_request(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    return contains_any(normalized, INVOICE_REQUEST_KEYWORDS)
+
+
+def is_legal_compensation_request(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    if contains_any(normalized, LEGAL_COMPENSATION_KEYWORDS):
+        return True
+    if "\u6295\u8bc9" in normalized and contains_any(
+        normalized, ["\u8d54", "\u8d54\u507f", "\u8d54\u4ed8", "\u8d54\u94b1"]
+    ):
+        return True
+    if "\u8d54\u4ed8" in normalized:
+        return True
+    return False
+
+
+def detect_financial_risk_query(query: str) -> tuple[str, str] | None:
+    stripped = str(query or "").strip()
+    if not stripped:
+        return None
+
+    checks: list[tuple[str, object, str]] = [
+        ("review_incentive_request", is_review_incentive_request, REVIEW_INCENTIVE_SAFE_ANSWER),
+        ("payment_transfer_request", is_payment_transfer_request, PAYMENT_TRANSFER_SAFE_ANSWER),
+        ("refund_status_or_amount_request", is_refund_status_or_amount_request, REFUND_STATUS_OR_AMOUNT_SAFE_ANSWER),
+        ("legal_compensation_request", is_legal_compensation_request, LEGAL_COMPENSATION_SAFE_ANSWER),
+        ("compensation_request", is_compensation_request, COMPENSATION_REQUEST_SAFE_ANSWER),
+        ("price_difference_request", is_price_difference_request, PRICE_DIFFERENCE_SAFE_ANSWER),
+        ("shipping_fee_reimbursement_request", is_shipping_fee_reimbursement_request, SHIPPING_FEE_REIMBURSEMENT_SAFE_ANSWER),
+        ("discount_or_price_change_request", is_discount_or_price_change_request, DISCOUNT_OR_PRICE_CHANGE_SAFE_ANSWER),
+        ("invoice_request", is_invoice_request, INVOICE_REQUEST_SAFE_ANSWER),
+    ]
+    for query_type, detector, answer in checks:
+        if detector(stripped):
+            return query_type, answer
     return None
+
+
+def is_financial_risk_query(query: str) -> bool:
+    return detect_financial_risk_query(query) is not None
 
 
 def expand_retrieval_query(user_question: str) -> str:
@@ -1274,7 +1539,7 @@ def resolve_followup_context(
     previous_answer = str(previous_assistant_answer or "").strip()
     has_previous = bool(previous_user)
 
-    if has_previous and (is_followup_query(original) or is_compensation_request(original)):
+    if has_previous and (is_followup_query(original) or is_financial_risk_query(original)):
         contextual = build_contextual_query(original, previous_user, previous_answer)
         retrieval_query = contextual
         is_followup = True
@@ -1305,20 +1570,21 @@ def try_followup_safe_answer(
     normalized_current = re.sub(r"\s+", "", current_query)
     combined_prev = _combined_topic_text(previous_user_query or "", previous_assistant_answer or "")
 
+    financial = detect_financial_risk_query(current_query)
+    if financial:
+        return financial[1]
+
     if contains_any(normalized_current, BACKEND_ACTION_FOLLOWUP_KEYWORDS):
         if is_post_ship_refund_query(retrieval_query) or contains_any(
             combined_prev, POST_SHIP_TOPIC_CONTEXT_KEYWORDS
         ):
             return DEMO_CANNOT_OPERATE_BACKEND_ANSWER
 
-    if contains_any(normalized_current, COMPENSATION_FOLLOWUP_KEYWORDS) or is_compensation_request(
-        current_query
-    ):
+    if contains_any(normalized_current, COMPENSATION_FOLLOWUP_KEYWORDS):
         if (
             is_glue_quality_query(retrieval_query)
             or is_wrong_item_query(retrieval_query)
             or contains_any(combined_prev, QUALITY_TOPIC_CONTEXT_KEYWORDS)
-            or is_compensation_request(current_query)
         ):
             return COMPENSATION_REQUEST_SAFE_ANSWER
 
@@ -1819,7 +2085,7 @@ def clean_product_attribute_answer(answer: str) -> str:
     result = "\u4eb2\u4eb2\uff0c" + "\u3002".join(kept)
     if not result.endswith(("\u3002", "\uff01", "\uff1f", "!", "?")):
         result += "\u3002"
-    return finalize_answer(result)
+    return result
 
 
 def product_attribute_fallback_answer(user_question: str, reranked_results: list) -> str:
@@ -1893,9 +2159,9 @@ def generate_final_answer(
     )
     if followup_safe:
         return finalize_answer(followup_safe), prompt
-    compensation_safe = try_compensation_safe_answer(user_question)
-    if compensation_safe:
-        return finalize_answer(compensation_safe), prompt
+    financial_risk = detect_financial_risk_query(user_question)
+    if financial_risk:
+        return finalize_answer(financial_risk[1]), prompt
     if backend_required:
         return finalize_answer(BACKEND_REQUIRED_ANSWER), prompt
     conservative = try_conservative_topic_answer(domain_query, answer_context)
@@ -1977,16 +2243,17 @@ def run_rag_query(
             **debug,
         }
 
-    compensation_safe = try_compensation_safe_answer(question)
-    if compensation_safe:
+    financial_risk = detect_financial_risk_query(question)
+    if financial_risk:
+        financial_query_type, financial_answer = financial_risk
         return {
             "question": question,
-            "final_answer": finalize_answer(compensation_safe),
-            "requires_backend_api": False,
+            "final_answer": finalize_answer(financial_answer),
+            "requires_backend_api": financial_query_type == "refund_status_or_amount_request",
             "invalid_input": False,
             "skip_retrieval": True,
             "skip_llm": True,
-            "query_type": "compensation_request",
+            "query_type": financial_query_type,
             "policy_category": None,
             "original_results": [],
             "reranked_results": [],
@@ -2086,6 +2353,8 @@ def print_answer_results(
 
 def interactive_loop(corpus, embeddings, embedding_model, top_k: int, cosine_similarity, low_confidence_threshold: float, llm_config: LLMConfig) -> None:
     print("\nJD QA RAG answer demo is ready. Type a question, or exit to quit.")
+    previous_user_query: str | None = None
+    previous_assistant_answer: str | None = None
     while True:
         try:
             query = input("\nQuestion> ").strip()
@@ -2098,60 +2367,40 @@ def interactive_loop(corpus, embeddings, embedding_model, top_k: int, cosine_sim
         if not query:
             print(INVALID_INPUT_ANSWER)
             continue
-        skip_retrieval, guarded_type, guarded_answer = intent_guard(query)
-        if skip_retrieval:
-            guarded_backend_required = guarded_type == "backend_required"
-            guarded_invalid_input = guarded_type == "unclear"
-            print_answer_results(
-                query,
-                [],
-                [],
-                None,
-                guarded_backend_required,
-                guarded_answer or UNCLEAR_ANSWER,
-                invalid_input=guarded_invalid_input,
-                query_type=guarded_type,
-                skip_retrieval=True,
-            )
-            continue
-        invalid_input, invalid_answer = invalid_input_guard(query)
-        if invalid_input:
-            print_answer_results(
-                query,
-                [],
-                [],
-                None,
-                False,
-                invalid_answer or INVALID_INPUT_ANSWER,
-                invalid_input=True,
-                query_type="unclear",
-                skip_retrieval=True,
-            )
-            continue
-        original_results = retrieve(query, corpus, embeddings, embedding_model, top_k, cosine_similarity)
-        reranked_results, policy_category = rerank_retrieved_results(query, original_results)
-        backend_required = resolve_backend_required(query, reranked_results)
-        query_type = detect_query_type(query, backend_required, policy_category)
-        final_answer, _prompt = generate_final_answer(
+
+        result = run_rag_query(
             query,
-            original_results,
-            reranked_results,
+            corpus,
+            embeddings,
+            embedding_model,
+            top_k,
+            cosine_similarity,
             low_confidence_threshold,
             llm_config,
-            backend_required,
-            query_type=query_type,
+            previous_user_query=previous_user_query,
+            previous_assistant_answer=previous_assistant_answer,
         )
         print_answer_results(
-            query,
-            original_results,
-            reranked_results,
-            policy_category,
-            backend_required,
-            final_answer,
-            invalid_input=False,
-            query_type=query_type,
-            skip_retrieval=False,
+            result["question"],
+            result.get("original_results", []),
+            result.get("reranked_results", []),
+            result.get("policy_category"),
+            result.get("requires_backend_api", False),
+            result.get("final_answer", ""),
+            invalid_input=result.get("invalid_input", False),
+            query_type=result.get("query_type", "normal"),
+            skip_retrieval=result.get("skip_retrieval", False),
         )
+        if result.get("is_followup_query"):
+            print(
+                f"\nFollow-up debug: contextual_query={result.get('contextual_query', '')} "
+                f"| retrieval_query={result.get('retrieval_query', '')}"
+            )
+
+        final_answer = result.get("final_answer", "")
+        if final_answer:
+            previous_user_query = query
+            previous_assistant_answer = final_answer
 
 
 def build_parser() -> argparse.ArgumentParser:
