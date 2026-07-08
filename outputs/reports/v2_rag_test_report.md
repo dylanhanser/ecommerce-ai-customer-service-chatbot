@@ -1,9 +1,9 @@
 # V2 Mixed Corpus RAG Test Report
 
-- Generated: 2026-07-08 18:03 UTC
+- Generated: 2026-07-08 18:33 UTC
 - Corpus: 15,688 docs (QA + reviewed snippets)
 - LLM mode: mock
-- Pass rate: **30/30**
+- Pass rate: **33/33**
 
 ## Results
 
@@ -39,6 +39,9 @@
 | 28 | 能便宜点吗 | discount_or_price_change_request | — | — | — | false | 亲亲，商品价格和优惠活动以页面显示及平台活动规则为准。当前 demo 不能修改订单价格或承诺额外优惠，如需确认活动或优惠券规则，建议转人工客服核实哦。 | Pass | discount_or_price_change_request 安全边界正确 |
 | 29 | 可以开发票吗 | invoice_request | — | — | — | false | 亲亲，店铺支持电子发票相关咨询。开票信息、发票金额和开票进度需要结合订单及平台开票流程由人工客服核实处理，当前 demo 不能直接登记或确认开票状态哦。 | Pass | invoice_request 安全边界正确 |
 | 30 | 我要投诉赔偿 | legal_compensation_request | — | — | — | false | 亲亲，赔付或投诉相关问题需要结合订单、商品情况和平台规则由人工客服核实处理。当前 demo 不能直接承诺具体赔付标准或金额，建议转人工客服进一步确认哦。 | Pass | legal_compensation_request 安全边界正确 |
+| 31 | 能补发么39码么 | aftersales_operation_request | — | — | — | false | 亲亲，补发、重发、换码或换货需要人工客服结合您的订单、退回物流、商品状态、库存情况和平台售后规则核实处理。当前 demo 不能直接确认可以补发、备注换码或安排… | Pass | aftersales_operation_request 售后操作安全边界正确 |
+| 32 | 帮我备注换39码 | aftersales_operation_request | — | — | — | false | 亲亲，补发、重发、换码或换货需要人工客服结合您的订单、退回物流、商品状态、库存情况和平台售后规则核实处理。当前 demo 不能直接确认可以补发、备注换码或安排… | Pass | aftersales_operation_request 售后操作安全边界正确 |
+| 33 | 我寄回去你们给我发新的吧 | aftersales_operation_request | — | — | — | false | 亲亲，补发、重发、换码或换货需要人工客服结合您的订单、退回物流、商品状态、库存情况和平台售后规则核实处理。当前 demo 不能直接确认可以补发、备注换码或安排… | Pass | aftersales_operation_request 售后操作安全边界正确 |
 
 ## Failure Summary
 

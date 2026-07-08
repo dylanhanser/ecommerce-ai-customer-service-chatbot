@@ -149,6 +149,9 @@ class RAGEngine:
             "contextual_query": result.get("contextual_query", question),
             "previous_user_query": result.get("previous_user_query", ""),
             "retrieval_query": result.get("retrieval_query", question),
+            "inherited_financial_risk": result.get("inherited_financial_risk", False),
+            "inherited_from_previous_query": result.get("inherited_from_previous_query", ""),
+            "inherited_aftersales_operation": result.get("inherited_aftersales_operation", False),
             "retrieved_results": serialize_results(result.get("original_results", [])),
             "reranked_results": serialize_results(result.get("reranked_results", [])),
         }

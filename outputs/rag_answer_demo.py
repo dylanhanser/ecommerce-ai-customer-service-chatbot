@@ -452,6 +452,24 @@ RISKY_ANSWER_PATTERNS = [
     re.compile(r"\u7533\u8bf7\u8865\u507f\s*\d+"),
     re.compile(r"\u7ed9\u60a8\u8865\u507f\s*\d+"),
     re.compile(r"\u8865\u507f\s*\d+"),
+    re.compile(r"\u5df2\u7ecf\u5907\u6ce8"),
+    re.compile(r"\u6211\u4eec\u5907\u6ce8\u4e86"),
+    re.compile(r"\u5df2\u5907\u6ce8"),
+    re.compile(r"\u5e2e\u60a8\u5907\u6ce8"),
+    re.compile(r"\u5df2\u7ecf\u5b89\u6392"),
+    re.compile(r"\u5df2\u5b89\u6392"),
+    re.compile(r"\u5b89\u6392\u8865\u53d1"),
+    re.compile(r"\u5df2\u7ecf\u8865\u53d1"),
+    re.compile(r"\u5df2\u8865\u53d1"),
+    re.compile(r"\u7ed9\u60a8\u8865\u53d1"),
+    re.compile(r"\u7ed9\u60a8\u91cd\u53d1"),
+    re.compile(r"\u5df2\u7ecf\u91cd\u53d1"),
+    re.compile(r"\u653e\u65b0"),
+    re.compile(r"\u53d1\u65b0\u7684"),
+    re.compile(r"\u6362\u65b0"),
+    re.compile(r"\u5df2\u6362\u65b0"),
+    re.compile(r"\u5df2\u5904\u7406"),
+    re.compile(r"\u5df2\u7ecf\u5904\u7406"),
 ]
 SAFE_HUMAN_VERIFICATION_ANSWER = (
     "\u4eb2\u4eb2\uff0c\u8fd9\u4e2a\u95ee\u9898\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u8ba2\u5355\u3001"
@@ -731,6 +749,147 @@ FOLLOWUP_QUERY_PHRASES = [
     "\u90a3\u6211\u600e\u4e48\u529e",
     "\u90a3\u4f60\u5e2e\u6211\u5904\u7406",
     "\u90a3\u4f60\u5e2e\u6211\u5904\u7406\u5427",
+    "\u771f\u4e0d\u53ef\u4ee5\u5417",
+    "\u771f\u7684\u4e0d\u53ef\u4ee5\u5417",
+    "\u771f\u7684\u4e0d\u884c\u5417",
+    "\u4e0d\u53ef\u4ee5\u5417",
+    "\u4e0d\u80fd\u5417",
+    "\u4e0d\u884c\u5417",
+    "\u771f\u4e0d\u884c\u5417",
+    "\u4e3a\u4ec0\u4e48\u4e0d\u53ef\u4ee5",
+    "\u4e3a\u5565\u4e0d\u884c",
+    "\u90a3\u4e3a\u4ec0\u4e48",
+    "\u786e\u5b9a\u4e0d\u80fd\u67e5\u5417",
+    "\u6211\u8fd9\u4e2a\u9000\u56de\u53bb",
+    "\u90a3\u6211\u9000\u56de\u53bb",
+    "\u6211\u5bc4\u56de\u53bb",
+    "\u90a3\u5bc4\u56de\u53bb",
+    "\u9000\u56de\u53bb\u5462",
+    "\u90a3\u600e\u4e48\u5f04",
+    "\u4f60\u5e2e\u6211\u5907\u6ce8",
+    "\u5e2e\u6211\u5907\u6ce8\u4e00\u4e0b",
+    "\u4f60\u7ed9\u6211\u5b89\u6392\u5427",
+    "\u90a3\u7ed9\u6211\u636239",
+    "\u90a3\u8865\u53d139",
+    "\u90a3\u53d1\u65b0\u7684",
+]
+FINANCIAL_SAFE_ANSWER_BY_TYPE = {
+    "review_incentive_request": REVIEW_INCENTIVE_SAFE_ANSWER,
+    "payment_transfer_request": PAYMENT_TRANSFER_SAFE_ANSWER,
+    "refund_status_or_amount_request": REFUND_STATUS_OR_AMOUNT_SAFE_ANSWER,
+    "legal_compensation_request": LEGAL_COMPENSATION_SAFE_ANSWER,
+    "compensation_request": COMPENSATION_REQUEST_SAFE_ANSWER,
+    "price_difference_request": PRICE_DIFFERENCE_SAFE_ANSWER,
+    "shipping_fee_reimbursement_request": SHIPPING_FEE_REIMBURSEMENT_SAFE_ANSWER,
+    "discount_or_price_change_request": DISCOUNT_OR_PRICE_CHANGE_SAFE_ANSWER,
+    "invoice_request": INVOICE_REQUEST_SAFE_ANSWER,
+}
+FINANCIAL_ASSISTANT_ANSWER_SIGNALS: list[tuple[str, list[str]]] = [
+    ("review_incentive_request", ["\u4e0d\u80fd\u627f\u8bfa\u4efb\u4f55\u8bc4\u4ef7\u8fd4\u73b0", "\u597d\u8bc4\u5956\u52b1", "\u622a\u56fe\u8fd4\u73b0"]),
+    ("payment_transfer_request", ["\u6253\u6b3e\u3001\u8fd4\u6b3e\u6216\u8f6c\u8d26", "\u4e0d\u80fd\u786e\u8ba4\u6216\u627f\u8bfa\u4efb\u4f55\u6253\u6b3e"]),
+    ("refund_status_or_amount_request", ["\u6838\u5b9e\u9000\u6b3e\u91d1\u989d\u3001\u8fdb\u5ea6\u6216\u5230\u8d26\u60c5\u51b5", "\u67e5\u8be2\u60a8\u7684\u8ba2\u5355\u3001\u9000\u6b3e\u6216\u652f\u4ed8\u540e\u53f0\u72b6\u6001"]),
+    ("legal_compensation_request", ["\u8d54\u4ed8\u6216\u6295\u8bc9\u76f8\u5173\u95ee\u9898", "\u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u5177\u4f53\u8d54\u4ed8\u6807\u51c6"]),
+    ("compensation_request", ["\u8865\u507f\u91d1\u989d\u9700\u8981\u4eba\u5de5\u5ba2\u670d", "\u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u5177\u4f53\u8865\u507f\u91d1\u989d"]),
+    ("price_difference_request", ["\u4ef7\u5dee\u6216\u4ef7\u4fdd", "\u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u9000\u4ef7\u5dee\u6216\u8865\u4ef7\u5dee"]),
+    ("shipping_fee_reimbursement_request", ["\u8fd0\u8d39\u627f\u62c5\u6216\u62a5\u9500", "\u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u62a5\u9500\u8fd0\u8d39\u6216\u8865\u8d34\u8fd0\u8d39"]),
+    ("discount_or_price_change_request", ["\u4e0d\u80fd\u4fee\u6539\u8ba2\u5355\u4ef7\u683c\u6216\u627f\u8bfa\u989d\u5916\u4f18\u60e0", "\u5546\u54c1\u4ef7\u683c\u548c\u4f18\u60e0\u6d3b\u52a8"]),
+    ("invoice_request", ["\u5f00\u7968\u4fe1\u606f\u3001\u53d1\u7968\u91d1\u989d\u548c\u5f00\u7968\u8fdb\u5ea6", "\u4e0d\u80fd\u76f4\u63a5\u767b\u8bb0\u6216\u786e\u8ba4\u5f00\u7968\u72b6\u6001"]),
+]
+AFTERSALES_OPERATION_QUERY_TYPE = "aftersales_operation_request"
+AFTERSALES_OPERATION_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u8865\u53d1\u3001\u91cd\u53d1\u3001\u6362\u7801\u6216\u6362\u8d27\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u60a8\u7684\u8ba2\u5355\u3001"
+    "\u9000\u56de\u7269\u6d41\u3001\u5546\u54c1\u72b6\u6001\u3001\u5e93\u5b58\u60c5\u51b5\u548c\u5e73\u53f0\u552e\u540e\u89c4\u5219\u6838\u5b9e\u5904\u7406\u3002"
+    "\u5f53\u524d demo \u4e0d\u80fd\u76f4\u63a5\u786e\u8ba4\u53ef\u4ee5\u8865\u53d1\u3001\u5907\u6ce8\u6362\u7801\u6216\u5b89\u6392\u6362\u65b0\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u8fdb\u4e00\u6b65\u5904\u7406\u54e6\u3002"
+)
+AFTERSALES_RESHIP_KEYWORDS = [
+    "\u8865\u53d1",
+    "\u91cd\u53d1",
+    "\u91cd\u65b0\u53d1",
+    "\u518d\u53d1\u4e00\u53cc",
+    "\u53d1\u65b0\u7684",
+    "\u6362\u65b0\u7684",
+    "\u6362\u65b0",
+    "\u653e\u65b0",
+    "\u8865\u4e00\u53cc",
+    "\u91cd\u65b0\u5bc4",
+    "\u518d\u5bc4\u4e00\u53cc",
+]
+AFTERSALES_SIZE_EXCHANGE_KEYWORDS = [
+    "\u6362\u7801",
+    "\u6362\u5c3a\u7801",
+    "\u6362\u4e2a\u7801",
+    "\u6362\u4e00\u53cc",
+    "\u6362\u8d27\u6362\u7801",
+    "\u6362\u5927\u4e00\u7801",
+    "\u6362\u5c0f\u4e00\u7801",
+]
+AFTERSALES_RETURN_RESHIP_KEYWORDS = [
+    "\u9000\u56de\u53bb",
+    "\u6211\u9000\u56de\u53bb",
+    "\u9000\u56de\u540e",
+    "\u5bc4\u56de\u53bb",
+    "\u5bc4\u56de\u540e",
+    "\u9000\u56de\u53bb\u518d\u53d1",
+    "\u9000\u56de\u53bb\u6362",
+    "\u6536\u5230\u540e\u8865\u53d1",
+    "\u6536\u5230\u540e\u6362",
+    "\u9000\u56de\u53bb\u4e86\u80fd\u6362\u5417",
+]
+AFTERSALES_BACKEND_ACTION_KEYWORDS = [
+    "\u5e2e\u6211\u5907\u6ce8",
+    "\u5907\u6ce8\u4e00\u4e0b",
+    "\u5907\u6ce8\u6362\u7801",
+    "\u5907\u6ce8\u8865\u53d1",
+    "\u5e2e\u6211\u5b89\u6392",
+    "\u5b89\u6392\u8865\u53d1",
+    "\u5b89\u6392\u6362\u8d27",
+    "\u7ed9\u6211\u5904\u7406",
+    "\u4f60\u5e2e\u6211\u5f04",
+]
+AFTERSALES_OPERATION_CONTEXT_KEYWORDS = (
+    AFTERSALES_RESHIP_KEYWORDS
+    + AFTERSALES_RETURN_RESHIP_KEYWORDS
+    + AFTERSALES_BACKEND_ACTION_KEYWORDS
+    + AFTERSALES_SIZE_EXCHANGE_KEYWORDS
+    + ["\u6362\u8d27", "\u9000\u56de", "\u5bc4\u56de", "\u53d1\u65b0", "\u6362\u65b0"]
+)
+AFTERSALES_SIZE_CONSULTATION_KEYWORDS = [
+    "\u5c3a\u7801\u6807\u51c6",
+    "\u7801\u6807\u51c6",
+    "\u978b\u7801",
+    "\u9009\u7801",
+    "\u9002\u5408\u591a\u957f",
+    "\u811a\u957f",
+    "\u811a\u5bbd",
+    "\u811a\u80d6",
+    "\u504f\u5927",
+    "\u504f\u5c0f",
+    "\u5efa\u8bae\u5927",
+    "\u5efa\u8bae\u5c0f",
+    "\u600e\u4e48\u9009\u7801",
+    "\u62cd\u5927",
+    "\u62cd\u5c0f",
+]
+AFTERSALES_ASSISTANT_ANSWER_SIGNALS = [
+    "\u8865\u53d1\u3001\u91cd\u53d1\u3001\u6362\u7801\u6216\u6362\u8d27",
+    "\u4e0d\u80fd\u76f4\u63a5\u786e\u8ba4\u53ef\u4ee5\u8865\u53d1",
+    "\u5907\u6ce8\u6362\u7801\u6216\u5b89\u6392\u6362\u65b0",
+    "\u9000\u56de\u7269\u6d41\u3001\u5546\u54c1\u72b6\u6001\u3001\u5e93\u5b58\u60c5\u51b5",
+]
+AFTERSALES_FOLLOWUP_PHRASES = [
+    "\u6211\u8fd9\u4e2a\u9000\u56de\u53bb",
+    "\u90a3\u6211\u9000\u56de\u53bb",
+    "\u6211\u5bc4\u56de\u53bb",
+    "\u90a3\u5bc4\u56de\u53bb",
+    "\u9000\u56de\u53bb\u5462",
+    "\u90a3\u600e\u4e48\u5f04",
+    "\u4f60\u5e2e\u6211\u5907\u6ce8",
+    "\u5e2e\u6211\u5907\u6ce8\u4e00\u4e0b",
+    "\u4f60\u7ed9\u6211\u5b89\u6392\u5427",
+    "\u90a3\u7ed9\u6211\u636239",
+    "\u90a3\u8865\u53d139",
+    "\u90a3\u53d1\u65b0\u7684",
 ]
 BACKEND_ACTION_FOLLOWUP_KEYWORDS = [
     "\u4f60\u80fd\u5904\u7406\u5417",
@@ -856,6 +1015,19 @@ class FollowupResolution:
     previous_user_query: str
     previous_assistant_answer: str
     retrieval_query: str
+
+
+@dataclass
+class FinancialRiskInheritance:
+    query_type: str
+    safe_answer: str
+    inherited_from_previous_query: str
+
+
+@dataclass
+class AftersalesOperationInheritance:
+    safe_answer: str
+    inherited_from_previous_query: str
 
 
 @dataclass
@@ -1440,6 +1612,141 @@ def detect_financial_risk_query(query: str) -> tuple[str, str] | None:
 
 def is_financial_risk_query(query: str) -> bool:
     return detect_financial_risk_query(query) is not None
+
+
+def detect_financial_risk_from_assistant_answer(answer: str) -> str | None:
+    stripped = str(answer or "").strip()
+    if not stripped:
+        return None
+    for query_type, signals in FINANCIAL_ASSISTANT_ANSWER_SIGNALS:
+        if contains_any(stripped, signals):
+            return query_type
+    return None
+
+
+def inherit_financial_risk_from_previous(
+    current_query: str,
+    previous_user_query: str | None = None,
+    previous_assistant_answer: str | None = None,
+) -> FinancialRiskInheritance | None:
+    current = str(current_query or "").strip()
+    previous_user = str(previous_user_query or "").strip()
+    previous_answer = str(previous_assistant_answer or "").strip()
+    if not current or not previous_user:
+        return None
+    if not is_followup_query(current):
+        return None
+
+    inherited_type: str | None = None
+    financial_from_previous = detect_financial_risk_query(previous_user)
+    if financial_from_previous:
+        inherited_type = financial_from_previous[0]
+    else:
+        inherited_type = detect_financial_risk_from_assistant_answer(previous_answer)
+
+    if not inherited_type or inherited_type not in FINANCIAL_RISK_QUERY_TYPES:
+        return None
+
+    safe_answer = FINANCIAL_SAFE_ANSWER_BY_TYPE.get(inherited_type)
+    if not safe_answer:
+        return None
+
+    return FinancialRiskInheritance(
+        query_type=inherited_type,
+        safe_answer=safe_answer,
+        inherited_from_previous_query=previous_user,
+    )
+
+
+def is_pure_size_consultation_query(normalized: str) -> bool:
+    if contains_any(normalized, AFTERSALES_OPERATION_CONTEXT_KEYWORDS):
+        return False
+    if re.search(r"\u6362\s*\d{2}\s*\u7801|\u6362\u6210\d{2}|\u6362\d{2}\u7801", normalized):
+        return False
+    if contains_any(normalized, AFTERSALES_SIZE_CONSULTATION_KEYWORDS):
+        return True
+    if re.search(r"\d{2}\u7801", normalized) and contains_any(
+        normalized, ["\u9002\u5408", "\u591a\u957f", "\u600e\u4e48\u9009", "\u6807\u51c6", "\u5bf9\u5e94"]
+    ):
+        return True
+    if ("\u5927\u4e00\u7801" in normalized or "\u5c0f\u4e00\u7801" in normalized) and "\u6362" not in normalized:
+        return True
+    return False
+
+
+def is_aftersales_operation_request(query: str) -> bool:
+    stripped = str(query or "").strip()
+    if not stripped:
+        return False
+    normalized = re.sub(r"\s+", "", stripped)
+    if is_pure_size_consultation_query(normalized):
+        return False
+    if contains_any(normalized, AFTERSALES_RESHIP_KEYWORDS):
+        return True
+    if contains_any(normalized, AFTERSALES_RETURN_RESHIP_KEYWORDS):
+        return True
+    if contains_any(normalized, AFTERSALES_BACKEND_ACTION_KEYWORDS):
+        return True
+    if contains_any(normalized, AFTERSALES_SIZE_EXCHANGE_KEYWORDS):
+        return True
+    if re.search(r"\u6362\s*\d{2}\s*\u7801|\u6362\u6210\d{2}|\u6362\d{2}\u7801", normalized):
+        return True
+    has_size_code = bool(re.search(r"\d{2}\u7801", normalized))
+    has_operation_context = contains_any(
+        normalized,
+        ["\u8865\u53d1", "\u91cd\u53d1", "\u6362\u8d27", "\u9000\u56de", "\u5bc4\u56de", "\u53d1\u65b0", "\u6362\u65b0"],
+    )
+    if has_operation_context and has_size_code:
+        return True
+    if contains_any(normalized, ["\u53d1\u65b0", "\u6362\u65b0"]) and contains_any(
+        normalized, ["\u5bc4\u56de", "\u9000\u56de", "\u9000"]
+    ):
+        return True
+    return False
+
+
+def detect_aftersales_operation_from_assistant_answer(answer: str) -> bool:
+    stripped = str(answer or "").strip()
+    if not stripped:
+        return False
+    return contains_any(stripped, AFTERSALES_ASSISTANT_ANSWER_SIGNALS)
+
+
+def is_aftersales_followup_query(query: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(query or "").strip())
+    if not normalized:
+        return False
+    return contains_any(normalized, AFTERSALES_FOLLOWUP_PHRASES)
+
+
+def inherit_aftersales_operation_from_previous(
+    current_query: str,
+    previous_user_query: str | None = None,
+    previous_assistant_answer: str | None = None,
+) -> AftersalesOperationInheritance | None:
+    current = str(current_query or "").strip()
+    previous_user = str(previous_user_query or "").strip()
+    previous_answer = str(previous_assistant_answer or "").strip()
+    if not current or not previous_user:
+        return None
+
+    previous_is_aftersales = is_aftersales_operation_request(previous_user) or detect_aftersales_operation_from_assistant_answer(
+        previous_answer
+    )
+    if not previous_is_aftersales:
+        return None
+
+    if not (
+        is_followup_query(current)
+        or is_aftersales_followup_query(current)
+        or is_aftersales_operation_request(current)
+    ):
+        return None
+
+    return AftersalesOperationInheritance(
+        safe_answer=AFTERSALES_OPERATION_SAFE_ANSWER,
+        inherited_from_previous_query=previous_user,
+    )
 
 
 def expand_retrieval_query(user_question: str) -> str:
@@ -2224,6 +2531,8 @@ def run_rag_query(
             "policy_category": None,
             "original_results": [],
             "reranked_results": [],
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": "",
             **debug,
         }
 
@@ -2240,6 +2549,8 @@ def run_rag_query(
             "policy_category": None,
             "original_results": [],
             "reranked_results": [],
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": "",
             **debug,
         }
 
@@ -2257,6 +2568,72 @@ def run_rag_query(
             "policy_category": None,
             "original_results": [],
             "reranked_results": [],
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": "",
+            **debug,
+        }
+
+    inherited_financial = inherit_financial_risk_from_previous(
+        question,
+        previous_user_query=previous_user_query,
+        previous_assistant_answer=previous_assistant_answer,
+    )
+    if inherited_financial:
+        return {
+            "question": question,
+            "final_answer": finalize_answer(inherited_financial.safe_answer),
+            "requires_backend_api": inherited_financial.query_type == "refund_status_or_amount_request",
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": inherited_financial.query_type,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            "inherited_financial_risk": True,
+            "inherited_from_previous_query": inherited_financial.inherited_from_previous_query,
+            "inherited_aftersales_operation": False,
+            **debug,
+        }
+
+    inherited_aftersales = inherit_aftersales_operation_from_previous(
+        question,
+        previous_user_query=previous_user_query,
+        previous_assistant_answer=previous_assistant_answer,
+    )
+    if inherited_aftersales:
+        return {
+            "question": question,
+            "final_answer": finalize_answer(inherited_aftersales.safe_answer),
+            "requires_backend_api": True,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": AFTERSALES_OPERATION_QUERY_TYPE,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": inherited_aftersales.inherited_from_previous_query,
+            "inherited_aftersales_operation": True,
+            **debug,
+        }
+
+    if is_aftersales_operation_request(question):
+        return {
+            "question": question,
+            "final_answer": finalize_answer(AFTERSALES_OPERATION_SAFE_ANSWER),
+            "requires_backend_api": True,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": AFTERSALES_OPERATION_QUERY_TYPE,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": "",
+            "inherited_aftersales_operation": False,
             **debug,
         }
 
@@ -2308,6 +2685,9 @@ def run_rag_query(
         "policy_category": policy_category,
         "original_results": original_results,
         "reranked_results": reranked_results,
+        "inherited_financial_risk": False,
+        "inherited_from_previous_query": "",
+        "inherited_aftersales_operation": False,
         **debug,
     }
 
