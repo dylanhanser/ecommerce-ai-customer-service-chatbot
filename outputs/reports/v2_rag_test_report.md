@@ -1,6 +1,6 @@
 # V2 Mixed Corpus RAG Test Report
 
-- Generated: 2026-07-06 20:04 UTC
+- Generated: 2026-07-08 17:10 UTC
 - Corpus: 15,688 docs (QA + reviewed snippets)
 - LLM mode: mock
 - Pass rate: **20/20**

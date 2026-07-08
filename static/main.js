@@ -7,6 +7,7 @@ const backendFlag = document.querySelector("#backendFlag");
 const invalidFlag = document.querySelector("#invalidFlag");
 const skipFlag = document.querySelector("#skipFlag");
 const queryTypeFlag = document.querySelector("#queryTypeFlag");
+const followupDebug = document.querySelector("#followupDebug");
 const retrievedResults = document.querySelector("#retrievedResults");
 const rerankedResults = document.querySelector("#rerankedResults");
 
@@ -128,6 +129,13 @@ function renderResponse(data) {
     data.requires_backend_api,
     data.requires_backend_api,
   );
+  followupDebug.textContent = [
+    `original_query: ${asText(data.original_query || data.question)}`,
+    `is_followup_query: ${Boolean(data.is_followup_query)}`,
+    `contextual_query: ${asText(data.contextual_query)}`,
+    `previous_user_query: ${asText(data.previous_user_query)}`,
+    `retrieval_query: ${asText(data.retrieval_query)}`,
+  ].join("\n");
   if (data.skip_retrieval) {
     renderSkipped(retrievedResults);
     renderSkipped(rerankedResults);

@@ -26,10 +26,13 @@ if str(OUTPUTS_DIR) not in sys.path:
 import rag_answer_demo as rag  # noqa: E402
 
 DEFAULT_CACHE_DIR = rag.DEFAULT_CACHE_ROOT
+DEFAULT_SESSION_ID = "demo"
+MAX_SESSION_HISTORY_TURNS = 3
 
 
 class ChatRequest(BaseModel):
     question: str
+    session_id: str = DEFAULT_SESSION_ID
 
 
 class RAGEngine:
@@ -43,6 +46,7 @@ class RAGEngine:
         self.corpus = None
         self.embeddings = None
         self.llm_config = None
+        self.session_history: dict[str, list[dict[str, str]]] = {}
 
     def load(self) -> None:
         with self.lock:
@@ -93,79 +97,60 @@ class RAGEngine:
             )
             self.loaded = True
 
-    def chat(self, question: str) -> dict[str, Any]:
-        skip_retrieval, guarded_type, guarded_answer = rag.intent_guard(question)
-        if skip_retrieval:
-            backend_required = guarded_type == "backend_required"
-            invalid_input = guarded_type == "unclear"
-            return {
-                "question": question,
-                "final_answer": guarded_answer,
-                "requires_backend_api": backend_required,
-                "invalid_input": invalid_input,
-                "skip_retrieval": True,
-                "skip_llm": True,
-                "query_type": guarded_type,
-                "policy_category": None,
-                "retrieved_results": [],
-                "reranked_results": [],
-            }
+    def _get_previous_turn(self, session_id: str) -> tuple[str, str]:
+        history = self.session_history.get(session_id, [])
+        if not history:
+            return "", ""
+        last_turn = history[-1]
+        return last_turn.get("user", ""), last_turn.get("assistant", "")
 
-        invalid_input, invalid_answer = rag.invalid_input_guard(question)
-        if invalid_input:
-            return {
-                "question": question,
-                "final_answer": invalid_answer or rag.INVALID_INPUT_ANSWER,
-                "requires_backend_api": False,
-                "invalid_input": True,
-                "skip_retrieval": True,
-                "skip_llm": True,
-                "query_type": "unclear",
-                "policy_category": None,
-                "retrieved_results": [],
-                "reranked_results": [],
-            }
+    def _append_turn(self, session_id: str, user_query: str, assistant_answer: str) -> None:
+        history = self.session_history.setdefault(session_id, [])
+        history.append({"user": user_query, "assistant": assistant_answer})
+        if len(history) > MAX_SESSION_HISTORY_TURNS:
+            self.session_history[session_id] = history[-MAX_SESSION_HISTORY_TURNS:]
 
+    def chat(self, question: str, session_id: str = DEFAULT_SESSION_ID) -> dict[str, Any]:
         self.load()
         top_k = int(os.getenv("RAG_TOP_K", "10"))
         threshold = float(
             os.getenv("RAG_LOW_CONFIDENCE_THRESHOLD", str(rag.LOW_CONFIDENCE_THRESHOLD))
         )
+        previous_user_query, previous_assistant_answer = self._get_previous_turn(session_id)
 
-        original_results = rag.retrieve(
+        result = rag.run_rag_query(
             question,
             self.corpus,
             self.embeddings,
             self.embedding_model,
             top_k,
             self.cosine_similarity,
-        )
-        reranked_results, policy_category = rag.rerank_retrieved_results(
-            question, original_results
-        )
-        backend_required = rag.resolve_backend_required(question, reranked_results)
-        query_type = rag.detect_query_type(question, backend_required, policy_category)
-        final_answer, _prompt = rag.generate_final_answer(
-            question,
-            original_results,
-            reranked_results,
             threshold,
             self.llm_config,
-            backend_required,
-            query_type=query_type,
+            previous_user_query=previous_user_query or None,
+            previous_assistant_answer=previous_assistant_answer or None,
         )
 
+        final_answer = result.get("final_answer", "")
+        if final_answer:
+            self._append_turn(session_id, question, final_answer)
+
         return {
-            "question": question,
+            "question": result["question"],
             "final_answer": final_answer,
-            "requires_backend_api": backend_required,
-            "invalid_input": False,
-            "skip_retrieval": False,
-            "skip_llm": backend_required,
-            "query_type": query_type,
-            "policy_category": policy_category,
-            "retrieved_results": serialize_results(original_results),
-            "reranked_results": serialize_results(reranked_results),
+            "requires_backend_api": result["requires_backend_api"],
+            "invalid_input": result["invalid_input"],
+            "skip_retrieval": result["skip_retrieval"],
+            "skip_llm": result.get("skip_llm", result["requires_backend_api"]),
+            "query_type": result["query_type"],
+            "policy_category": result.get("policy_category"),
+            "original_query": result.get("original_query", question),
+            "is_followup_query": result.get("is_followup_query", False),
+            "contextual_query": result.get("contextual_query", question),
+            "previous_user_query": result.get("previous_user_query", ""),
+            "retrieval_query": result.get("retrieval_query", question),
+            "retrieved_results": serialize_results(result.get("original_results", [])),
+            "reranked_results": serialize_results(result.get("reranked_results", [])),
         }
 
 
@@ -213,7 +198,8 @@ def index(request: Request):
 @app.post("/chat")
 def chat(request: ChatRequest):
     question = request.question.strip()
+    session_id = (request.session_id or DEFAULT_SESSION_ID).strip() or DEFAULT_SESSION_ID
     try:
-        return engine.chat(question)
+        return engine.chat(question, session_id=session_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

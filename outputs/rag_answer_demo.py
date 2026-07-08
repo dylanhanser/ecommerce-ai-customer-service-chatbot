@@ -490,6 +490,151 @@ POST_SHIP_REFUND_SAFE_ANSWER = (
     "\u5f85\u7269\u6d41\u9000\u56de\u540e\u518d\u7533\u8bf7\u6216\u5904\u7406\u9000\u6b3e\u3002"
     "\u5177\u4f53\u62e6\u622a\u7ed3\u679c\u3001\u9000\u6b3e\u8fdb\u5ea6\u548c\u8ba2\u5355\u72b6\u6001\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u540e\u53f0\u4fe1\u606f\u6838\u5b9e\u54e6\u3002"
 )
+DEMO_CANNOT_OPERATE_BACKEND_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u5f53\u524d demo \u65e0\u6cd5\u76f4\u63a5\u64cd\u4f5c\u8ba2\u5355\u6216\u7269\u6d41\u540e\u53f0\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u540e\u53f0\u4fe1\u606f\u4e3a\u60a8\u5904\u7406\u54e6\u3002"
+)
+COMPENSATION_FOLLOWUP_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u662f\u5426\u8865\u507f\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u8ba2\u5355\u3001"
+    "\u7167\u7247\u548c\u5e73\u53f0\u552e\u540e\u89c4\u5219\u6838\u5b9e\uff0c"
+    "\u5f53\u524d demo \u4e0d\u627f\u8bfa\u5177\u4f53\u8865\u507f\u91d1\u989d\u3002"
+)
+FOLLOWUP_QUERY_PHRASES = [
+    "\u771f\u7684\u5417",
+    "\u771f\u7684\u554a",
+    "\u786e\u5b9a\u5417",
+    "\u662f\u5417",
+    "\u53ef\u4ee5\u5417",
+    "\u884c\u5417",
+    "\u80fd\u5417",
+    "\u4e3a\u4ec0\u4e48",
+    "\u4e3a\u5565",
+    "\u90a3\u600e\u4e48\u529e",
+    "\u600e\u4e48\u529e",
+    "\u600e\u4e48\u5904\u7406",
+    "\u7136\u540e\u5462",
+    "\u90a3\u5462",
+    "\u4e0b\u96e8\u5462",
+    "\u6cb9\u5730\u5462",
+    "\u6709\u6c34\u5462",
+    "\u6e7f\u5730\u5462",
+    "\u90a3\u80fd\u9000\u5417",
+    "\u90a3\u80fd\u6362\u5417",
+    "\u90a3\u80fd\u8d54\u5417",
+    "\u90a3\u591a\u4e45\u5230\u8d26",
+    "\u90a3\u591a\u4e45\u9000",
+    "\u4f60\u80fd\u5904\u7406\u5417",
+    "\u4f60\u5e2e\u6211\u5904\u7406",
+    "\u90a3\u600e\u4e48\u5f04",
+    "\u90a3\u4e25\u91cd\u5417",
+    "\u4e25\u91cd\u5417",
+    "\u90a3\u80fd\u8d54\u5417",
+    "\u80fd\u8d54\u5417",
+    "\u80fd\u8865\u507f\u5417",
+    "\u90a3\u80fd\u8865\u507f\u5417",
+    "\u90a3\u600e\u4e48\u9000",
+    "\u90a3\u6211\u600e\u4e48\u529e",
+    "\u90a3\u4f60\u5e2e\u6211\u5904\u7406",
+    "\u90a3\u4f60\u5e2e\u6211\u5904\u7406\u5427",
+]
+BACKEND_ACTION_FOLLOWUP_KEYWORDS = [
+    "\u4f60\u80fd\u5904\u7406\u5417",
+    "\u4f60\u5e2e\u6211\u5904\u7406",
+    "\u5e2e\u6211\u5904\u7406",
+    "\u90a3\u4f60\u5e2e\u6211",
+    "\u90a3\u4f60\u5e2e\u6211\u5904\u7406",
+]
+COMPENSATION_FOLLOWUP_KEYWORDS = [
+    "\u90a3\u80fd\u8d54\u5417",
+    "\u80fd\u8d54\u5417",
+    "\u80fd\u8865\u507f\u5417",
+    "\u90a3\u80fd\u8865\u507f\u5417",
+    "\u8d54\u5417",
+    "\u8865\u507f\u5417",
+]
+SLIP_TOPIC_CONTEXT_KEYWORDS = SLIP_CONTENT_KEYWORDS + [
+    "\u6ed1\u4e0d\u6ed1",
+    "\u4e0b\u96e8",
+    "\u96e8\u5929",
+    "\u6709\u6c34",
+    "\u6e7f\u6ed1",
+    "\u6709\u6cb9",
+]
+SLIP_FOLLOWUP_TRIGGERS = [
+    "\u771f\u7684\u5417",
+    "\u771f\u7684\u554a",
+    "\u786e\u5b9a\u5417",
+    "\u662f\u5417",
+    "\u4e0b\u96e8\u5462",
+    "\u6cb9\u5730\u5462",
+    "\u6709\u6c34\u5462",
+    "\u6e7f\u5730\u5462",
+]
+POST_SHIP_TOPIC_CONTEXT_KEYWORDS = POST_SHIP_QUERY_KEYWORDS + POST_SHIP_CONTENT_KEYWORDS + [
+    "\u53d1\u51fa\u540e",
+    "\u9000\u6b3e",
+]
+POST_SHIP_FOLLOWUP_TRIGGERS = [
+    "\u90a3\u600e\u4e48\u529e",
+    "\u600e\u4e48\u5904\u7406",
+    "\u90a3\u600e\u4e48\u9000",
+    "\u90a3\u591a\u4e45\u5230\u8d26",
+    "\u4f60\u80fd\u5904\u7406\u5417",
+    "\u4f60\u5e2e\u6211\u5904\u7406",
+    "\u90a3\u4f60\u5e2e\u6211\u5904\u7406",
+    "\u90a3\u4f60\u5e2e\u6211\u5904\u7406\u5427",
+]
+QUALITY_TOPIC_CONTEXT_KEYWORDS = [
+    "\u5f00\u80f6",
+    "\u8d28\u91cf\u95ee\u9898",
+    "\u53d1\u9519\u6b3e\u5f0f",
+    "\u9519\u53d1",
+    "\u8865\u507f",
+    "\u8d54\u507f",
+    "\u552e\u540e",
+]
+QUALITY_FOLLOWUP_TRIGGERS = [
+    "\u90a3\u80fd\u8d54\u5417",
+    "\u80fd\u8d54\u5417",
+    "\u80fd\u8865\u507f\u5417",
+    "\u90a3\u80fd\u8865\u507f\u5417",
+    "\u600e\u4e48\u5904\u7406",
+    "\u90a3\u600e\u4e48\u529e",
+]
+FOOT_TOPIC_CONTEXT_KEYWORDS = FOOT_DISCOMFORT_QUERY_KEYWORDS + [
+    "\u811a\u4e0d\u8212\u670d",
+    "\u811a\u90e8\u4e0d\u9002",
+    "\u76ae\u80a4\u79d1",
+    "\u533b\u751f",
+    "\u5c31\u533b",
+]
+FOOT_FOLLOWUP_TRIGGERS = [
+    "\u90a3\u600e\u4e48\u529e",
+    "\u4e25\u91cd\u5417",
+    "\u90a3\u4e25\u91cd\u5417",
+    "\u771f\u7684\u5417",
+    "\u600e\u4e48\u5904\u7406",
+]
+SLIP_FOLLOWUP_CONTEXTUAL_QUERY = (
+    "\u7528\u6237\u5728\u8ffd\u95ee\u4e0a\u4e00\u8f6e\u5173\u4e8e\u978b\u5e95\u9632\u6ed1\u7684\u95ee\u9898\uff1a"
+    "\u8fd9\u6b3e\u978b\u662f\u5426\u771f\u7684\u9632\u6ed1\uff1f"
+    "\u5728\u4e0b\u96e8\u3001\u6709\u6c34\u3001\u6709\u6cb9\u6216\u6e7f\u6ed1\u5730\u9762\u662f\u5426\u5bb9\u6613\u6253\u6ed1\uff1f"
+)
+POST_SHIP_FOLLOWUP_CONTEXTUAL_QUERY = (
+    "\u7528\u6237\u5728\u8ffd\u95ee\u5546\u54c1\u5df2\u53d1\u51fa\u540e\u7684\u9000\u6b3e\u5904\u7406\uff1a"
+    "\u662f\u5426\u9700\u8981\u7269\u6d41\u62e6\u622a\u3001\u62d2\u6536\u3001\u9000\u56de\u540e\u9000\u6b3e\uff0c"
+    "\u4ee5\u53ca\u662f\u5426\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u540e\u53f0\u6838\u5b9e\u3002"
+)
+QUALITY_FOLLOWUP_CONTEXTUAL_QUERY = (
+    "\u7528\u6237\u5728\u8ffd\u95ee\u552e\u540e\u8d28\u91cf\u95ee\u9898\u662f\u5426\u53ef\u4ee5\u8865\u507f\u6216\u5904\u7406\uff0c"
+    "\u9700\u8981\u7ed3\u5408\u8ba2\u5355\u3001\u7167\u7247\u548c\u5e73\u53f0\u552e\u540e\u89c4\u5219\u4eba\u5de5\u6838\u5b9e\uff0c"
+    "\u4e0d\u80fd\u627f\u8bfa\u5177\u4f53\u8865\u507f\u91d1\u989d\u3002"
+)
+FOOT_FOLLOWUP_CONTEXTUAL_QUERY = (
+    "\u7528\u6237\u5728\u8ffd\u95ee\u7a7f\u7740\u540e\u811a\u90e8\u4e0d\u9002\u95ee\u9898\uff0c"
+    "\u9700\u8981\u907f\u514d\u533b\u5b66\u8bca\u65ad\uff0c\u5efa\u8bae\u5c31\u533b\uff0c"
+    "\u5e76\u7531\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u8ba2\u5355\u548c\u552e\u540e\u89c4\u5219\u6838\u5b9e\u3002"
+)
 UNCLEAR_SHORT_KEYWORDS = [
     "\u4f55\u610f\u5473",
     "\u5565\u610f\u601d",
@@ -504,6 +649,16 @@ UNCLEAR_SHORT_KEYWORDS = [
     "\u55ef",
     "\u54e6",
 ]
+
+
+@dataclass
+class FollowupResolution:
+    is_followup_query: bool
+    original_query: str
+    contextual_query: str
+    previous_user_query: str
+    previous_assistant_answer: str
+    retrieval_query: str
 
 
 @dataclass
@@ -647,10 +802,14 @@ def is_generic_return_only_row(row) -> bool:
     return not contains_any(combined, POST_SHIP_CONTENT_KEYWORDS)
 
 
-def resolve_backend_required(user_question: str, reranked_results: list) -> bool:
+def resolve_backend_required(
+    user_question: str,
+    reranked_results: list,
+    allow_top_row_inference: bool = True,
+) -> bool:
     if requires_backend_api(user_question):
         return True
-    if not reranked_results:
+    if not allow_top_row_inference or not reranked_results:
         return False
     top_row, top_score = reranked_results[0][0], float(reranked_results[0][1])
     if row_is_backend_only(top_row) and top_score >= 0.62 and not is_business_query(user_question):
@@ -924,6 +1083,8 @@ def is_foot_discomfort_query(user_question: str) -> bool:
     normalized = normalize_query_text(user_question)
     if contains_any(normalized, FOOT_DISCOMFORT_QUERY_KEYWORDS):
         return True
+    if "\u811a\u90e8\u4e0d\u9002" in normalized:
+        return True
     return "\u811a" in normalized and "\u4e0d\u8212\u670d" in normalized
 
 
@@ -946,6 +1107,151 @@ def expand_retrieval_query(user_question: str) -> str:
     if is_foot_discomfort_query(user_question):
         return f"{user_question.strip()} 就医 医生 皮肤科 脚部不适 人工核实"
     return user_question.strip()
+
+
+def count_effective_query_chars(query: str) -> int:
+    compact = re.sub(r"\s+", "", str(query or ""))
+    return len(re.findall(r"[\u4e00-\u9fffA-Za-z0-9]", compact))
+
+
+def is_intent_guard_priority_query(query: str) -> bool:
+    skip_retrieval, _guarded_type, _answer = intent_guard(query)
+    return skip_retrieval
+
+
+def is_followup_query(query: str) -> bool:
+    stripped = str(query or "").strip()
+    if not stripped:
+        return False
+    if is_intent_guard_priority_query(stripped):
+        return False
+
+    normalized = re.sub(r"\s+", "", stripped)
+    if contains_any(normalized, IDENTITY_QUERY_KEYWORDS):
+        return False
+    if contains_any(normalized, HUMAN_HANDOVER_KEYWORDS):
+        return False
+    if requires_backend_api(stripped):
+        return False
+    if contains_any(normalized, ABUSIVE_OR_IRRELEVANT_KEYWORDS):
+        return False
+
+    if contains_any(normalized, FOLLOWUP_QUERY_PHRASES):
+        return True
+
+    if len(normalized) <= 8 or count_effective_query_chars(stripped) <= 6:
+        if is_business_query(stripped) and not contains_any(normalized, FOLLOWUP_QUERY_PHRASES):
+            return False
+        return True
+    return False
+
+
+def _combined_topic_text(previous_user_query: str, previous_assistant_answer: str) -> str:
+    return f"{previous_user_query or ''}{previous_assistant_answer or ''}"
+
+
+def build_contextual_query(
+    current_query: str,
+    previous_user_query: str,
+    previous_assistant_answer: str = "",
+) -> str:
+    current = str(current_query or "").strip()
+    previous_user = str(previous_user_query or "").strip()
+    if not previous_user:
+        return current
+
+    combined_topic = _combined_topic_text(previous_user, previous_assistant_answer)
+    normalized_current = re.sub(r"\s+", "", current)
+
+    if contains_any(combined_topic, SLIP_TOPIC_CONTEXT_KEYWORDS) and contains_any(
+        normalized_current, SLIP_FOLLOWUP_TRIGGERS
+    ):
+        return SLIP_FOLLOWUP_CONTEXTUAL_QUERY
+
+    if contains_any(combined_topic, POST_SHIP_TOPIC_CONTEXT_KEYWORDS) and contains_any(
+        normalized_current, POST_SHIP_FOLLOWUP_TRIGGERS
+    ):
+        return POST_SHIP_FOLLOWUP_CONTEXTUAL_QUERY
+
+    if contains_any(combined_topic, QUALITY_TOPIC_CONTEXT_KEYWORDS) and contains_any(
+        normalized_current, QUALITY_FOLLOWUP_TRIGGERS
+    ):
+        return QUALITY_FOLLOWUP_CONTEXTUAL_QUERY
+
+    if contains_any(combined_topic, FOOT_TOPIC_CONTEXT_KEYWORDS) and contains_any(
+        normalized_current, FOOT_FOLLOWUP_TRIGGERS
+    ):
+        return FOOT_FOLLOWUP_CONTEXTUAL_QUERY
+
+    return f"{previous_user} {current}".strip()
+
+
+def resolve_followup_context(
+    current_query: str,
+    previous_user_query: str | None = None,
+    previous_assistant_answer: str | None = None,
+) -> FollowupResolution:
+    original = str(current_query or "").strip()
+    previous_user = str(previous_user_query or "").strip()
+    previous_answer = str(previous_assistant_answer or "").strip()
+    has_previous = bool(previous_user)
+
+    if has_previous and is_followup_query(original):
+        contextual = build_contextual_query(original, previous_user, previous_answer)
+        retrieval_query = contextual
+        is_followup = True
+    else:
+        contextual = original
+        retrieval_query = original
+        is_followup = False
+
+    return FollowupResolution(
+        is_followup_query=is_followup,
+        original_query=original,
+        contextual_query=contextual,
+        previous_user_query=previous_user,
+        previous_assistant_answer=previous_answer,
+        retrieval_query=retrieval_query,
+    )
+
+
+def try_followup_safe_answer(
+    current_query: str,
+    retrieval_query: str,
+    previous_user_query: str | None,
+    previous_assistant_answer: str | None,
+) -> str | None:
+    if not previous_user_query or not is_followup_query(current_query):
+        return None
+
+    normalized_current = re.sub(r"\s+", "", current_query)
+    combined_prev = _combined_topic_text(previous_user_query or "", previous_assistant_answer or "")
+
+    if contains_any(normalized_current, BACKEND_ACTION_FOLLOWUP_KEYWORDS):
+        if is_post_ship_refund_query(retrieval_query) or contains_any(
+            combined_prev, POST_SHIP_TOPIC_CONTEXT_KEYWORDS
+        ):
+            return DEMO_CANNOT_OPERATE_BACKEND_ANSWER
+
+    if contains_any(normalized_current, COMPENSATION_FOLLOWUP_KEYWORDS):
+        if (
+            is_glue_quality_query(retrieval_query)
+            or is_wrong_item_query(retrieval_query)
+            or contains_any(combined_prev, QUALITY_TOPIC_CONTEXT_KEYWORDS)
+        ):
+            return COMPENSATION_FOLLOWUP_SAFE_ANSWER
+
+    return None
+
+
+def followup_debug_info(followup: FollowupResolution) -> dict[str, str | bool]:
+    return {
+        "original_query": followup.original_query,
+        "is_followup_query": followup.is_followup_query,
+        "contextual_query": followup.contextual_query,
+        "previous_user_query": followup.previous_user_query,
+        "retrieval_query": followup.retrieval_query,
+    }
 
 
 def apply_domain_rerank_rules(
@@ -1113,18 +1419,20 @@ def detect_query_type(
     user_question: str,
     backend_required: bool | None = None,
     policy_category: str | None = None,
+    domain_query: str | None = None,
 ) -> str:
     skip_retrieval, guarded_type, _answer = intent_guard(user_question)
     if skip_retrieval:
         return guarded_type
+    effective_query = str(domain_query or user_question)
     if backend_required is None:
         backend_required = requires_backend_api(user_question)
     if backend_required:
         return "backend_required"
-    if is_product_attribute_query(user_question):
+    if is_product_attribute_query(effective_query):
         return "product_attribute"
     if policy_category is None:
-        policy_category = detect_policy_category(user_question)
+        policy_category = detect_policy_category(effective_query)
     if policy_category:
         return "general_policy"
     return "normal"
@@ -1236,6 +1544,8 @@ def build_rag_prompt(
     retrieved_results: Iterable[tuple],
     query_type: str = "normal",
     backend_required: bool = False,
+    contextual_query: str | None = None,
+    is_followup: bool = False,
 ) -> str:
     context_blocks = []
     for rank, result in enumerate(retrieved_results, start=1):
@@ -1282,6 +1592,13 @@ def build_rag_prompt(
             "\u4e0d\u80fd\u7528\u6765\u627f\u8bfa\u5177\u4f53\u8ba2\u5355\u72b6\u6001\u3001\u8865\u507f\u91d1\u989d\u3001"
             "\u9000\u6b3e/\u5230\u8d26\u8fdb\u5ea6\u6216\u7269\u6d41\u7ed3\u8bba\u3002"
         )
+    followup_rule = ""
+    if is_followup and contextual_query and contextual_query != user_question:
+        followup_rule = (
+            f"\n\u8865\u5145\uff1a\u7528\u6237\u5f53\u524d\u662f\u5728\u8ffd\u95ee\u4e0a\u4e00\u8f6e\u8bdd\u9898\u3002"
+            f"\u4e0a\u4e0b\u6587\u68c0\u7d22\u4e3b\u9898\uff1a{contextual_query}"
+            f"\n\u8bf7\u7ed3\u5408\u8be5\u8bdd\u9898\u56de\u7b54\u7528\u6237\u7684\u7b80\u77ed\u8ffd\u95ee\u300c{user_question}\u300d\u3002"
+        )
     return f"""\u4f60\u662f\u4eac\u4e1c\u5e97\u94fa\u5ba2\u670d\u52a9\u624b\u3002\u8bf7\u53ea\u57fa\u4e8e\u4e0b\u9762\u68c0\u7d22\u5230\u7684\u5386\u53f2\u5ba2\u670d QA \u4e0e\u5ba1\u6838\u8fc7\u7684\u8bdd\u672f\u77e5\u8bc6\u5e93\u56de\u7b54\u7528\u6237\u5f53\u524d\u95ee\u9898\u3002
 
 \u786c\u6027\u8981\u6c42\uff1a
@@ -1296,6 +1613,7 @@ def build_rag_prompt(
 9. Final answer must be concise. Do not copy long retrieved answers directly. Ignore irrelevant sales, shipping, refund, compensation, logistics, and after-sales content unless the user explicitly asks about them. Do not include unrelated policies.
 {backend_rule}
 {product_attribute_rule}
+{followup_rule}
 
 \u7528\u6237\u95ee\u9898\uff1a
 {user_question}
@@ -1375,11 +1693,17 @@ def finalize_answer(answer: str) -> str:
     return cleanup_final_answer(answer)
 
 
-def mock_llm_answer(user_question: str, retrieved_results: list, prompt: str) -> str:
+def mock_llm_answer(
+    user_question: str,
+    retrieved_results: list,
+    prompt: str,
+    domain_query: str | None = None,
+) -> str:
     del prompt
+    effective_query = domain_query or user_question
     if not retrieved_results:
         return SAFE_HUMAN_VERIFICATION_ANSWER
-    conservative = try_conservative_topic_answer(user_question, retrieved_results)
+    conservative = try_conservative_topic_answer(effective_query, retrieved_results)
     if conservative:
         return conservative
     top_row = retrieved_results[0][0]
@@ -1460,26 +1784,42 @@ def generate_final_answer(
     llm_config: LLMConfig,
     backend_required: bool,
     query_type: str = "normal",
+    retrieval_query: str | None = None,
+    previous_user_query: str | None = None,
+    previous_assistant_answer: str | None = None,
+    is_followup: bool = False,
+    contextual_query: str | None = None,
 ) -> tuple[str, str]:
+    domain_query = retrieval_query or user_question
     if not original_results:
         return finalize_answer(LOW_CONFIDENCE_ANSWER), ""
     answer_context = filter_results_for_answer_generation(
-        reranked_results, backend_required, user_question=user_question
+        reranked_results, backend_required, user_question=domain_query
     )
     prompt = build_rag_prompt(
         user_question,
         answer_context,
         query_type=query_type,
         backend_required=backend_required,
+        contextual_query=contextual_query or domain_query,
+        is_followup=is_followup,
     )
+    followup_safe = try_followup_safe_answer(
+        user_question,
+        domain_query,
+        previous_user_query,
+        previous_assistant_answer,
+    )
+    if followup_safe:
+        return finalize_answer(followup_safe), prompt
     if backend_required:
         return finalize_answer(BACKEND_REQUIRED_ANSWER), prompt
-    conservative = try_conservative_topic_answer(user_question, answer_context)
+    conservative = try_conservative_topic_answer(domain_query, answer_context)
     if conservative:
         return finalize_answer(conservative), prompt
     if not answer_context:
         return finalize_answer(SAFE_HUMAN_VERIFICATION_ANSWER), prompt
-    if query_type == "product_attribute" and is_soft_hard_sole_query(user_question):
+    if query_type == "product_attribute" and is_soft_hard_sole_query(domain_query):
         return finalize_answer(SOFT_HARD_SOLE_ANSWER), prompt
     if original_results[0][1] < low_confidence_threshold:
         return finalize_answer(LOW_CONFIDENCE_ANSWER), prompt
@@ -1493,9 +1833,116 @@ def generate_final_answer(
             print(f"DeepSeek API failed; fallback to mock. Error: {exc}")
     if query_type == "product_attribute":
         return finalize_answer(
-            product_attribute_fallback_answer(user_question, answer_context)
+            product_attribute_fallback_answer(domain_query, answer_context)
         ), prompt
-    return finalize_answer(mock_llm_answer(user_question, answer_context, prompt)), prompt
+    return finalize_answer(
+        mock_llm_answer(user_question, answer_context, prompt, domain_query=domain_query)
+    ), prompt
+
+
+def run_rag_query(
+    user_question: str,
+    corpus,
+    embeddings,
+    embedding_model,
+    top_k: int,
+    cosine_similarity,
+    low_confidence_threshold: float,
+    llm_config: LLMConfig,
+    previous_user_query: str | None = None,
+    previous_assistant_answer: str | None = None,
+) -> dict:
+    question = str(user_question or "").strip()
+    followup = resolve_followup_context(
+        question,
+        previous_user_query=previous_user_query,
+        previous_assistant_answer=previous_assistant_answer,
+    )
+    debug = followup_debug_info(followup)
+
+    skip_retrieval, guarded_type, guarded_answer = intent_guard(question)
+    if skip_retrieval:
+        backend_required = guarded_type == "backend_required"
+        return {
+            "question": question,
+            "final_answer": finalize_answer(guarded_answer or ""),
+            "requires_backend_api": backend_required,
+            "invalid_input": guarded_type == "unclear",
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": guarded_type,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            **debug,
+        }
+
+    invalid_input, invalid_answer = invalid_input_guard(question)
+    if invalid_input:
+        return {
+            "question": question,
+            "final_answer": finalize_answer(invalid_answer or INVALID_INPUT_ANSWER),
+            "requires_backend_api": False,
+            "invalid_input": True,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": "unclear",
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            **debug,
+        }
+
+    retrieval_query = followup.retrieval_query
+    original_results = retrieve(
+        retrieval_query,
+        corpus,
+        embeddings,
+        embedding_model,
+        top_k,
+        cosine_similarity,
+    )
+    reranked_results, policy_category = rerank_retrieved_results(
+        retrieval_query, original_results
+    )
+    backend_required = resolve_backend_required(
+        question,
+        reranked_results,
+        allow_top_row_inference=not followup.is_followup_query,
+    )
+    query_type = detect_query_type(
+        question,
+        backend_required,
+        policy_category,
+        domain_query=retrieval_query,
+    )
+    final_answer, _prompt = generate_final_answer(
+        question,
+        original_results,
+        reranked_results,
+        low_confidence_threshold,
+        llm_config,
+        backend_required,
+        query_type=query_type,
+        retrieval_query=retrieval_query,
+        previous_user_query=followup.previous_user_query,
+        previous_assistant_answer=followup.previous_assistant_answer,
+        is_followup=followup.is_followup_query,
+        contextual_query=followup.contextual_query,
+    )
+    return {
+        "question": question,
+        "final_answer": final_answer,
+        "requires_backend_api": backend_required,
+        "invalid_input": False,
+        "skip_retrieval": False,
+        "skip_llm": backend_required,
+        "query_type": query_type,
+        "policy_category": policy_category,
+        "original_results": original_results,
+        "reranked_results": reranked_results,
+        **debug,
+    }
 
 
 def print_answer_results(
