@@ -499,6 +499,47 @@ COMPENSATION_FOLLOWUP_SAFE_ANSWER = (
     "\u7167\u7247\u548c\u5e73\u53f0\u552e\u540e\u89c4\u5219\u6838\u5b9e\uff0c"
     "\u5f53\u524d demo \u4e0d\u627f\u8bfa\u5177\u4f53\u8865\u507f\u91d1\u989d\u3002"
 )
+COMPENSATION_REQUEST_SAFE_ANSWER = (
+    "\u4eb2\u4eb2\uff0c\u8865\u507f\u91d1\u989d\u9700\u8981\u4eba\u5de5\u5ba2\u670d\u7ed3\u5408\u8ba2\u5355\u60c5\u51b5\u3001"
+    "\u5546\u54c1\u95ee\u9898\u548c\u5e73\u53f0\u552e\u540e\u89c4\u5219\u6838\u5b9e\u5904\u7406\uff0c"
+    "\u5f53\u524d demo \u4e0d\u80fd\u76f4\u63a5\u627f\u8bfa\u5177\u4f53\u8865\u507f\u91d1\u989d\uff0c"
+    "\u5efa\u8bae\u8f6c\u4eba\u5de5\u5ba2\u670d\u8fdb\u4e00\u6b65\u786e\u8ba4\u54e6\u3002"
+)
+COMPENSATION_REQUEST_KEYWORDS = [
+    "\u8865\u507f",
+    "\u8d54\u507f",
+    "\u8d54\u6211",
+    "\u8865\u6211",
+    "\u8865\u507f\u51e0\u5757",
+    "\u8865\u507f\u4e24\u5757",
+    "\u80fd\u7ed9\u6211\u8865\u507f",
+    "\u80fd\u8d54\u5417",
+    "\u80fd\u8865\u5417",
+    "\u80fd\u7ed9\u6211\u8865\u507f\u5417",
+]
+COMPENSATION_REQUEST_PATTERNS = [
+    re.compile(r"\u8865\u507f\s*\d+\s*\u5143"),
+    re.compile(r"\u8d54\s*\d+\s*\u5143"),
+    re.compile(r"\u9000\u6211\s*\d+\s*\u5143"),
+    re.compile(r"(\u8865\u507f|\u8d54\u507f|\u8d54|\u8865).{0,8}([一二两三四五六七八九十百千万\d]+)\s*\u5757"),
+    re.compile(r"\u80fd\u7ed9\u6211\u8865\u507f"),
+    re.compile(r"\u90a3\u80fd\u7ed9\u6211\u8865\u507f"),
+]
+COMPENSATION_REQUEST_SIGNAL_TERMS = [
+    "\u51e0\u5757",
+    "\u4e24\u5757",
+    "\u5757",
+    "\u5143",
+    "\u591a\u5c11",
+    "\u7ed9\u6211",
+    "\u8d54\u6211",
+    "\u8865\u6211",
+    "\u80fd\u8d54",
+    "\u80fd\u8865",
+    "\u80fd\u8865\u507f",
+    "\u80fd\u8d54\u507f",
+    "\u5417",
+]
 FOLLOWUP_QUERY_PHRASES = [
     "\u771f\u7684\u5417",
     "\u771f\u7684\u554a",
@@ -600,6 +641,8 @@ QUALITY_FOLLOWUP_TRIGGERS = [
     "\u90a3\u80fd\u8865\u507f\u5417",
     "\u600e\u4e48\u5904\u7406",
     "\u90a3\u600e\u4e48\u529e",
+    "\u90a3\u80fd\u7ed9\u6211\u8865\u507f",
+    "\u80fd\u7ed9\u6211\u8865\u507f",
 ]
 FOOT_TOPIC_CONTEXT_KEYWORDS = FOOT_DISCOMFORT_QUERY_KEYWORDS + [
     "\u811a\u4e0d\u8212\u670d",
@@ -1099,6 +1142,41 @@ def is_glue_quality_query(user_question: str) -> bool:
     return "\u5f00\u80f6" in normalized and "\u8d28\u91cf" in normalized
 
 
+def is_compensation_request(query: str) -> bool:
+    stripped = str(query or "").strip()
+    if not stripped:
+        return False
+    if requires_backend_api(stripped):
+        return False
+
+    normalized = re.sub(r"\s+", "", stripped)
+    for pattern in COMPENSATION_REQUEST_PATTERNS:
+        if pattern.search(normalized):
+            return True
+
+    if not contains_any(normalized, COMPENSATION_REQUEST_KEYWORDS):
+        return False
+
+    if normalized in {
+        "\u80fd\u8d54\u5417",
+        "\u80fd\u8865\u5417",
+        "\u80fd\u8d54\u507f\u5417",
+        "\u80fd\u8865\u507f\u5417",
+    }:
+        return True
+
+    if contains_any(normalized, COMPENSATION_REQUEST_SIGNAL_TERMS):
+        return True
+
+    return False
+
+
+def try_compensation_safe_answer(query: str) -> str | None:
+    if is_compensation_request(query):
+        return COMPENSATION_REQUEST_SAFE_ANSWER
+    return None
+
+
 def expand_retrieval_query(user_question: str) -> str:
     if is_slip_resistance_query(user_question):
         return f"{user_question.strip()}{SLIP_QUERY_EXPANSION}"
@@ -1196,7 +1274,7 @@ def resolve_followup_context(
     previous_answer = str(previous_assistant_answer or "").strip()
     has_previous = bool(previous_user)
 
-    if has_previous and is_followup_query(original):
+    if has_previous and (is_followup_query(original) or is_compensation_request(original)):
         contextual = build_contextual_query(original, previous_user, previous_answer)
         retrieval_query = contextual
         is_followup = True
@@ -1233,13 +1311,16 @@ def try_followup_safe_answer(
         ):
             return DEMO_CANNOT_OPERATE_BACKEND_ANSWER
 
-    if contains_any(normalized_current, COMPENSATION_FOLLOWUP_KEYWORDS):
+    if contains_any(normalized_current, COMPENSATION_FOLLOWUP_KEYWORDS) or is_compensation_request(
+        current_query
+    ):
         if (
             is_glue_quality_query(retrieval_query)
             or is_wrong_item_query(retrieval_query)
             or contains_any(combined_prev, QUALITY_TOPIC_CONTEXT_KEYWORDS)
+            or is_compensation_request(current_query)
         ):
-            return COMPENSATION_FOLLOWUP_SAFE_ANSWER
+            return COMPENSATION_REQUEST_SAFE_ANSWER
 
     return None
 
@@ -1812,6 +1893,9 @@ def generate_final_answer(
     )
     if followup_safe:
         return finalize_answer(followup_safe), prompt
+    compensation_safe = try_compensation_safe_answer(user_question)
+    if compensation_safe:
+        return finalize_answer(compensation_safe), prompt
     if backend_required:
         return finalize_answer(BACKEND_REQUIRED_ANSWER), prompt
     conservative = try_conservative_topic_answer(domain_query, answer_context)
@@ -1887,6 +1971,22 @@ def run_rag_query(
             "skip_retrieval": True,
             "skip_llm": True,
             "query_type": "unclear",
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            **debug,
+        }
+
+    compensation_safe = try_compensation_safe_answer(question)
+    if compensation_safe:
+        return {
+            "question": question,
+            "final_answer": finalize_answer(compensation_safe),
+            "requires_backend_api": False,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": "compensation_request",
             "policy_category": None,
             "original_results": [],
             "reranked_results": [],

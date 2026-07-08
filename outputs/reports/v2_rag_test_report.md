@@ -1,9 +1,9 @@
 # V2 Mixed Corpus RAG Test Report
 
-- Generated: 2026-07-08 17:10 UTC
+- Generated: 2026-07-08 17:32 UTC
 - Corpus: 15,688 docs (QA + reviewed snippets)
 - LLM mode: mock
-- Pass rate: **20/20**
+- Pass rate: **21/21**
 
 ## Results
 
@@ -29,6 +29,7 @@
 | 18 | 人工 | human_handover | — | — | — | false | 亲亲，好的，这个问题建议转人工客服为您进一步处理。当前 demo 暂未接入真实人工客服系统，正式系统中会在这里进行人工转接。 | Pass | intent guard 正确拦截 |
 | 19 | 你好蠢 | abusive_or_emotional | — | — | — | false | 亲亲，我会尽量帮您解决问题，麻烦您具体描述一下商品、尺码、订单或售后问题哦。 | Pass | intent guard 正确拦截 |
 | 20 | sb | abusive_or_emotional | — | — | — | false | 亲亲，我会尽量帮您解决问题，麻烦您具体描述一下商品、尺码、订单或售后问题哦。 | Pass | intent guard 正确拦截 |
+| 21 | 能给我补偿两块吗 | compensation_request | — | — | — | false | 亲亲，补偿金额需要人工客服结合订单情况、商品问题和平台售后规则核实处理，当前 demo 不能直接承诺具体补偿金额，建议转人工客服进一步确认哦。 | Pass | 补偿金额请求返回保守边界，未承诺具体金额 |
 
 ## Failure Summary
 
@@ -43,3 +44,4 @@ All tests passed.
 | T11 脚不舒服就医/人工 | Pass |
 | T13 催快递后台约束 | Pass |
 | T16 身份 intent guard | Pass |
+| T21 补偿金额请求安全边界 | Pass |
