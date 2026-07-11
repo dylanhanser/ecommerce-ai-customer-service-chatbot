@@ -8,7 +8,7 @@ import hashlib
 import os
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -176,6 +176,7 @@ BACKEND_API_REQUIRED_KEYWORDS = [
     "\u591a\u4e45\u5230",
     "\u4eca\u5929\u80fd\u5230\u5417",
     "\u8ba2\u5355\u72b6\u6001",
+    "订单现在什么状态",
     "\u552e\u540e\u8fdb\u5ea6",
     "\u9000\u6b3e\u8fdb\u5ea6",
     "\u8865\u507f\u5230\u8d26",
@@ -898,6 +899,14 @@ BACKEND_ACTION_FOLLOWUP_KEYWORDS = [
     "\u90a3\u4f60\u5e2e\u6211",
     "\u90a3\u4f60\u5e2e\u6211\u5904\u7406",
 ]
+BACKEND_STATE_FOLLOWUP_PHRASES = [
+    "那你帮我查一下",
+    "你能看一下吗",
+    "帮我查一下",
+    "能查一下吗",
+    "那你查一下",
+    "帮我看一下",
+]
 COMPENSATION_FOLLOWUP_KEYWORDS = [
     "\u90a3\u80fd\u8d54\u5417",
     "\u80fd\u8d54\u5417",
@@ -1028,6 +1037,34 @@ class FinancialRiskInheritance:
 class AftersalesOperationInheritance:
     safe_answer: str
     inherited_from_previous_query: str
+
+
+@dataclass
+class BackendRequiredInheritance:
+    query_type: str
+    safe_answer: str
+    current_topic: str
+
+
+@dataclass
+class ConversationState:
+    current_topic: str = "none"
+    query_type: str = "normal"
+    risk_type: str = "none"
+    requires_backend_api: bool = False
+    last_safe_answer_type: str = "none"
+    last_user_query: str = ""
+    last_assistant_answer: str = ""
+    last_retrieval_query: str = ""
+    last_contextual_query: str = ""
+    last_successful_contextual_query: str = ""
+    state_confidence: float = 0.0
+    state_turn_count: int = 0
+    updated_at_turn: int = 0
+    should_reset: bool = False
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
 
 
 @dataclass
@@ -1786,7 +1823,7 @@ def is_followup_query(query: str) -> bool:
     if contains_any(normalized, ABUSIVE_OR_IRRELEVANT_KEYWORDS):
         return False
 
-    if contains_any(normalized, FOLLOWUP_QUERY_PHRASES):
+    if contains_any(normalized, FOLLOWUP_QUERY_PHRASES + BACKEND_STATE_FOLLOWUP_PHRASES):
         return True
 
     if len(normalized) <= 8 or count_effective_query_chars(stripped) <= 6:
@@ -2497,6 +2534,253 @@ def generate_final_answer(
     ), prompt
 
 
+def coerce_conversation_state(
+    value: ConversationState | dict | None,
+    previous_user_query: str | None = None,
+    previous_assistant_answer: str | None = None,
+) -> ConversationState:
+    """Return an isolated, validated state while preserving V2.1a compatibility."""
+    if isinstance(value, ConversationState):
+        state = ConversationState(**value.to_dict())
+    elif isinstance(value, dict):
+        defaults = ConversationState().to_dict()
+        state = ConversationState(
+            **{key: value.get(key, default) for key, default in defaults.items()}
+        )
+    else:
+        state = ConversationState()
+
+    if state.should_reset:
+        state = ConversationState()
+    if not state.last_user_query:
+        state.last_user_query = str(previous_user_query or "").strip()
+    if not state.last_assistant_answer:
+        state.last_assistant_answer = str(previous_assistant_answer or "").strip()
+    state.state_confidence = max(0.0, min(1.0, float(state.state_confidence or 0.0)))
+    state.state_turn_count = max(0, int(state.state_turn_count or 0))
+    state.updated_at_turn = max(0, int(state.updated_at_turn or 0))
+    return state
+
+
+def detect_conversation_topic(
+    query: str,
+    query_type: str,
+    previous_topic: str = "none",
+) -> str:
+    normalized = re.sub(r"\s+", "", str(query or ""))
+    if query_type in {"backend_required", "refund_status_or_amount_request"}:
+        if "退款" in normalized or "返款" in normalized:
+            return "refund_progress"
+        if "订单" in normalized:
+            return "order_status"
+        if contains_any(normalized, ["物流", "快递", "到哪", "发货"]):
+            return "logistics_status"
+        if previous_topic not in {"", "none"}:
+            return previous_topic
+        return "backend_operation"
+    if query_type in FINANCIAL_RISK_QUERY_TYPES:
+        return query_type.removesuffix("_request")
+    if query_type == AFTERSALES_OPERATION_QUERY_TYPE:
+        if contains_any(normalized, ["补发", "重发", "发新的"]):
+            return "reshipment"
+        if contains_any(normalized, ["换码", "换货", "换新"]):
+            return "exchange_operation"
+        if "备注" in normalized:
+            return "backend_note"
+        return previous_topic if previous_topic not in {"", "none"} else "aftersales_operation"
+    if is_slip_resistance_query(normalized) or contains_any(normalized, ["防滑", "打滑", "下雨"]):
+        return "anti_slip"
+    if is_product_attribute_query(normalized):
+        return "product_attribute"
+    policy_category = detect_policy_category(normalized)
+    if policy_category:
+        return f"policy:{policy_category}"
+    return previous_topic if previous_topic not in {"", "none"} else "general"
+
+
+def safe_answer_type_for_query_type(query_type: str) -> str:
+    if query_type == "backend_required":
+        return "backend_required_answer"
+    if query_type == AFTERSALES_OPERATION_QUERY_TYPE:
+        return "aftersales_operation_safe_answer"
+    if query_type in FINANCIAL_RISK_QUERY_TYPES:
+        return f"{query_type}_safe_answer"
+    if query_type in {"identity", "human_handover", "abusive_or_emotional", "unclear"}:
+        return f"{query_type}_answer"
+    return "none"
+
+
+def inherit_backend_required_from_state(
+    current_query: str,
+    state: ConversationState,
+) -> BackendRequiredInheritance | None:
+    """Carry a recent live-data boundary across a short operational follow-up."""
+    current = str(current_query or "").strip()
+    normalized = re.sub(r"\s+", "", current)
+    if not current or state.should_reset or not state.requires_backend_api:
+        return None
+    if state.query_type not in {"backend_required", "refund_status_or_amount_request"}:
+        return None
+    if state.state_confidence < 0.6 or state.state_turn_count > 3:
+        return None
+    if not (
+        is_followup_query(current)
+        or contains_any(normalized, BACKEND_STATE_FOLLOWUP_PHRASES)
+    ):
+        return None
+
+    query_type = (
+        "refund_status_or_amount_request"
+        if state.query_type == "refund_status_or_amount_request"
+        or state.current_topic == "refund_progress"
+        else "backend_required"
+    )
+    safe_answer = (
+        REFUND_STATUS_OR_AMOUNT_SAFE_ANSWER
+        if query_type == "refund_status_or_amount_request"
+        else BACKEND_REQUIRED_ANSWER
+    )
+    return BackendRequiredInheritance(
+        query_type=query_type,
+        safe_answer=safe_answer,
+        current_topic=state.current_topic,
+    )
+
+
+def inherit_financial_risk_from_state(
+    current_query: str,
+    state: ConversationState,
+) -> FinancialRiskInheritance | None:
+    if (
+        state.should_reset
+        or state.risk_type != "financial"
+        or state.query_type not in FINANCIAL_RISK_QUERY_TYPES
+        or state.state_confidence < 0.6
+        or state.state_turn_count > 3
+        or not is_followup_query(current_query)
+    ):
+        return None
+    safe_answer = FINANCIAL_SAFE_ANSWER_BY_TYPE.get(state.query_type)
+    if not safe_answer:
+        return None
+    return FinancialRiskInheritance(
+        query_type=state.query_type,
+        safe_answer=safe_answer,
+        inherited_from_previous_query=state.last_user_query,
+    )
+
+
+def inherit_aftersales_operation_from_state(
+    current_query: str,
+    state: ConversationState,
+) -> AftersalesOperationInheritance | None:
+    if (
+        state.should_reset
+        or state.risk_type != "aftersales_operation"
+        or state.query_type != AFTERSALES_OPERATION_QUERY_TYPE
+        or state.state_confidence < 0.6
+        or state.state_turn_count > 3
+    ):
+        return None
+    if not (
+        is_followup_query(current_query)
+        or is_aftersales_followup_query(current_query)
+        or is_aftersales_operation_request(current_query)
+    ):
+        return None
+    return AftersalesOperationInheritance(
+        safe_answer=AFTERSALES_OPERATION_SAFE_ANSWER,
+        inherited_from_previous_query=state.last_user_query,
+    )
+
+
+def update_conversation_state(
+    previous_state: ConversationState,
+    result: dict,
+    followup: FollowupResolution,
+) -> ConversationState:
+    """Update structured state from the authoritative result of the current turn."""
+    query_type = str(result.get("query_type", "normal"))
+    question = str(result.get("question", "")).strip()
+    answer = str(result.get("final_answer", "")).strip()
+    next_turn = previous_state.updated_at_turn + 1
+
+    if query_type == "human_handover":
+        return ConversationState(
+            last_user_query=question,
+            last_assistant_answer=answer,
+            last_contextual_query=followup.contextual_query,
+            updated_at_turn=next_turn,
+            should_reset=True,
+        )
+
+    if query_type in {"identity", "abusive_or_emotional", "unclear"}:
+        state = ConversationState(**previous_state.to_dict())
+        state.last_user_query = question
+        state.last_assistant_answer = answer
+        state.last_contextual_query = followup.contextual_query
+        state.state_confidence = max(0.0, state.state_confidence - 0.2)
+        state.updated_at_turn = next_turn
+        state.should_reset = False
+        return state
+
+    inherited = any(
+        bool(result.get(flag))
+        for flag in (
+            "inherited_backend_required",
+            "inherited_financial_risk",
+            "inherited_aftersales_operation",
+        )
+    )
+    topic = detect_conversation_topic(
+        followup.retrieval_query or question,
+        query_type,
+        previous_state.current_topic if inherited else "none",
+    )
+    if query_type == AFTERSALES_OPERATION_QUERY_TYPE:
+        risk_type = "aftersales_operation"
+    elif query_type in FINANCIAL_RISK_QUERY_TYPES:
+        risk_type = "financial"
+    elif query_type == "backend_required":
+        risk_type = "backend_operation"
+    else:
+        risk_type = "none"
+
+    same_state = inherited or (
+        topic == previous_state.current_topic
+        and query_type == previous_state.query_type
+        and topic not in {"", "none", "general"}
+    )
+    return ConversationState(
+        current_topic=topic,
+        query_type=query_type,
+        risk_type=risk_type,
+        requires_backend_api=bool(result.get("requires_backend_api")),
+        last_safe_answer_type=safe_answer_type_for_query_type(query_type),
+        last_user_query=question,
+        last_assistant_answer=answer,
+        last_retrieval_query=(
+            previous_state.last_retrieval_query
+            if result.get("skip_retrieval")
+            else followup.retrieval_query
+        ),
+        last_contextual_query=followup.contextual_query,
+        last_successful_contextual_query=(
+            followup.contextual_query
+            if not result.get("skip_retrieval") and answer
+            else previous_state.last_successful_contextual_query
+        ),
+        state_confidence=(
+            min(1.0, max(previous_state.state_confidence, 0.85) + 0.05)
+            if inherited
+            else (0.95 if risk_type != "none" or result.get("requires_backend_api") else 0.8)
+        ),
+        state_turn_count=previous_state.state_turn_count + 1 if same_state else 1,
+        updated_at_turn=next_turn,
+        should_reset=False,
+    )
+
+
 def run_rag_query(
     user_question: str,
     corpus,
@@ -2508,8 +2792,18 @@ def run_rag_query(
     llm_config: LLMConfig,
     previous_user_query: str | None = None,
     previous_assistant_answer: str | None = None,
+    conversation_state: ConversationState | dict | None = None,
 ) -> dict:
     question = str(user_question or "").strip()
+    prior_state = coerce_conversation_state(
+        conversation_state,
+        previous_user_query=previous_user_query,
+        previous_assistant_answer=previous_assistant_answer,
+    )
+    previous_user_query = previous_user_query or prior_state.last_user_query or None
+    previous_assistant_answer = (
+        previous_assistant_answer or prior_state.last_assistant_answer or None
+    )
     followup = resolve_followup_context(
         question,
         previous_user_query=previous_user_query,
@@ -2517,10 +2811,20 @@ def run_rag_query(
     )
     debug = followup_debug_info(followup)
 
+    def finish(result: dict, state_update_reason: str) -> dict:
+        result.setdefault("inherited_backend_required", False)
+        result.setdefault("inherited_financial_risk", False)
+        result.setdefault("inherited_aftersales_operation", False)
+        result["conversation_state"] = update_conversation_state(
+            prior_state, result, followup
+        ).to_dict()
+        result["state_update_reason"] = state_update_reason
+        return result
+
     skip_retrieval, guarded_type, guarded_answer = intent_guard(question)
     if skip_retrieval:
         backend_required = guarded_type == "backend_required"
-        return {
+        return finish({
             "question": question,
             "final_answer": finalize_answer(guarded_answer or ""),
             "requires_backend_api": backend_required,
@@ -2534,11 +2838,11 @@ def run_rag_query(
             "inherited_financial_risk": False,
             "inherited_from_previous_query": "",
             **debug,
-        }
+        }, f"intent_guard:{guarded_type}")
 
     invalid_input, invalid_answer = invalid_input_guard(question)
     if invalid_input:
-        return {
+        return finish({
             "question": question,
             "final_answer": finalize_answer(invalid_answer or INVALID_INPUT_ANSWER),
             "requires_backend_api": False,
@@ -2552,12 +2856,12 @@ def run_rag_query(
             "inherited_financial_risk": False,
             "inherited_from_previous_query": "",
             **debug,
-        }
+        }, "invalid_input")
 
     financial_risk = detect_financial_risk_query(question)
     if financial_risk:
         financial_query_type, financial_answer = financial_risk
-        return {
+        return finish({
             "question": question,
             "final_answer": finalize_answer(financial_answer),
             "requires_backend_api": financial_query_type == "refund_status_or_amount_request",
@@ -2571,56 +2875,10 @@ def run_rag_query(
             "inherited_financial_risk": False,
             "inherited_from_previous_query": "",
             **debug,
-        }
+        }, f"financial_guard:{financial_query_type}")
 
-    inherited_financial = inherit_financial_risk_from_previous(
-        question,
-        previous_user_query=previous_user_query,
-        previous_assistant_answer=previous_assistant_answer,
-    )
-    if inherited_financial:
-        return {
-            "question": question,
-            "final_answer": finalize_answer(inherited_financial.safe_answer),
-            "requires_backend_api": inherited_financial.query_type == "refund_status_or_amount_request",
-            "invalid_input": False,
-            "skip_retrieval": True,
-            "skip_llm": True,
-            "query_type": inherited_financial.query_type,
-            "policy_category": None,
-            "original_results": [],
-            "reranked_results": [],
-            "inherited_financial_risk": True,
-            "inherited_from_previous_query": inherited_financial.inherited_from_previous_query,
-            "inherited_aftersales_operation": False,
-            **debug,
-        }
-
-    inherited_aftersales = inherit_aftersales_operation_from_previous(
-        question,
-        previous_user_query=previous_user_query,
-        previous_assistant_answer=previous_assistant_answer,
-    )
-    if inherited_aftersales:
-        return {
-            "question": question,
-            "final_answer": finalize_answer(inherited_aftersales.safe_answer),
-            "requires_backend_api": True,
-            "invalid_input": False,
-            "skip_retrieval": True,
-            "skip_llm": True,
-            "query_type": AFTERSALES_OPERATION_QUERY_TYPE,
-            "policy_category": None,
-            "original_results": [],
-            "reranked_results": [],
-            "inherited_financial_risk": False,
-            "inherited_from_previous_query": inherited_aftersales.inherited_from_previous_query,
-            "inherited_aftersales_operation": True,
-            **debug,
-        }
-
-    if is_aftersales_operation_request(question):
-        return {
+    if is_aftersales_operation_request(question) and not is_aftersales_followup_query(question):
+        return finish({
             "question": question,
             "final_answer": finalize_answer(AFTERSALES_OPERATION_SAFE_ANSWER),
             "requires_backend_api": True,
@@ -2635,7 +2893,97 @@ def run_rag_query(
             "inherited_from_previous_query": "",
             "inherited_aftersales_operation": False,
             **debug,
-        }
+        }, "aftersales_operation_guard")
+
+    inherited_backend = inherit_backend_required_from_state(question, prior_state)
+    if inherited_backend:
+        return finish({
+            "question": question,
+            "final_answer": finalize_answer(inherited_backend.safe_answer),
+            "requires_backend_api": True,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": inherited_backend.query_type,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            "inherited_backend_required": True,
+            "inherited_financial_risk": (
+                inherited_backend.query_type == "refund_status_or_amount_request"
+            ),
+            "inherited_from_previous_query": prior_state.last_user_query,
+            "inherited_aftersales_operation": False,
+            **debug,
+        }, "inherited_backend_required")
+
+    inherited_financial = inherit_financial_risk_from_state(question, prior_state)
+    if not inherited_financial:
+        inherited_financial = inherit_financial_risk_from_previous(
+            question,
+            previous_user_query=previous_user_query,
+            previous_assistant_answer=previous_assistant_answer,
+        )
+    if inherited_financial:
+        return finish({
+            "question": question,
+            "final_answer": finalize_answer(inherited_financial.safe_answer),
+            "requires_backend_api": inherited_financial.query_type == "refund_status_or_amount_request",
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": inherited_financial.query_type,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            "inherited_financial_risk": True,
+            "inherited_from_previous_query": inherited_financial.inherited_from_previous_query,
+            "inherited_aftersales_operation": False,
+            **debug,
+        }, "inherited_financial_risk")
+
+    inherited_aftersales = inherit_aftersales_operation_from_state(question, prior_state)
+    if not inherited_aftersales:
+        inherited_aftersales = inherit_aftersales_operation_from_previous(
+            question,
+            previous_user_query=previous_user_query,
+            previous_assistant_answer=previous_assistant_answer,
+        )
+    if inherited_aftersales:
+        return finish({
+            "question": question,
+            "final_answer": finalize_answer(inherited_aftersales.safe_answer),
+            "requires_backend_api": True,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": AFTERSALES_OPERATION_QUERY_TYPE,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": inherited_aftersales.inherited_from_previous_query,
+            "inherited_aftersales_operation": True,
+            **debug,
+        }, "inherited_aftersales_operation")
+
+    if is_aftersales_operation_request(question):
+        return finish({
+            "question": question,
+            "final_answer": finalize_answer(AFTERSALES_OPERATION_SAFE_ANSWER),
+            "requires_backend_api": True,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": AFTERSALES_OPERATION_QUERY_TYPE,
+            "policy_category": None,
+            "original_results": [],
+            "reranked_results": [],
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": "",
+            "inherited_aftersales_operation": False,
+            **debug,
+        }, "aftersales_operation_guard")
 
     retrieval_query = followup.retrieval_query
     original_results = retrieve(
@@ -2674,7 +3022,7 @@ def run_rag_query(
         is_followup=followup.is_followup_query,
         contextual_query=followup.contextual_query,
     )
-    return {
+    return finish({
         "question": question,
         "final_answer": final_answer,
         "requires_backend_api": backend_required,
@@ -2689,7 +3037,7 @@ def run_rag_query(
         "inherited_from_previous_query": "",
         "inherited_aftersales_operation": False,
         **debug,
-    }
+    }, "retrieval_answer")
 
 
 def print_answer_results(
@@ -2735,6 +3083,7 @@ def interactive_loop(corpus, embeddings, embedding_model, top_k: int, cosine_sim
     print("\nJD QA RAG answer demo is ready. Type a question, or exit to quit.")
     previous_user_query: str | None = None
     previous_assistant_answer: str | None = None
+    conversation_state: dict | None = None
     while True:
         try:
             query = input("\nQuestion> ").strip()
@@ -2759,6 +3108,7 @@ def interactive_loop(corpus, embeddings, embedding_model, top_k: int, cosine_sim
             llm_config,
             previous_user_query=previous_user_query,
             previous_assistant_answer=previous_assistant_answer,
+            conversation_state=conversation_state,
         )
         print_answer_results(
             result["question"],
@@ -2781,6 +3131,7 @@ def interactive_loop(corpus, embeddings, embedding_model, top_k: int, cosine_sim
         if final_answer:
             previous_user_query = query
             previous_assistant_answer = final_answer
+            conversation_state = result.get("conversation_state")
 
 
 def build_parser() -> argparse.ArgumentParser:

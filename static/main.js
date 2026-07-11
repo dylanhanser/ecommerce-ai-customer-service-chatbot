@@ -119,6 +119,7 @@ function setFlag(element, label, value, isWarning) {
 }
 
 function renderResponse(data) {
+  const state = data.conversation_state || {};
   finalAnswer.textContent = data.final_answer || "";
   setFlag(invalidFlag, "Invalid input", data.invalid_input, data.invalid_input);
   setFlag(skipFlag, "Skip retrieval", data.skip_retrieval, data.skip_retrieval);
@@ -135,6 +136,16 @@ function renderResponse(data) {
     `contextual_query: ${asText(data.contextual_query)}`,
     `previous_user_query: ${asText(data.previous_user_query)}`,
     `retrieval_query: ${asText(data.retrieval_query)}`,
+    `current_topic: ${asText(state.current_topic)}`,
+    `state_query_type: ${asText(state.query_type)}`,
+    `risk_type: ${asText(state.risk_type)}`,
+    `state_requires_backend_api: ${Boolean(state.requires_backend_api)}`,
+    `state_confidence: ${asText(state.state_confidence)}`,
+    `state_turn_count: ${asText(state.state_turn_count)}`,
+    `inherited_backend_required: ${Boolean(data.inherited_backend_required)}`,
+    `inherited_financial_risk: ${Boolean(data.inherited_financial_risk)}`,
+    `inherited_aftersales_operation: ${Boolean(data.inherited_aftersales_operation)}`,
+    `state_update_reason: ${asText(data.state_update_reason)}`,
   ].join("\n");
   if (data.skip_retrieval) {
     renderSkipped(retrievedResults);

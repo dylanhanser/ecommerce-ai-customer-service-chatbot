@@ -15,6 +15,7 @@ if str(OUTPUTS) not in sys.path:
     sys.path.insert(0, str(OUTPUTS))
 
 import rag_answer_demo as rag  # noqa: E402
+from encoding_sanity import assert_readable_chinese_values
 
 REPORT_PATH = ROOT / "outputs" / "reports" / "v21_followup_test_report.md"
 
@@ -111,8 +112,8 @@ TEST_CASES = [
         "case_id": "C12",
         "name": "补偿金额确认追问",
         "turns": [
-            "能给我补偿两块吗",
-            "真的不行吗",
+            "能给我补偿两块吗？",
+            "真不可以吗？",
         ],
     },
     {
@@ -137,6 +138,38 @@ TEST_CASES = [
         "turns": [
             "能补发么39码么",
             "你帮我备注一下",
+        ],
+    },
+    {
+        "case_id": "C16",
+        "name": "物流后台状态继承",
+        "turns": [
+            "我的物流到哪了？",
+            "那你帮我查一下？",
+        ],
+    },
+    {
+        "case_id": "C17",
+        "name": "退款进度后台状态继承",
+        "turns": [
+            "退款多久到账？",
+            "那你帮我查一下？",
+        ],
+    },
+    {
+        "case_id": "C18",
+        "name": "订单后台状态继承",
+        "turns": [
+            "我的订单现在什么状态？",
+            "你能看一下吗？",
+        ],
+    },
+    {
+        "case_id": "C19",
+        "name": "防滑切换到补偿请求",
+        "turns": [
+            "这鞋防滑吗？",
+            "能给我补偿两块吗？",
         ],
     },
 ]
@@ -410,6 +443,51 @@ def evaluate_turn(case_id: str, turn: int, query: str, result: dict) -> tuple[st
                 return "Fail", "首轮应跳过检索"
         return "Pass", "首轮回答正常"
 
+    if case_id in {"C16", "C18"}:
+        state = result.get("conversation_state") or {}
+        expected_topic = "logistics_status" if case_id == "C16" else "order_status"
+        if result.get("query_type") != "backend_required":
+            return "Fail", f"期望 backend_required，实际 {result.get('query_type')}"
+        if not result.get("skip_retrieval") or not result.get("requires_backend_api"):
+            return "Fail", "后台状态追问必须跳过检索并保留 requires_backend_api=true"
+        if not result.get("inherited_backend_required"):
+            return "Fail", "应标记 inherited_backend_required=true"
+        if state.get("current_topic") != expected_topic:
+            return "Fail", f"期望状态主题 {expected_topic}，实际 {state.get('current_topic')}"
+        if state.get("risk_type") != "backend_operation":
+            return "Fail", f"期望 backend_operation，实际 {state.get('risk_type')}"
+        if not contains_any(answer, ["人工", "后台", "核实", "无法"]):
+            return "Fail", "未返回安全的后台限制/人工核实回答"
+        return "Pass", "正确继承后台所需状态并跳过检索"
+
+    if case_id == "C17":
+        state = result.get("conversation_state") or {}
+        if result.get("query_type") not in {"refund_status_or_amount_request", "backend_required"}:
+            return "Fail", f"期望退款后台边界，实际 {result.get('query_type')}"
+        if not result.get("skip_retrieval") or not result.get("requires_backend_api"):
+            return "Fail", "退款进度追问必须跳过检索并保留后台需求"
+        if not result.get("inherited_backend_required"):
+            return "Fail", "应标记 inherited_backend_required=true"
+        if state.get("current_topic") != "refund_progress":
+            return "Fail", f"期望 refund_progress，实际 {state.get('current_topic')}"
+        if not contains_any(answer, ["人工", "后台", "退款", "到账", "核实"]):
+            return "Fail", "未返回退款进度后台核实回答"
+        return "Pass", "正确继承退款进度后台状态"
+
+    if case_id == "C19":
+        state = result.get("conversation_state") or {}
+        if result.get("query_type") != "compensation_request":
+            return "Fail", f"期望 compensation_request，实际 {result.get('query_type')}"
+        if not result.get("skip_retrieval"):
+            return "Fail", "补偿请求必须跳过检索"
+        if result.get("inherited_backend_required"):
+            return "Fail", "不应继承后台状态"
+        if state.get("risk_type") != "financial" or state.get("current_topic") != "compensation":
+            return "Fail", f"补偿状态错误: {state}"
+        if contains_any(answer, ["防滑", "打滑"]) and not contains_any(answer, ["补偿", "人工"]):
+            return "Fail", "错误继承防滑话题"
+        return "Pass", "显式补偿请求正确替换防滑状态"
+
     return "Pass", "默认通过"
 
 
@@ -417,6 +495,7 @@ def run_case(case: dict, corpus, embeddings, embedding_model, cosine_similarity,
     rows = []
     previous_user = None
     previous_answer = None
+    conversation_state = None
     case_pass = True
 
     for turn_idx, query in enumerate(case["turns"], start=1):
@@ -431,6 +510,7 @@ def run_case(case: dict, corpus, embeddings, embedding_model, cosine_similarity,
             llm_config,
             previous_user_query=previous_user,
             previous_assistant_answer=previous_answer,
+            conversation_state=conversation_state,
         )
         pf, notes = evaluate_turn(case["case_id"], turn_idx, query, result)
         if pf != "Pass":
@@ -456,12 +536,27 @@ def run_case(case: dict, corpus, embeddings, embedding_model, cosine_similarity,
         )
         previous_user = query
         previous_answer = result.get("final_answer", "")
+        conversation_state = result.get("conversation_state")
 
     return rows, case_pass
 
 
 def main() -> int:
     os.environ.setdefault("DEEPSEEK_API_KEY", "")
+    assert_readable_chinese_values(TEST_CASES)
+    assert_readable_chinese_values(
+        [
+            rag.FOLLOWUP_QUERY_PHRASES,
+            rag.BACKEND_STATE_FOLLOWUP_PHRASES,
+            rag.AFTERSALES_FOLLOWUP_PHRASES,
+            rag.SLIP_FOLLOWUP_CONTEXTUAL_QUERY,
+            rag.POST_SHIP_FOLLOWUP_CONTEXTUAL_QUERY,
+            rag.QUALITY_FOLLOWUP_CONTEXTUAL_QUERY,
+            rag.FOOT_FOLLOWUP_CONTEXTUAL_QUERY,
+            HIGH_RISK_PATTERNS,
+            MEDICAL_DIAGNOSIS_TERMS,
+        ]
+    )
     np, pd, load_dotenv, OpenAI, SentenceTransformer, cosine_similarity = rag.load_dependencies()
     llm_config = rag.load_llm_config(load_dotenv, OpenAI)
     embedding_model = SentenceTransformer(rag.DEFAULT_EMBEDDING_MODEL)
@@ -508,7 +603,7 @@ def main() -> int:
     total_cases = len(TEST_CASES)
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
-        "# V2.1a Follow-up Test Report",
+        "# V2.1b Structured-State Follow-up Test Report",
         "",
         f"- Generated: {now}",
         f"- LLM mode: {'deepseek' if llm_config.has_api_key else 'mock'}",

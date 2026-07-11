@@ -228,6 +228,36 @@ Structured state tracking should generalise beyond today’s separate inheritanc
 - aftersales operation state inheritance;
 - topical product/policy continuation where useful.
 
+### 6.4 Encoding and data-quality requirement
+
+All V2.1b test inputs, detector keywords, contextual-query templates, comments,
+debug fixtures, evaluation cases, and generated reports must use readable
+Simplified Chinese encoded as UTF-8. Mojibake must never be treated as a valid
+user-intent example or detector keyword.
+
+Canonical examples include:
+
+- `我的物流到哪了？` → `那你帮我查一下？`
+- `退款多久到账？` → `那你帮我查一下？`
+- `我的订单现在什么状态？` → `你能看一下吗？`
+- `这鞋防滑吗？` → `能给我补偿两块吗？`
+- `这鞋防滑吗？` → `下雨呢？`
+- `能给我补偿两块吗？` → `真不可以吗？`
+- a readable reshipment or exchange request → `我这个退回去`
+
+Implementation checklist:
+
+1. Save every modified Python, JSON, CSV, Markdown, JavaScript, or HTML file
+   containing Chinese as UTF-8.
+2. Use `encoding="utf-8"` for Python reads and writes involving Chinese.
+3. Use `ensure_ascii=False` when serialising JSON intended for human review.
+4. Do not convert already-corrupted text into canonical detector inputs.
+5. Run the reusable mojibake sanity check over test queries, follow-up detector
+   keywords, contextual-query templates, expected answer keywords, and loaded
+   V2.1b evaluation cases before behavioural evaluation begins.
+6. Fail early with a clear encoding/data-quality error if corrupted text is
+   found.
+
 ## 7. Expected Benefit
 
 Compared with V2.1a’s lightweight rule patches, V2.1b structured conversation state is expected to:

@@ -38,6 +38,7 @@ class ChatRequest(BaseModel):
 class RAGEngine:
     def __init__(self) -> None:
         self.lock = Lock()
+        self.session_lock = Lock()
         self.loaded = False
         self.np = None
         self.pd = None
@@ -47,6 +48,7 @@ class RAGEngine:
         self.embeddings = None
         self.llm_config = None
         self.session_history: dict[str, list[dict[str, str]]] = {}
+        self.session_states: dict[str, dict[str, Any]] = {}
 
     def load(self) -> None:
         with self.lock:
@@ -98,17 +100,28 @@ class RAGEngine:
             self.loaded = True
 
     def _get_previous_turn(self, session_id: str) -> tuple[str, str]:
-        history = self.session_history.get(session_id, [])
-        if not history:
-            return "", ""
-        last_turn = history[-1]
-        return last_turn.get("user", ""), last_turn.get("assistant", "")
+        with self.session_lock:
+            history = self.session_history.get(session_id, [])
+            if not history:
+                return "", ""
+            last_turn = history[-1]
+            return last_turn.get("user", ""), last_turn.get("assistant", "")
+
+    def _get_conversation_state(self, session_id: str) -> dict[str, Any] | None:
+        with self.session_lock:
+            state = self.session_states.get(session_id)
+            return dict(state) if state else None
 
     def _append_turn(self, session_id: str, user_query: str, assistant_answer: str) -> None:
-        history = self.session_history.setdefault(session_id, [])
-        history.append({"user": user_query, "assistant": assistant_answer})
-        if len(history) > MAX_SESSION_HISTORY_TURNS:
-            self.session_history[session_id] = history[-MAX_SESSION_HISTORY_TURNS:]
+        with self.session_lock:
+            history = self.session_history.setdefault(session_id, [])
+            history.append({"user": user_query, "assistant": assistant_answer})
+            if len(history) > MAX_SESSION_HISTORY_TURNS:
+                self.session_history[session_id] = history[-MAX_SESSION_HISTORY_TURNS:]
+
+    def _store_conversation_state(self, session_id: str, state: dict[str, Any]) -> None:
+        with self.session_lock:
+            self.session_states[session_id] = dict(state)
 
     def chat(self, question: str, session_id: str = DEFAULT_SESSION_ID) -> dict[str, Any]:
         self.load()
@@ -117,6 +130,7 @@ class RAGEngine:
             os.getenv("RAG_LOW_CONFIDENCE_THRESHOLD", str(rag.LOW_CONFIDENCE_THRESHOLD))
         )
         previous_user_query, previous_assistant_answer = self._get_previous_turn(session_id)
+        conversation_state = self._get_conversation_state(session_id)
 
         result = rag.run_rag_query(
             question,
@@ -129,11 +143,15 @@ class RAGEngine:
             self.llm_config,
             previous_user_query=previous_user_query or None,
             previous_assistant_answer=previous_assistant_answer or None,
+            conversation_state=conversation_state,
         )
 
         final_answer = result.get("final_answer", "")
         if final_answer:
             self._append_turn(session_id, question, final_answer)
+        returned_state = result.get("conversation_state") or {}
+        if returned_state:
+            self._store_conversation_state(session_id, returned_state)
 
         return {
             "question": result["question"],
@@ -152,6 +170,9 @@ class RAGEngine:
             "inherited_financial_risk": result.get("inherited_financial_risk", False),
             "inherited_from_previous_query": result.get("inherited_from_previous_query", ""),
             "inherited_aftersales_operation": result.get("inherited_aftersales_operation", False),
+            "inherited_backend_required": result.get("inherited_backend_required", False),
+            "conversation_state": returned_state,
+            "state_update_reason": result.get("state_update_reason", ""),
             "retrieved_results": serialize_results(result.get("original_results", [])),
             "reranked_results": serialize_results(result.get("reranked_results", [])),
         }
