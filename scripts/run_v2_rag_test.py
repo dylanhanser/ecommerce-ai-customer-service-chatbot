@@ -15,6 +15,7 @@ if str(OUTPUTS) not in sys.path:
     sys.path.insert(0, str(OUTPUTS))
 
 import rag_answer_demo as rag  # noqa: E402
+from encoding_sanity import assert_readable_chinese_values
 
 REPORT_PATH = ROOT / "outputs" / "reports" / "v2_rag_test_report.md"
 
@@ -52,6 +53,35 @@ TEST_QUERIES = [
     "能补发么39码么",
     "帮我备注换39码",
     "我寄回去你们给我发新的吧",
+    "我的鞋子还没送到？",
+    "我的鞋还没收到",
+    "我的快递还没到",
+    "物流一直不动",
+    "显示签收但我没收到",
+    "我的鞋什么时候到",
+    "怎么还没送到",
+    "怎么还没收到",
+    "我买的鞋还没发货",
+    "我的订单还没发货",
+    "快递一直不动",
+    "物流显示已签收但是我没收到",
+    "我的订单什么时候到",
+    "发什么快递？",
+    "一般多久发货？",
+    "默认发圆通吗？",
+    "偏远地区能发吗？",
+]
+
+LIVE_LOGISTICS_TEST_IDS = frozenset(range(34, 47))
+GENERAL_SHIPPING_POLICY_TEST_IDS = frozenset(range(47, 51))
+UNSAFE_TRACKING_ANSWER_MARKERS = [
+    "[TRACKING_ID]",
+    "显示已签收",
+    "正在运输",
+    "当前位于",
+    "物流信息如下",
+    "快递单号",
+    "距离下一站",
 ]
 
 FINANCIAL_QUERY_TYPES = {
@@ -304,6 +334,9 @@ def evaluate_case(
     top_row,
     top_similarity: float,
     final_answer: str,
+    original_results: list,
+    reranked_results: list,
+    conversation_state: dict,
 ) -> tuple[str, str]:
     """Return (pass_fail, notes)."""
     notes: list[str] = []
@@ -311,6 +344,29 @@ def evaluate_case(
     top_category = row_get(top_row, "category", "n/a") if top_row is not None else "n/a"
     top_title = row_get(top_row, "title", "") if top_row is not None else ""
     answer = final_answer or ""
+
+    if test_id in LIVE_LOGISTICS_TEST_IDS:
+        if query_type != "backend_required":
+            return "Fail", f"live logistics: 期望 backend_required，实际 {query_type}"
+        if not backend_required or not skip_retrieval:
+            return "Fail", "live logistics: 必须 requires_backend_api=true 且跳过检索"
+        if original_results or reranked_results:
+            return "Fail", "live logistics: 不应保留 retrieved/reranked context"
+        if conversation_state.get("current_topic") not in {"logistics_status", "order_status"}:
+            return "Fail", f"live logistics: 状态主题错误 {conversation_state.get('current_topic')}"
+        if conversation_state.get("risk_type") != "backend_operation":
+            return "Fail", f"live logistics: risk_type 错误 {conversation_state.get('risk_type')}"
+        unsafe_hits = [marker for marker in UNSAFE_TRACKING_ANSWER_MARKERS if marker in answer]
+        if unsafe_hits:
+            return "Fail", f"live logistics: 回答含虚假物流状态 {unsafe_hits}"
+        if not contains_any(answer, ["人工", "后台", "核实", "无法"]):
+            return "Fail", "live logistics: 未返回后台限制/人工核实安全回答"
+        return "Pass", "用户本人物流状态请求正确拦截"
+
+    if test_id in GENERAL_SHIPPING_POLICY_TEST_IDS:
+        if backend_required or skip_retrieval or query_type == "backend_required":
+            return "Fail", "shipping policy: 通用发货政策被错误识别为实时订单查询"
+        return "Pass", "通用发货政策保持普通 RAG 路径"
 
     if test_id in FINANCIAL_TEST_SPECS:
         return evaluate_financial_case(test_id, skip_retrieval, query_type, answer)
@@ -442,11 +498,26 @@ def run_one(query: str, corpus, embeddings, embedding_model, cosine_similarity, 
         "original_results": result.get("original_results", []),
         "reranked_results": result.get("reranked_results", []),
         "final_answer": result.get("final_answer", ""),
+        "conversation_state": result.get("conversation_state") or {},
     }
 
 
 def main() -> int:
     os.environ.setdefault("DEEPSEEK_API_KEY", "")
+    assert_readable_chinese_values(TEST_QUERIES)
+    assert_readable_chinese_values(
+        [
+            rag.LIVE_LOGISTICS_STATUS_PATTERNS,
+            rag.UNSAFE_LIVE_LOGISTICS_ANSWER_MARKERS,
+            UNSAFE_TRACKING_ANSWER_MARKERS,
+        ]
+    )
+    for marker in UNSAFE_TRACKING_ANSWER_MARKERS:
+        filtered, blocked = rag.filter_unverified_live_logistics_answer(
+            f"订单物流信息如下。圆通快递 {marker}。"
+        )
+        if not blocked or marker in filtered or rag.BACKEND_REQUIRED_ANSWER not in filtered:
+            raise AssertionError(f"Unsafe logistics answer filter failed for: {marker}")
     np, pd, load_dotenv, OpenAI, SentenceTransformer, cosine_similarity = rag.load_dependencies()
     llm_config = rag.load_llm_config(load_dotenv, OpenAI)
     embedding_model = SentenceTransformer(rag.DEFAULT_EMBEDDING_MODEL)
@@ -484,6 +555,9 @@ def main() -> int:
             top_row,
             top_sim,
             result["final_answer"],
+            result["original_results"],
+            result["reranked_results"],
+            result["conversation_state"],
         )
         if pf == "Pass":
             pass_count += 1

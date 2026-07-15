@@ -182,6 +182,22 @@ BACKEND_API_REQUIRED_KEYWORDS = [
     "\u8865\u507f\u5230\u8d26",
     "\u8fd4\u6b3e\u5230\u8d26",
 ]
+LIVE_LOGISTICS_STATUS_PATTERNS = [
+    r"(?:我的|我买的|我下单的).{0,10}(?:还没送到|还没收到|还没到|还没发货|什么时候到)",
+    r"(?:怎么|为什么|为何)?还没(?:送到|收到|到)",
+    r"(?:物流|快递).{0,6}(?:一直不动|不动了|没更新|没有更新)",
+    r"(?:物流)?显示(?:已)?签收.{0,10}(?:没收到|未收到)",
+    r"(?:已)?签收.{0,8}(?:但是|但)?(?:我)?(?:没收到|未收到)",
+]
+UNSAFE_LIVE_LOGISTICS_ANSWER_MARKERS = [
+    "[TRACKING_ID]",
+    "显示已签收",
+    "正在运输",
+    "当前位于",
+    "物流信息如下",
+    "快递单号",
+    "距离下一站",
+]
 PRODUCT_ATTRIBUTE_KEYWORDS = [
     "\u978b\u5e95",
     "\u8f6f\u5e95",
@@ -1187,6 +1203,13 @@ def filter_results_for_answer_generation(
     filtered = results
     if not backend_required:
         filtered = [item for item in filtered if not row_is_backend_only(item[0])]
+        filtered = [
+            item
+            for item in filtered
+            if not contains_any(
+                row_answer_text(item[0]), UNSAFE_LIVE_LOGISTICS_ANSWER_MARKERS
+            )
+        ]
     filtered = [item for item in filtered if not is_risky_chat_qa_row(item[0])]
     if is_foot_discomfort_query(user_question):
         non_transition = [item for item in filtered if not is_foot_transition_qa_row(item[0])]
@@ -2131,6 +2154,8 @@ def detect_query_type(
 
 def requires_backend_api(user_question: str) -> bool:
     normalized = re.sub(r"\s+", "", user_question)
+    if any(re.search(pattern, normalized) for pattern in LIVE_LOGISTICS_STATUS_PATTERNS):
+        return True
     if contains_any(normalized, BACKEND_API_REQUIRED_KEYWORDS):
         return True
     backend_patterns = [
@@ -2384,6 +2409,19 @@ def finalize_answer(answer: str) -> str:
     return cleanup_final_answer(answer)
 
 
+def filter_unverified_live_logistics_answer(
+    answer: str,
+    backend_access_verified: bool = False,
+) -> tuple[str, bool]:
+    """Replace unverified live tracking claims with the backend-safe boundary."""
+    text = str(answer or "")
+    if backend_access_verified:
+        return text, False
+    if contains_any(text, UNSAFE_LIVE_LOGISTICS_ANSWER_MARKERS):
+        return finalize_answer(BACKEND_REQUIRED_ANSWER), True
+    return text, False
+
+
 def mock_llm_answer(
     user_question: str,
     retrieved_results: list,
@@ -2573,7 +2611,10 @@ def detect_conversation_topic(
             return "refund_progress"
         if "订单" in normalized:
             return "order_status"
-        if contains_any(normalized, ["物流", "快递", "到哪", "发货"]):
+        if contains_any(
+            normalized,
+            ["物流", "快递", "到哪", "发货", "送到", "收到", "签收", "什么时候到", "一直不动", "还没到"],
+        ):
             return "logistics_status"
         if previous_topic not in {"", "none"}:
             return previous_topic
@@ -2815,6 +2856,27 @@ def run_rag_query(
         result.setdefault("inherited_backend_required", False)
         result.setdefault("inherited_financial_risk", False)
         result.setdefault("inherited_aftersales_operation", False)
+        filtered_answer, blocked_live_logistics = filter_unverified_live_logistics_answer(
+            result.get("final_answer", ""),
+            backend_access_verified=bool(result.get("backend_access_verified", False)),
+        )
+        if blocked_live_logistics:
+            result.update(
+                {
+                    "final_answer": filtered_answer,
+                    "requires_backend_api": True,
+                    "skip_retrieval": True,
+                    "skip_llm": True,
+                    "query_type": "backend_required",
+                    "policy_category": None,
+                    "original_results": [],
+                    "reranked_results": [],
+                    "unsafe_live_logistics_answer_filtered": True,
+                }
+            )
+            state_update_reason = "unsafe_live_logistics_answer_filter"
+        else:
+            result.setdefault("unsafe_live_logistics_answer_filtered", False)
         result["conversation_state"] = update_conversation_state(
             prior_state, result, followup
         ).to_dict()

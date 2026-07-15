@@ -1,6 +1,6 @@
 # V2.1b Structured-State Follow-up Test Report
 
-- Generated: 2026-07-11 11:26 UTC
+- Generated: 2026-07-15 13:49 UTC
 - LLM mode: mock
 - Case pass rate: 19/19
 
