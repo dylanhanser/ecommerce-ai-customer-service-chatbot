@@ -26,6 +26,8 @@ data/raw/
 month_04/
 month_05/
 month_06/
+data/external_eval/raw/
+data/external_eval/processed/*.csv
 
 # Logs
 *.log
@@ -40,6 +42,7 @@ Thumbs.db
 data/
 work/
 outputs/rejected/
+outputs/rejected/external_store_v1*.csv
 outputs/jd_final_safe_qa_refined_category.csv
 outputs/sample_100_jd_qa.csv
 outputs/*.csv
