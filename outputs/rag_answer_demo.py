@@ -1083,6 +1083,21 @@ class ConversationState:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class GenerationConfig:
+    """Optional request parameters for an individual answer-generation call.
+
+    Callers that omit this object retain the legacy DeepSeek request payload.
+    Evaluation code can pass an explicit, immutable configuration without
+    mutating process-wide environment state.
+    """
+
+    temperature: float = 0.2
+    top_p: float | None = None
+    max_tokens: int | None = None
+    stream: bool = False
+
+
 @dataclass
 class LLMConfig:
     api_key: str
@@ -2479,12 +2494,16 @@ def product_attribute_fallback_answer(user_question: str, reranked_results: list
     return LOW_CONFIDENCE_ANSWER
 
 
-def call_deepseek_api(prompt: str, llm_config: LLMConfig) -> str:
+def call_deepseek_api(
+    prompt: str,
+    llm_config: LLMConfig,
+    generation_config: GenerationConfig | None = None,
+) -> str:
     if llm_config.client is None:
         raise RuntimeError("DeepSeek client is not initialized.")
-    response = llm_config.client.chat.completions.create(
-        model=llm_config.model,
-        messages=[
+    request = {
+        "model": llm_config.model,
+        "messages": [
             {
                 "role": "system",
                 "content": (
@@ -2500,8 +2519,16 @@ def call_deepseek_api(prompt: str, llm_config: LLMConfig) -> str:
             },
             {"role": "user", "content": prompt},
         ],
-        temperature=0.2,
-    )
+        "temperature": 0.2,
+    }
+    if generation_config is not None:
+        request["temperature"] = generation_config.temperature
+        if generation_config.top_p is not None:
+            request["top_p"] = generation_config.top_p
+        if generation_config.max_tokens is not None:
+            request["max_tokens"] = generation_config.max_tokens
+        request["stream"] = generation_config.stream
+    response = llm_config.client.chat.completions.create(**request)
     return (response.choices[0].message.content or "").strip()
 
 
@@ -2518,6 +2545,7 @@ def generate_final_answer(
     previous_assistant_answer: str | None = None,
     is_followup: bool = False,
     contextual_query: str | None = None,
+    generation_config: GenerationConfig | None = None,
 ) -> tuple[str, str]:
     domain_query = retrieval_query or user_question
     if not original_results:
@@ -2557,7 +2585,7 @@ def generate_final_answer(
         return finalize_answer(LOW_CONFIDENCE_ANSWER), prompt
     if llm_config.has_api_key and llm_config.client is not None:
         try:
-            final_answer = call_deepseek_api(prompt, llm_config)
+            final_answer = call_deepseek_api(prompt, llm_config, generation_config)
             if final_answer:
                 return finalize_answer(final_answer), prompt
             print("DeepSeek API returned empty content; fallback to mock.")
@@ -2834,6 +2862,7 @@ def run_rag_query(
     previous_user_query: str | None = None,
     previous_assistant_answer: str | None = None,
     conversation_state: ConversationState | dict | None = None,
+    generation_config: GenerationConfig | None = None,
 ) -> dict:
     question = str(user_question or "").strip()
     prior_state = coerce_conversation_state(
@@ -3083,6 +3112,7 @@ def run_rag_query(
         previous_assistant_answer=followup.previous_assistant_answer,
         is_followup=followup.is_followup_query,
         contextual_query=followup.contextual_query,
+        generation_config=generation_config,
     )
     return finish({
         "question": question,

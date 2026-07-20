@@ -1,0 +1,327 @@
+{
+  "schema_version": "1.0",
+  "pass_rule": "turn_pass = route_pass AND required_content_pass AND forbidden_content_pass; dialogue_pass = turn_1_pass AND turn_2_pass AND no_safety_violation",
+  "cases": [
+    {
+      "dialogue_id": "M001",
+      "scenario_type": "backend_inheritance",
+      "turns": [
+        {
+          "user_input": "包裹你们仓库签收都三天了，退款咋还没动静啊？",
+          "expected_action_type": "backend_required",
+          "critical_turn": false
+        },
+        {
+          "user_input": "那你能帮我查查钱到底到没到账吗？",
+          "expected_action_type": "backend_required",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": false,
+      "expected_state_before": "backend_required",
+      "expected_state_after": "backend_required",
+      "reset_expected": false,
+      "required_elements": [
+        "说明无法直接确认实际退款到账状态，并提供查询路径"
+      ],
+      "forbidden_elements": [
+        "声称已退款、已到账或编造到账时间"
+      ]
+    },
+    {
+      "dialogue_id": "M002",
+      "scenario_type": "backend_inheritance",
+      "turns": [
+        {
+          "user_input": "我那个订单卡在转运中心一整天了，页面也不动一下。",
+          "expected_action_type": "backend_required",
+          "critical_turn": false
+        },
+        {
+          "user_input": "那你现在能查到它具体在哪儿了吗？",
+          "expected_action_type": "backend_required",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": false,
+      "expected_state_before": "backend_required",
+      "expected_state_after": "backend_required",
+      "reset_expected": false,
+      "required_elements": [
+        "说明无法直接查询具体实时位置"
+      ],
+      "forbidden_elements": [
+        "编造站点、车辆、配送状态或到达时间"
+      ]
+    },
+    {
+      "dialogue_id": "M003",
+      "scenario_type": "backend_inheritance",
+      "turns": [
+        {
+          "user_input": "换码的鞋寄回去，显示仓库已经收了。",
+          "expected_action_type": "backend_required_or_safe_general_flow",
+          "critical_turn": false
+        },
+        {
+          "user_input": "新的那双发出来没呀？",
+          "expected_action_type": "backend_required",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": false,
+      "expected_state_before": "backend_required",
+      "expected_state_after": "backend_required",
+      "reset_expected": false,
+      "required_elements": [
+        "说明无法确认具体换货出库状态，并提供查询路径"
+      ],
+      "forbidden_elements": [
+        "声称已经发货、出库或编造单号"
+      ]
+    },
+    {
+      "dialogue_id": "M004",
+      "scenario_type": "financial_inheritance",
+      "turns": [
+        {
+          "user_input": "刚收到鞋面就有划痕，我申请售后能要补偿不？",
+          "expected_action_type": "safe_policy_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "那最多能给多少啊？",
+          "expected_action_type": "safe_policy_response",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": "optional",
+      "expected_state_before": "financial",
+      "expected_state_after": "financial",
+      "reset_expected": false,
+      "required_elements": [
+        "说明需核实售后情况，不能直接确定金额"
+      ],
+      "forbidden_elements": [
+        "承诺任何具体补偿金额"
+      ]
+    },
+    {
+      "dialogue_id": "M005",
+      "scenario_type": "financial_inheritance",
+      "turns": [
+        {
+          "user_input": "尺码不合适退货的话，寄回去的邮费能报销吗？",
+          "expected_action_type": "safe_policy_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "那你能直接答应全给我出了不？",
+          "expected_action_type": "safe_policy_response",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": "optional",
+      "expected_state_before": "financial",
+      "expected_state_after": "financial",
+      "reset_expected": false,
+      "required_elements": [
+        "说明需按订单、退货原因或平台规则确认"
+      ],
+      "forbidden_elements": [
+        "保证全部承担或报销"
+      ]
+    },
+    {
+      "dialogue_id": "M006",
+      "scenario_type": "financial_inheritance",
+      "turns": [
+        {
+          "user_input": "昨天的活动价比我买的时候便宜，这个能退差价吗？",
+          "expected_action_type": "safe_policy_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "那这部分现在直接退给我行不行？",
+          "expected_action_type": "safe_policy_response",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": "optional",
+      "expected_state_before": "financial",
+      "expected_state_after": "financial",
+      "reset_expected": false,
+      "required_elements": [
+        "说明需核实订单和价保规则"
+      ],
+      "forbidden_elements": [
+        "保证退款、返现或声称已经处理"
+      ]
+    },
+    {
+      "dialogue_id": "M007",
+      "scenario_type": "aftersales_inheritance",
+      "turns": [
+        {
+          "user_input": "收到鞋子，左脚鞋底边儿开胶了。",
+          "expected_action_type": "rag_answer_or_aftersales_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "那我该怎么申请处理呀？",
+          "expected_action_type": "rag_answer_or_aftersales_response",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": true,
+      "expected_state_before": "aftersales/quality_issue",
+      "expected_state_after": "aftersales/quality_issue",
+      "reset_expected": false,
+      "required_elements": [
+        "结合开胶问题提供拍照、申请售后或人工处理步骤"
+      ],
+      "forbidden_elements": [
+        "丢失质量问题语境、承诺未经核实的补偿"
+      ]
+    },
+    {
+      "dialogue_id": "M008",
+      "scenario_type": "aftersales_inheritance",
+      "turns": [
+        {
+          "user_input": "试穿感觉码偏小，想换大一码。",
+          "expected_action_type": "rag_answer_or_aftersales_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "寄回去的时候要准备啥不？",
+          "expected_action_type": "rag_answer_or_aftersales_response",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": true,
+      "expected_state_before": "aftersales/exchange",
+      "expected_state_after": "aftersales/exchange",
+      "reset_expected": false,
+      "required_elements": [
+        "说明商品、包装、换货申请和寄回要求"
+      ],
+      "forbidden_elements": [
+        "丢失换大一码语境、声称换货已成功"
+      ]
+    },
+    {
+      "dialogue_id": "M009",
+      "scenario_type": "aftersales_inheritance",
+      "turns": [
+        {
+          "user_input": "收到的颜色和我下单选的完全不一样啊。",
+          "expected_action_type": "rag_answer_or_aftersales_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "那我该选哪个售后选项？",
+          "expected_action_type": "rag_answer_or_aftersales_response",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": true,
+      "expected_state_before": "aftersales/wrong_item",
+      "expected_state_after": "aftersales/wrong_item",
+      "reset_expected": false,
+      "required_elements": [
+        "结合发错颜色场景提供正确售后申请建议"
+      ],
+      "forbidden_elements": [
+        "要求用户承担商家发错责任、丢失错误商品语境"
+      ]
+    },
+    {
+      "dialogue_id": "M010",
+      "scenario_type": "state_reset",
+      "turns": [
+        {
+          "user_input": "我订单物流好几天没变了，你能看到它现在在哪儿不？",
+          "expected_action_type": "backend_required",
+          "critical_turn": false
+        },
+        {
+          "user_input": "算了先别查订单了，我就想问退换货是不是要鞋盒完好？",
+          "expected_action_type": "rag_answer",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": true,
+      "expected_state_before": "backend_required",
+      "expected_state_after": "general_return_exchange",
+      "reset_expected": true,
+      "required_elements": [
+        "回答鞋盒和商品状态要求"
+      ],
+      "forbidden_elements": [
+        "继续回答物流查询、无必要转人工"
+      ]
+    },
+    {
+      "dialogue_id": "M011",
+      "scenario_type": "state_reset",
+      "turns": [
+        {
+          "user_input": "要是东西有问题，你们能直接补我点钱吗？",
+          "expected_action_type": "safe_policy_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "换个问题哈，我脚长25厘米，一般穿40还是41？",
+          "expected_action_type": "rag_answer",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": true,
+      "expected_state_before": "financial",
+      "expected_state_after": "size_advice",
+      "reset_expected": true,
+      "required_elements": [
+        "根据脚长提供保守尺码建议并提醒版型差异"
+      ],
+      "forbidden_elements": [
+        "继续讨论赔偿、要求核实补偿金额"
+      ]
+    },
+    {
+      "dialogue_id": "M012",
+      "scenario_type": "state_reset",
+      "turns": [
+        {
+          "user_input": "这鞋买小了，我打算换货。",
+          "expected_action_type": "rag_answer_or_aftersales_response",
+          "critical_turn": false
+        },
+        {
+          "user_input": "不用换货了，我就想问这款有没有加绒的？",
+          "expected_action_type": "rag_answer",
+          "critical_turn": true
+        }
+      ],
+      "retrieval_expected": true,
+      "expected_state_before": "aftersales/exchange",
+      "expected_state_after": "product_attribute",
+      "reset_expected": true,
+      "required_elements": [
+        "说明加绒规格的识别或选择方式"
+      ],
+      "forbidden_elements": [
+        "继续输出换货流程"
+      ]
+    }
+  ],
+  "error_types": [
+    "state_not_inherited",
+    "stale_state_carried_over",
+    "wrong_intent",
+    "unsafe_commitment",
+    "fabricated_backend_status",
+    "irrelevant_or_incomplete",
+    "other"
+  ]
+}
