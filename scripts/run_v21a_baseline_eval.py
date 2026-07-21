@@ -7,13 +7,14 @@ It does not modify RAG core logic. Cases are designed for reuse with V2.1b.
 
 from __future__ import annotations
 
+import argparse
 import csv
+import hashlib
 import json
 import os
 import re
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,10 +23,13 @@ if str(OUTPUTS) not in sys.path:
     sys.path.insert(0, str(OUTPUTS))
 
 import rag_answer_demo as rag  # noqa: E402
+from encoding_sanity import assert_readable_chinese_values
 
+SYSTEM_VERSION = "V2.1a"
+REPORT_STEM = "v21a_baseline_eval"
 CASES_PATH = ROOT / "evaluation" / "v21a_baseline_cases.json"
-CSV_PATH = ROOT / "outputs" / "reports" / "v21a_baseline_eval_results.csv"
-REPORT_PATH = ROOT / "outputs" / "reports" / "v21a_baseline_eval_report.md"
+CSV_PATH = ROOT / "outputs" / "reports" / f"{REPORT_STEM}_results.csv"
+REPORT_PATH = ROOT / "outputs" / "reports" / f"{REPORT_STEM}_report.md"
 
 HANDOVER_TERMS = ["人工", "客服", "后台", "核实", "转人工"]
 GLOBAL_RISKY_PATTERNS = [
@@ -147,6 +151,9 @@ def score_correctness(
     inherit_as_ok = True
     if case.get("expected_inherited_aftersales_operation") is True:
         inherit_as_ok = bool(result.get("inherited_aftersales_operation"))
+    inherit_backend_ok = True
+    if case.get("expected_inherited_backend_required") is True:
+        inherit_backend_ok = bool(result.get("inherited_backend_required"))
 
     if forbidden:
         reasons.append(f"forbidden:{','.join(forbidden)}")
@@ -162,8 +169,10 @@ def score_correctness(
         reasons.append("expected inherited_financial_risk")
     if not inherit_as_ok:
         reasons.append("expected inherited_aftersales_operation")
+    if not inherit_backend_ok:
+        reasons.append("expected inherited_backend_required")
 
-    hard_fail = bool(forbidden) or (not inherit_fin_ok) or (not inherit_as_ok) or (
+    hard_fail = bool(forbidden) or (not inherit_fin_ok) or (not inherit_as_ok) or (not inherit_backend_ok) or (
         skip_expected is True and not skip_ok
     )
     if hard_fail:
@@ -252,6 +261,8 @@ def evaluate_multiturn(case: dict, result: dict, answer: str) -> str:
         return "false"
     if case.get("expected_inherited_aftersales_operation") and not result.get("inherited_aftersales_operation"):
         return "false"
+    if case.get("expected_inherited_backend_required") and not result.get("inherited_backend_required"):
+        return "false"
     if case.get("skip_retrieval_expected") and not result.get("skip_retrieval"):
         return "false"
     if case_forbidden_hits(answer, case.get("must_not_include_any") or []):
@@ -304,6 +315,7 @@ def empty_debug_fields() -> dict:
     return {
         "inherited_financial_risk": False,
         "inherited_aftersales_operation": False,
+        "inherited_backend_required": False,
         "is_followup_query": False,
         "retrieval_query": "",
         "skip_retrieval": False,
@@ -324,6 +336,7 @@ def run_query(
     threshold: float,
     previous_user_query: str | None = None,
     previous_assistant_answer: str | None = None,
+    conversation_state: dict | None = None,
 ) -> dict:
     return rag.run_rag_query(
         query,
@@ -336,6 +349,7 @@ def run_query(
         llm_config,
         previous_user_query=previous_user_query,
         previous_assistant_answer=previous_assistant_answer,
+        conversation_state=conversation_state,
     )
 
 
@@ -352,6 +366,7 @@ def evaluate_case_rows(
     rows = []
     previous_user = None
     previous_answer = None
+    conversation_state = None
 
     if case["case_type"] == "single_turn":
         turns = [{"user": case["query"]}]
@@ -371,6 +386,7 @@ def evaluate_case_rows(
             threshold,
             previous_user_query=previous_user,
             previous_assistant_answer=previous_answer,
+            conversation_state=(conversation_state if SYSTEM_VERSION == "V2.1b" else None),
         )
         answer = str(result.get("final_answer", ""))
         is_final = turn_idx == len(turns)
@@ -425,6 +441,10 @@ def evaluate_case_rows(
                 "is_followup_query": bool(result.get("is_followup_query")),
                 "inherited_financial_risk": bool(result.get("inherited_financial_risk")),
                 "inherited_aftersales_operation": bool(result.get("inherited_aftersales_operation")),
+                "inherited_backend_required": bool(result.get("inherited_backend_required")),
+                "conversation_state": json.dumps(
+                    result.get("conversation_state") or {}, ensure_ascii=False
+                ),
                 "retrieval_query": str(result.get("retrieval_query", query)),
                 "top1_title": top_title,
                 "top1_source_type": top_source,
@@ -443,6 +463,8 @@ def evaluate_case_rows(
         )
         previous_user = query
         previous_answer = answer
+        if SYSTEM_VERSION == "V2.1b":
+            conversation_state = result.get("conversation_state")
 
     return rows
 
@@ -469,6 +491,8 @@ def write_csv(rows: list[dict]) -> None:
         "is_followup_query",
         "inherited_financial_risk",
         "inherited_aftersales_operation",
+        "inherited_backend_required",
+        "conversation_state",
         "retrieval_query",
         "top1_title",
         "top1_source_type",
@@ -518,16 +542,17 @@ def write_report(cases: list[dict], rows: list[dict], llm_mode: str) -> None:
     multi_n = sum(1 for c in cases if c["case_type"] == "multi_turn")
 
     failed_rows = [r for r in final_rows if r["pass_fail"] == "Fail"]
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-
     lines = [
-        "# V2.1a Baseline Evaluation Report",
+        f"# {SYSTEM_VERSION} Baseline Evaluation Report",
         "",
-        f"- Generated: {now}",
-        f"- System version: V2.1a",
+        "- Snapshot: deterministic mock development regression output",
+        f"- System version: {SYSTEM_VERSION}",
         f"- LLM mode: {llm_mode}",
-        f"- Dataset: `{CASES_PATH.as_posix()}`",
-        f"- Detailed CSV: `{CSV_PATH.as_posix()}`",
+        "- Evaluation type: Development regression evaluation",
+        "- Dataset: `evaluation/v21a_baseline_cases.json`",
+        f"- Detailed CSV: `outputs/reports/{CSV_PATH.name}`",
+        f"- Case-ID-set SHA-256: `{case_id_set_sha256(cases)}`",
+        "- Not a formal held-out evaluation; not RQ1/RQ2/RQ3 evidence.",
         "",
         "## 1. Overall Summary",
         "",
@@ -563,16 +588,12 @@ def write_report(cases: list[dict], rows: list[dict], llm_mode: str) -> None:
     if not failed_rows:
         lines.append("No failed cases.")
     else:
-        lines.append("| Case ID | Category | Query | Query Type | Failure Reason | Answer Summary |")
-        lines.append("| --- | --- | --- | --- | --- | --- |")
+        lines.append("| Case ID | Category | Query Type | Failed Assertion | Safety Summary |")
+        lines.append("| --- | --- | --- | --- | --- |")
         for r in failed_rows:
-            ans = re.sub(r"\s+", " ", r["final_answer"]).strip()
-            if len(ans) > 80:
-                ans = ans[:79] + "…"
-            q = r["user_query"].replace("|", "\\|")
             fr = str(r["failure_reason"]).replace("|", "\\|")
             lines.append(
-                f"| {r['case_id']} | {r['category']} | {q} | {r['query_type']} | {fr} | {ans.replace('|', '\\|')} |"
+                f"| {r['case_id']} | {r['category']} | {r['query_type']} | {fr} | {safe_failure_summary(fr)} |"
             )
 
     strengths = []
@@ -617,14 +638,21 @@ def write_report(cases: list[dict], rows: list[dict], llm_mode: str) -> None:
     for w in weaknesses:
         lines.append(f"- {w}")
 
+    next_step = (
+        "Compare this V2.1b result with the preserved V2.1a 59/60 baseline."
+        if SYSTEM_VERSION == "V2.1b"
+        else "This V2.1a baseline should be reused unchanged for V2.1b comparison."
+    )
     lines.extend(
         [
             "",
             "## 6. Next Step",
             "",
-            "This V2.1a baseline should be reused unchanged for V2.1b comparison.",
+            next_step,
             "Keep `evaluation/v21a_baseline_cases.json` fixed; only change the system under test.",
             "Compare overall pass rate and the six metrics above between V2.1a and V2.1b.",
+            "The JSON intentionally reuses 16 normalized input groups across single-turn and multi-turn contexts; these are context-specific regression assertions, not independent statistical samples.",
+            "This development suite does not use the formal Gold Set deduplication standard; formal RQ2/RQ3 cases are separately deduplicated and frozen.",
             "",
         ]
     )
@@ -633,13 +661,65 @@ def write_report(cases: list[dict], rows: list[dict], llm_mode: str) -> None:
     REPORT_PATH.write_text("\n".join(lines), encoding="utf-8")
 
 
-def main() -> int:
-    os.environ.setdefault("DEEPSEEK_API_KEY", "")
+def case_id_set_sha256(cases: list[dict]) -> str:
+    values = "\n".join(sorted(str(case["case_id"]) for case in cases)) + "\n"
+    return hashlib.sha256(values.encode("utf-8")).hexdigest()
+
+
+def safe_failure_summary(reason: str, limit: int = 96) -> str:
+    """Fixed-length assertion-only summary; never includes generated answer text."""
+    return re.sub(r"\s+", " ", str(reason or "")).strip()[:limit]
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run V2.1 development regression evaluation.")
+    parser.add_argument("--llm-mode", choices=("auto", "mock", "real"), default="auto")
+    parser.add_argument("--system-version", choices=("V2.1a", "V2.1b"), default=None)
+    parser.add_argument("--output-dir", default="", help="Optional output directory for temporary validation.")
+    return parser
+
+
+def resolve_system_version(cli_value: str | None) -> str:
+    return cli_value or os.getenv("RAG_EVAL_SYSTEM_VERSION", "V2.1a")
+
+
+def build_llm_config(mode: str, load_dotenv, OpenAI):
+    if mode == "mock":
+        # Do not call load_dotenv or inspect any DEEPSEEK_* environment value.
+        return rag.LLMConfig(api_key="", base_url="", model=rag.DEFAULT_DEEPSEEK_MODEL, client=None)
+    return rag.load_llm_config(load_dotenv, OpenAI)
+
+
+def main(argv: list[str] | None = None) -> int:
+    global SYSTEM_VERSION, REPORT_STEM, CSV_PATH, REPORT_PATH
+    args = build_parser().parse_args(argv)
+    SYSTEM_VERSION = resolve_system_version(args.system_version)
+    REPORT_STEM = "v21b_baseline_eval" if SYSTEM_VERSION == "V2.1b" else "v21a_baseline_eval"
+    output_root = Path(args.output_dir).resolve() if args.output_dir else ROOT / "outputs" / "reports"
+    CSV_PATH = output_root / f"{REPORT_STEM}_results.csv"
+    REPORT_PATH = output_root / f"{REPORT_STEM}_report.md"
     payload = json.loads(CASES_PATH.read_text(encoding="utf-8"))
     cases = payload["cases"]
+    if SYSTEM_VERSION == "V2.1b":
+        for case in cases:
+            if case.get("case_id") == "M017":
+                case["expected_inherited_backend_required"] = True
+                case["skip_retrieval_expected"] = True
+    assert_readable_chinese_values(cases)
+    assert_readable_chinese_values(
+        [
+            rag.FOLLOWUP_QUERY_PHRASES,
+            rag.BACKEND_STATE_FOLLOWUP_PHRASES,
+            rag.AFTERSALES_FOLLOWUP_PHRASES,
+            rag.SLIP_FOLLOWUP_CONTEXTUAL_QUERY,
+            rag.POST_SHIP_FOLLOWUP_CONTEXTUAL_QUERY,
+            rag.QUALITY_FOLLOWUP_CONTEXTUAL_QUERY,
+            rag.FOOT_FOLLOWUP_CONTEXTUAL_QUERY,
+        ]
+    )
 
     np, pd, load_dotenv, OpenAI, SentenceTransformer, cosine_similarity = rag.load_dependencies()
-    llm_config = rag.load_llm_config(load_dotenv, OpenAI)
+    llm_config = build_llm_config(args.llm_mode, load_dotenv, OpenAI)
     embedding_model = SentenceTransformer(rag.DEFAULT_EMBEDDING_MODEL)
     qa_path = rag.resolve_qa_csv_path()
     snippets_path = rag.resolve_snippets_csv_path()
@@ -657,9 +737,8 @@ def main() -> int:
 
     top_k = 10
     threshold = rag.LOW_CONFIDENCE_THRESHOLD
-    llm_mode = "deepseek" if llm_config.has_api_key else "mock"
+    llm_mode = "mock" if args.llm_mode == "mock" else ("deepseek" if llm_config.has_api_key else "mock")
 
-    print(f"DEEPSEEK_API_KEY loaded: {llm_config.has_api_key}")
     print(f"LLM mode: {llm_mode}")
     print(f"Loaded cases: {len(cases)}")
     print(f"Loaded cache: {len(corpus):,} mixed corpus rows")

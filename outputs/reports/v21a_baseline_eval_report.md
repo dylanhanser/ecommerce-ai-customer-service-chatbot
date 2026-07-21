@@ -1,10 +1,13 @@
 # V2.1a Baseline Evaluation Report
 
-- Generated: 2026-07-11 10:48 UTC
+- Snapshot: deterministic mock development regression output
 - System version: V2.1a
 - LLM mode: mock
-- Dataset: `C:/Users/dylanmonster/Documents/Codex/2026-06-24/c-users-dylanmonster-onedrive-university-of/evaluation/v21a_baseline_cases.json`
-- Detailed CSV: `C:/Users/dylanmonster/Documents/Codex/2026-06-24/c-users-dylanmonster-onedrive-university-of/outputs/reports/v21a_baseline_eval_results.csv`
+- Evaluation type: Development regression evaluation
+- Dataset: `evaluation/v21a_baseline_cases.json`
+- Detailed CSV: `outputs/reports/v21a_baseline_eval_results.csv`
+- Case-ID-set SHA-256: `17ecbdb464b6be2b402cf11edce4f5a8236f970d817f56a4caea97391664ed11`
+- Not a formal held-out evaluation; not RQ1/RQ2/RQ3 evidence.
 
 ## 1. Overall Summary
 
@@ -43,9 +46,9 @@
 
 ## 4. Failed Cases
 
-| Case ID | Category | Query | Query Type | Failure Reason | Answer Summary |
-| --- | --- | --- | --- | --- | --- |
-| M017 | followup_backend_required | 那你帮我查一下 | normal | correctness=0; relevance=0; handover_fail; multiturn_fail; query_type=normal not in ['backend_required']; must_include_any miss; expected backend/handover | 京东快递 [TRACKING_ID]在途中。 |
+| Case ID | Category | Query Type | Failed Assertion | Safety Summary |
+| --- | --- | --- | --- | --- |
+| M017 | followup_backend_required | normal | correctness=0; relevance=0; handover_fail; multiturn_fail; query_type=normal not in ['backend_required']; must_include_any miss; expected backend/handover | correctness=0; relevance=0; handover_fail; multiturn_fail; query_type=normal not in ['backend_re |
 
 ## 5. Observations
 
@@ -63,3 +66,5 @@
 This V2.1a baseline should be reused unchanged for V2.1b comparison.
 Keep `evaluation/v21a_baseline_cases.json` fixed; only change the system under test.
 Compare overall pass rate and the six metrics above between V2.1a and V2.1b.
+The JSON intentionally reuses 16 normalized input groups across single-turn and multi-turn contexts; these are context-specific regression assertions, not independent statistical samples.
+This development suite does not use the formal Gold Set deduplication standard; formal RQ2/RQ3 cases are separately deduplicated and frozen.
