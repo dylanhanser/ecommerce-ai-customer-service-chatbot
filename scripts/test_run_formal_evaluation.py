@@ -14,6 +14,7 @@ class RunnerTests(unittest.TestCase):
   self.assertEqual(runner.FROZEN,runner.verify_frozen()); self.assertEqual(190,len(self.plan))
   self.assertEqual({"RQ1":102,"RQ2":40,"RQ3":48},{x:sum(u["rq"]==x for u in self.plan) for x in ("RQ1","RQ2","RQ3")})
   self.assertEqual(190,len({u["request_id"] for u in self.plan})); self.assertEqual(190,len({u["case_id"]+str(u["turn_index"])+u["system_config_id"] for u in self.plan}))
+  self.assertEqual(71,sum(u["system_config_id"]=="qa_only_reconstructed_baseline" for u in self.plan)); self.assertEqual(71,sum(u["system_config_id"]=="v2" for u in self.plan)); self.assertEqual(24,sum(u["system_config_id"]=="single_turn" for u in self.plan)); self.assertEqual(24,sum(u["system_config_id"]=="context_aware" for u in self.plan))
  def test_fixed_generation_and_no_scoring_leak(self):
   self.assertEqual(0.0,runner.GENERATION["temperature"]); self.assertEqual(1.0,runner.GENERATION["top_p"]); self.assertEqual(512,runner.GENERATION["max_tokens"])
   forbidden={"reference_answer","gold_category","expected_action_type","required_elements","forbidden_elements","pass_rule","critical_turn","expected_state_before"}
@@ -26,11 +27,11 @@ class RunnerTests(unittest.TestCase):
  def test_rq3_context_and_single_turn(self):
   units=[u for u in self.plan if u["rq"]=="RQ3"]
   for u in units:
-   if u["system_config_id"]=="v2_single_turn": self.assertEqual([],u["payload"]["history"])
-  second=[u for u in units if u["system_config_id"]=="v21b_context_aware" and u["turn_index"]==2]
+   if u["system_config_id"]=="single_turn": self.assertEqual([],u["payload"]["history"])
+  second=[u for u in units if u["system_config_id"]=="context_aware" and u["turn_index"]==2]
   self.assertEqual(12,len(second)); self.assertTrue(all(len(x["payload"]["history"])==1 for x in second))
   # Execution resolves the permitted Turn-1 response, while the plan hash stays stable.
-  dialog=sorted((u for u in units if u["case_id"]=="M001" and u["system_config_id"]=="v21b_context_aware"),key=lambda x:x["turn_index"])
+  dialog=sorted((u for u in units if u["case_id"]=="M001" and u["system_config_id"]=="context_aware"),key=lambda x:x["turn_index"])
   with tempfile.TemporaryDirectory() as t:
    seen=[]
    runner.run_plan(dialog,Path(t),lambda u,a: (seen.append(u),runner.fake_executor(u,a))[1])
@@ -51,6 +52,10 @@ class RunnerTests(unittest.TestCase):
    def okay(u,a): calls.append(a); return runner.fake_executor(u,a)
    runner.run_plan(unit,Path(t),okay); runner.run_plan(unit,Path(t),okay); self.assertEqual([1],calls)
    rows=runner.load_jsonl(Path(t)/"responses.jsonl"); rows[0]["payload_sha256"]="bad"; runner.write_jsonl(Path(t)/"responses.jsonl",rows)
+   with self.assertRaises(runner.Blocked): runner.run_plan(unit,Path(t),okay)
+  with tempfile.TemporaryDirectory() as t:
+   legacy={"request_id":"legacy-v1","system_config_id":"v1_qa_top5","payload_sha256":"x","execution_status":"success"}
+   runner.write_jsonl(Path(t)/"responses.jsonl",[legacy])
    with self.assertRaises(runner.Blocked): runner.run_plan(unit,Path(t),okay)
   with tempfile.TemporaryDirectory() as t:
    calls=[]

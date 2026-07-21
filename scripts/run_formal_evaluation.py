@@ -19,7 +19,8 @@ BASE_SEED = 20260721
 CONFIRM = "FORMAL_EVAL_20260721"
 FROZEN = {
  "data/external_eval/review/final/external_store_v1_gold_51.csv":"773535bf13c1d2a80ebff5410c2f16c96b6f297b2b3f17cd99628165b26fc444",
- "evaluation/formal_rq1_scoring_schema.json":"dac0bcc70915106513bd059bb4fe42dd2482dc5b1c25a811151cf57df42e422b",
+ "evaluation/formal_qa_only_baseline_spec.json":"ea776d7cd43e76cad9f42874a0d9da0fb9b0abd4007d752ea7cc1794bd5ed399",
+ "evaluation/formal_rq1_scoring_schema.json":"a2854a92a5dff3c59215cfef5cc49416a4d64e5c89b0a915d95a43791f4bba9b",
  "evaluation/formal_rq2_boundary_cases.json":"4a5680a7cd21ba434c958b3c3cdd9407a84b77d7f3741b10476fa86fa9851417",
  "evaluation/formal_rq3_multiturn_cases.json":"c534867d93edbed724efd8064c85555b3fbeab89f4bdc58dbebb45a904018b95",
 }
@@ -60,16 +61,16 @@ def build_plan() -> list[dict[str,Any]]:
  with (ROOT/"data/external_eval/review/final/external_store_v1_gold_51.csv").open(encoding="utf-8-sig",newline="") as f: gold=list(csv.DictReader(f))
  plan=[]
  for row in gold:
-  for system in ("v1_qa_top5","v2_mixed_top10"):
+  for system in ("qa_only_reconstructed_baseline","v2"):
    u=_unit("RQ1",row["review_id"],1,system,row["question"],"data/external_eval/review/final/external_store_v1_gold_51.csv")
    u["review_id"]=row["review_id"]; plan.append(u)
  for row in read_json("evaluation/formal_rq2_boundary_cases.json")["cases"]:
-  for system in ("v1_qa_top5","v2_mixed_top10"):
+  for system in ("qa_only_reconstructed_baseline","v2"):
    plan.append(_unit("RQ2",row["case_id"],1,system,row["user_input"],"evaluation/formal_rq2_boundary_cases.json"))
  for dialog in read_json("evaluation/formal_rq3_multiturn_cases.json")["cases"]:
-  for system in ("v2_single_turn","v21b_context_aware"):
+  for system in ("single_turn","context_aware"):
    for i,turn in enumerate(dialog["turns"],1):
-    history=[] if system=="v2_single_turn" or i==1 else [{"user_input":dialog["turns"][0]["user_input"],"assistant_answer":"__PRIOR_RESPONSE_BY_SAME_REQUEST_SEQUENCE__"}]
+    history=[] if system=="single_turn" or i==1 else [{"user_input":dialog["turns"][0]["user_input"],"assistant_answer":"__PRIOR_RESPONSE_BY_SAME_REQUEST_SEQUENCE__"}]
     plan.append(_unit("RQ3",dialog["dialogue_id"],i,system,turn["user_input"],"evaluation/formal_rq3_multiturn_cases.json",history))
  # Namespace SHA-256 defines the fixed execution order. RQ3 pairs retain their
  # causal Turn-1 -> Turn-2 order inside a SHA-256 ordered dialogue/system group.
@@ -104,13 +105,17 @@ def resolved_execution_unit(unit: dict[str,Any], known: dict[str,dict[str,Any]])
 
  The plan stores a stable reference marker so its hash never depends on model text.
  """
- if unit["rq"]!="RQ3" or unit["system_config_id"]!="v21b_context_aware" or unit["turn_index"]!=2: return unit
+ if unit["rq"]!="RQ3" or unit["system_config_id"]!="context_aware" or unit["turn_index"]!=2: return unit
  prior=next((r for r in known.values() if r["rq"]=="RQ3" and r["case_id"]==unit["case_id"] and r["system_config_id"]==unit["system_config_id"] and r["turn_index"]==1 and r["execution_status"]=="success"),None)
  if prior is None: raise Blocked("BLOCKED MISSING LOCKED RQ3 TURN 1")
  copy=json.loads(json.dumps(unit,ensure_ascii=False)); copy["payload"]["history"][0]["assistant_answer"]=prior["response_text"]
  return copy
 def run_plan(plan: list[dict[str,Any]], directory: Path, executor: Callable[[dict[str,Any],int],dict[str,Any]]=fake_executor) -> list[dict[str,Any]]:
  directory.mkdir(parents=True,exist_ok=True); rp=directory/"responses.jsonl"; existing={x["request_id"]:x for x in load_jsonl(rp)}; out=[]
+ expected={x["request_id"]:x for x in plan}
+ for rid,row in existing.items():
+  if rid not in expected or row.get("system_config_id") != expected[rid]["system_config_id"]:
+   raise Blocked("BLOCKED LEGACY OR MIXED FORMAL PLAN RESULTS")
  for unit in plan:
   old=existing.get(unit["request_id"])
   if old:
@@ -173,7 +178,7 @@ def templates(plan: list[dict[str,Any]], responses: list[dict[str,Any]], d: Path
 
 def prepare(directory: Path) -> dict[str,Any]:
  hashes=verify_frozen(); plan=build_plan(); write_jsonl(directory/"request_plan.jsonl",plan); responses=run_plan(plan,directory); counts=templates(plan,responses,directory)
- manifest={"protocol_version":"1.0","base_seed":BASE_SEED,"frozen_input_sha256":hashes,"generation":GENERATION,"transport":"fake","responses_are_not_model_outputs":True,"request_count":190,"system_configurations":{"v1_qa_top5":{"corpus":"qa","qa_count":15333,"top_k":5},"v2_mixed_top10":{"corpus":"mixed","qa_count":15333,"snippet_count":355,"top_k":10},"v2_single_turn":{"context":"disabled","top_k":10},"v21b_context_aware":{"context":"enabled","top_k":10}},"template_rows":counts}
+ manifest={"protocol_version":"1.1","base_seed":BASE_SEED,"frozen_input_sha256":hashes,"generation":GENERATION,"transport":"fake","responses_are_not_model_outputs":True,"request_count":190,"system_configurations":{"qa_only_reconstructed_baseline":{"corpus":"qa_only","qa_count":15333,"top_k":5},"v2":{"corpus":"mixed","qa_count":15333,"snippet_count":355,"top_k":10},"single_turn":{"context":"disabled","top_k":10},"context_aware":{"context":"enabled","top_k":10}},"template_rows":counts}
  write_json(directory/"run_manifest.json",manifest); write_jsonl(directory/"execution_events.jsonl",[{"request_id":r["request_id"],"execution_status":r["execution_status"],"transport":"fake"} for r in responses]); return manifest
 def real_gate(args: argparse.Namespace) -> None:
  if args.mode!="real": return

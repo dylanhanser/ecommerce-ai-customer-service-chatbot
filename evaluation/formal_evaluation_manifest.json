@@ -1,43 +1,50 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
+  "freeze_revision": "qa_only_reconstructed_baseline_20260721",
+  "freeze_date": "2026-07-21",
   "research_questions": {
     "rq1": {
-      "zh": "与 V1 相比，V2 RAG 管线能否提升系统在经人工验证的外部店铺 held-out 真实客户查询上的回答质量？",
-      "en": "To what extent does the V2 RAG pipeline improve response quality on human-validated, held-out customer queries from an external e-commerce store compared with V1?"
+      "zh": "与冻结的 QA-only 重建基线相比，当前 V2 RAG 管线能否提升系统在经人工验证的外部店铺 held-out 真实客户查询上的回答质量？",
+      "en": "To what extent does the current V2 RAG pipeline improve response quality on human-validated, held-out customer queries from an external e-commerce store compared with the frozen QA-only reconstructed baseline?"
     },
     "rq2": {
-      "zh": "与 V1 相比，V2 能否提高系统在预定义电商业务边界与安全场景中的正确路由和安全响应遵从性？",
-      "en": "To what extent does V2 improve correct routing and safe-response compliance in predefined e-commerce operational and safety-boundary scenarios compared with V1?"
+      "zh": "QA-only 重建基线与当前 V2 在预定义电商业务边界与安全场景中的正确路由和安全响应遵从性比较。",
+      "en": "Comparison of the QA-only reconstructed baseline and current V2 on predefined e-commerce operational and safety-boundary scenarios."
     },
     "rq3": {
-      "zh": "与单轮 V2 相比，V2.1b 的多轮上下文管理机制（包括结构化 ConversationState 与有界历史文本回退）能否提高系统处理上下文依赖型追问的正确性？",
-      "en": "Does the multi-turn context-management mechanism used in V2.1b, comprising structured ConversationState and bounded conversational-history fallback, improve the correct handling of context-dependent follow-up queries compared with single-turn V2?"
+      "zh": "与单轮 V2 相比，V2.1b 的多轮上下文管理机制能否提高系统处理上下文依赖型追问的正确性？",
+      "en": "Does V2.1b context management improve handling of context-dependent follow-up queries compared with single-turn V2?"
     }
   },
   "system_comparison_matrix": {
-    "rq1": "V1 vs V2",
-    "rq2": "V1 vs V2",
-    "rq3": "V2 single-turn vs V2.1b context-aware"
+    "rq1": "qa_only_reconstructed_baseline vs v2",
+    "rq2": "qa_only_reconstructed_baseline vs v2",
+    "rq3": "single_turn vs context_aware"
   },
   "base_seed": 20260721,
+  "formal_system_ids": {
+    "qa_only_reconstructed_baseline": "evaluation/formal_qa_only_baseline_spec.json",
+    "v2": "current_v2",
+    "single_turn": "v2_without_context_management",
+    "context_aware": "v21b_context_aware"
+  },
+  "baseline_provenance": {
+    "source_commit": "12136b7c084e5b68dc4ca6672da20ed800a8a11b",
+    "source_path": "outputs/rag_answer_demo.py",
+    "git_blob": "5906f6af2a65584af7b54d08d3e3aa252d3551ea",
+    "blob_sha256": "2a1585575162de62de30df3fca809048f5a81878b491050e57565e548936fcdc"
+  },
   "gold_51_sha256": "773535bf13c1d2a80ebff5410c2f16c96b6f297b2b3f17cd99628165b26fc444",
   "artifact_sha256": {
-    "rq1_scoring_schema": "dac0bcc70915106513bd059bb4fe42dd2482dc5b1c25a811151cf57df42e422b",
+    "qa_only_baseline_spec": "ea776d7cd43e76cad9f42874a0d9da0fb9b0abd4007d752ea7cc1794bd5ed399",
+    "rq1_scoring_schema": "a2854a92a5dff3c59215cfef5cc49416a4d64e5c89b0a915d95a43791f4bba9b",
     "rq2_cases": "4a5680a7cd21ba434c958b3c3cdd9407a84b77d7f3741b10476fa86fa9851417",
-    "rq3_cases": "c534867d93edbed724efd8064c85555b3fbeab89f4bdc58dbebb45a904018b95"
+    "rq3_cases": "c534867d93edbed724efd8064c85555b3fbeab89f4bdc58dbebb45a904018b95",
+    "formal_protocol": "361ff39e405846757d454c4d9f49838049b5a7996d929a580310d092316f3f1f"
   },
-  "code_config_sha256": {
-    "rag_answer_demo": "b5d288be643228505b2b76c07ee595b0b80e3526f32f37303edd06fa2f3ba110",
-    "app": "c860558de3153f968de86c7e7c4dcc65c3d423abc41e9c1bd52213d3841a6953"
+  "superseded_artifact_sha256": {
+    "rq1_scoring_schema": "dac0bcc70915106513bd059bb4fe42dd2482dc5b1c25a811151cf57df42e422b"
   },
-  "corpus_sha256": {
-    "qa": "730670dc6a47d6f1d7c7b146f546dc061802d672d78922fab82718f394100714",
-    "snippets": "d88f449a80a308ed8d648fa13a60a77671dcd273748e4e0bddf30e4c9076b685",
-    "v2_cache_corpus": "e2121cc34bd9bd01a168430976f2c83c3310b9fff4390deb8eb74426f17e90da",
-    "v2_cache_embeddings": "58f4dd3c05d466a277b23437c2edcbcffe576f179f947b345f220cb21fbe2f93"
-  },
-  "requirements_sha256": "da58070895607df13d5bdd2c443a786a86e7a04b82ee6beaa1e009a1abecb6e1",
-  "prompt_sha256": "71419686c32df8dd916e590eba5f8ebaa714e2943d264f7a1698e25e15a45675",
   "generator": {
     "provider": "DeepSeek",
     "base_url": "https://api.deepseek.com",
@@ -49,12 +56,7 @@
     "evaluation_stream": false,
     "thinking": "not_applicable"
   },
-  "git_head": "910a4532cc15db07cd78ae8db8f4f67a7f3a0717",
-  "dirty_worktree_pre_freeze": {
-    "evaluation/v21a_baseline_cases.json": "5ddf7d95cbdf47a57d56d11bcf2dbde000b52d6bc837904eb2b38beed3620902",
-    "outputs/reports/v21a_baseline_eval_report.md": "3c62fd31808caeb5f18391ca0eb1825512c25c97f43b285fa4e66ea747a752af",
-    "outputs/reports/v21a_baseline_eval_results.csv": "8f3213836d1c539e3cae0b429a7df9404ea99f972ca000eaa77d02be4472eda8",
-    "scripts/run_v21a_baseline_eval.py": "5588fe4f502414b13ece0666284d303b292c33da3ce0f96c362974e85d0fd816"
-  },
+  "real_execution_started": false,
+  "formal_model_responses": 0,
   "execution_not_started": true
 }

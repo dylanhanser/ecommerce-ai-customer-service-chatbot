@@ -20,7 +20,7 @@
 - 190 units: RQ1 102, RQ2 40, RQ3 48.
 - SHA-256 namespace ordering uses base seed `20260721`; IDs include protocol, RQ, case, turn, system, input, generation, and frozen-file hashes.
 - Config: DeepSeek / `https://api.deepseek.com` / `deepseek-chat`; temperature 0.0, top_p 1.0, max_tokens 512, stream false, thinking not applicable.
-- V1 is QA-only, 15,333 QA, Top-K 5; V2 is mixed, 15,333 QA plus 355 snippets, Top-K 10. RQ3 contrasts context disabled/enabled only.
+- This superseded dry-run report used legacy V1-labelled planning. The current formal freeze replaces that label with `qa_only_reconstructed_baseline`; legacy plan artifacts must not be mixed into a resumed run.
 - Payload-leak checks cover all 190 execution payloads. Gold and scoring metadata are separated.
 - Fake transport validates first-success locking, resume, retry classification/max-three, and payload-mismatch blocking.
 

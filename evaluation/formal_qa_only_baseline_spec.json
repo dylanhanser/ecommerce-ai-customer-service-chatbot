@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0",
+  "system_id": "qa_only_reconstructed_baseline",
+  "version": "1.0",
+  "display_label_policy": "Blind reviewer materials must not expose this system identifier.",
+  "classification": "predefined_qa_only_reconstructed_comparator",
+  "provenance": {
+    "source_commit": "12136b7c084e5b68dc4ca6672da20ed800a8a11b",
+    "source_path": "outputs/rag_answer_demo.py",
+    "git_blob": "5906f6af2a65584af7b54d08d3e3aa252d3551ea",
+    "blob_sha256": "2a1585575162de62de30df3fca809048f5a81878b491050e57565e548936fcdc",
+    "historical_entry_chain": "main -> interactive_loop -> retrieve -> rerank_retrieved_results -> generate_final_answer",
+    "statement": "This provenance is a verifiable design source, not evidence that the source was a historical production V1."
+  },
+  "corpus": {
+    "source": "project historical store QA corpus",
+    "qa_count": 15333,
+    "mode": "qa_only",
+    "cache_family": "v1_qa",
+    "exclude_structured_snippets": true,
+    "exclude_external_store_v1": true,
+    "exclude_gold_51": true,
+    "exclude_rq2_rq3_cases": true,
+    "allow_web_or_dynamic_external_knowledge": false
+  },
+  "retrieval": {
+    "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "similarity": "cosine_similarity",
+    "top_k": 5,
+    "top_k_provenance": "initial CLI default in the provenance blob",
+    "reranking": "retain only rule-based reranking present in the provenance blob",
+    "forbid_current_v2_rag_query_as_qa_only_substitute": true
+  },
+  "pipeline_boundary": {
+    "retain_from_provenance_blob": [
+      "prompt",
+      "rule_based_reranking",
+      "intent_and_backend_guard",
+      "answer_post_processing"
+    ],
+    "exclude_post_provenance_enhancements": [
+      "lightweight_followup_text_history",
+      "compensation_guard_enhancements",
+      "financial_risk_guard_enhancements",
+      "aftersales_operation_guard_enhancements",
+      "conversation_state",
+      "bounded_previous_user_assistant_fallback",
+      "live_logistics_safety_filter",
+      "structured_snippets",
+      "current_v2_extended_guards_prompt_post_processing"
+    ],
+    "adapter_requirement": "A future adapter must extract or independently verify each retained provenance-blob behavior; it must not substitute current V2 run_rag_query with a QA-only cache."
+  },
+  "generation": {
+    "provider": "DeepSeek",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-chat",
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 512,
+    "stream": false,
+    "thinking": "not_sent",
+    "statement": "These are controlled formal-experiment parameters, not a claim about the source commit's online parameters."
+  },
+  "state": {
+    "rq1_rq2": "new independent single-turn state per case; no prior text, ConversationState, or cross-sample answer sharing"
+  },
+  "interpretation": {
+    "not_historical_v1": true,
+    "not_original_production_v1": true,
+    "not_exact_historical_reproduction": true,
+    "not_single_component_ablation": true,
+    "comparison": "RQ1 and RQ2 compare complete frozen system configurations; results cannot identify the causal effect of snippets, reranking, or any individual guard."
+  }
+}

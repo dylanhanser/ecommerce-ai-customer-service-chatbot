@@ -1,5 +1,10 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
+  "comparison": {
+    "baseline_system_id": "qa_only_reconstructed_baseline",
+    "current_system_id": "v2",
+    "scope": "complete_system_configuration_comparison_not_single_component_causal_ablation"
+  },
   "dimensions": [
     {
       "name": "relevance",
