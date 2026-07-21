@@ -11,4 +11,6 @@ The future controlled command is:
 
 `python scripts/run_formal_evaluation.py --mode real --confirm-real-api FORMAL_EVAL_20260721`
 
+Before any real execution, review the pre-execution implementation-correction amendment and verify that its recorded implementation SHA values match the checked-out commit.
+
 Real execution is gate-protected by a clean worktree and every frozen SHA. This build deliberately leaves the real transport disabled, so the command cannot call an API until separately implemented and approved. A future baseline adapter must implement only the behavior frozen in `formal_qa_only_baseline_spec.json`; it must not pass a QA-only cache to current V2 `run_rag_query()`.
