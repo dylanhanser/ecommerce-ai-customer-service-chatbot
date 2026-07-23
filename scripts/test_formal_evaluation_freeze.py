@@ -1,9 +1,11 @@
 """Offline structural checks for the formal evaluation freeze."""
 from __future__ import annotations
-import ast, hashlib, json, subprocess, sys, unittest
+import ast, copy, hashlib, json, subprocess, sys, unittest
 from collections import Counter
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/"scripts"))
+import run_formal_evaluation as runner
 def load(name): return json.loads((ROOT/name).read_text(encoding="utf-8"))
 def sha(name): return hashlib.sha256((ROOT/name).read_bytes()).hexdigest()
 class FormalFreezeTests(unittest.TestCase):
@@ -23,8 +25,10 @@ class FormalFreezeTests(unittest.TestCase):
   attrs=subprocess.check_output(["git","check-attr","text","eol","--","evaluation/formal_evaluation_manifest.json"],cwd=ROOT,text=True); self.assertIn("text: set",attrs); self.assertIn("eol: lf",attrs)
   filtered=subprocess.check_output(["git","hash-object","--path=evaluation/formal_evaluation_manifest.json","evaluation/formal_evaluation_manifest.json"],cwd=ROOT,text=True).strip(); raw_blob=subprocess.check_output(["git","hash-object","--no-filters","evaluation/formal_evaluation_manifest.json"],cwd=ROOT,text=True).strip()
   self.assertEqual(filtered,raw_blob); self.assertEqual("1c1c803d50a25a611c0317923cb2d60b668d0d9973b232fa89ab135ce4d3dc18",hashlib.sha256(raw).hexdigest())
- def test_manifest_semantic_diff_is_only_baseline_formal_id(self):
-  before=json.loads(subprocess.check_output(["git","show","HEAD:evaluation/formal_evaluation_manifest.json"],cwd=ROOT)); after=load("evaluation/formal_evaluation_manifest.json"); self.assertEqual("evaluation/formal_qa_only_baseline_spec.json",before["formal_system_ids"]["qa_only_reconstructed_baseline"]); self.assertEqual("qa_only_reconstructed_baseline",after["formal_system_ids"]["qa_only_reconstructed_baseline"]); before["formal_system_ids"]["qa_only_reconstructed_baseline"]=after["formal_system_ids"]["qa_only_reconstructed_baseline"]; self.assertEqual(before,after)
+ def test_manifest_semantic_diff_rejects_legacy_baseline_formal_id(self):
+  current=load("evaluation/formal_evaluation_manifest.json"); current_id=current["formal_system_ids"]["qa_only_reconstructed_baseline"]; self.assertEqual("qa_only_reconstructed_baseline",current_id); validated=runner.resolve_formal_system_ids(current["formal_system_ids"]); runner.validate_baseline_identity(validated)
+  legacy=copy.deepcopy(current); legacy["formal_system_ids"]["qa_only_reconstructed_baseline"]="evaluation/formal_qa_only_baseline_spec.json"; self.assertNotEqual(current,legacy); restored=copy.deepcopy(legacy); restored["formal_system_ids"]["qa_only_reconstructed_baseline"]=current_id; self.assertEqual(current,restored)
+  with self.assertRaises(runner.Blocked): runner.resolve_formal_system_ids(legacy["formal_system_ids"])
  def test_reconstructed_baseline_spec_and_unchanged_cases(self):
   s=load("evaluation/formal_qa_only_baseline_spec.json"); self.assertEqual("qa_only_reconstructed_baseline",s["system_id"]); self.assertEqual(5,s["retrieval"]["top_k"]); self.assertTrue(s["corpus"]["exclude_structured_snippets"]); self.assertTrue(s["corpus"]["exclude_external_store_v1"]); self.assertEqual("12136b7c084e5b68dc4ca6672da20ed800a8a11b",s["provenance"]["source_commit"]); self.assertEqual("5906f6af2a65584af7b54d08d3e3aa252d3551ea",s["provenance"]["git_blob"]); self.assertEqual("2a1585575162de62de30df3fca809048f5a81878b491050e57565e548936fcdc",s["provenance"]["blob_sha256"]); self.assertEqual("4a5680a7cd21ba434c958b3c3cdd9407a84b77d7f3741b10476fa86fa9851417",sha("evaluation/formal_rq2_boundary_cases.json")); self.assertEqual("c534867d93edbed724efd8064c85555b3fbeab89f4bdc58dbebb45a904018b95",sha("evaluation/formal_rq3_multiturn_cases.json"))
  def test_baseline_provenance_git_blob(self):
