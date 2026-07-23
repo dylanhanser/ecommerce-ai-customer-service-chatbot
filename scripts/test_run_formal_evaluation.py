@@ -31,6 +31,37 @@ class RunnerTests(unittest.TestCase):
   expected_bytes="".join(runner.canonical(unit)+"\r\n" for unit in self.plan).encode("utf-8")
   self.assertEqual(runner.PLAN_FINGERPRINT,hashlib.sha256(expected_bytes).hexdigest())
   self.assertEqual("v21b_context_aware",runner.formal_system_id("context_aware"))
+ def test_formal_system_identity_resolver_rejects_paths_and_mismatches(self):
+  expected={"qa_only_reconstructed_baseline":"qa_only_reconstructed_baseline","v2":"current_v2","single_turn":"v2_without_context_management","context_aware":"v21b_context_aware"}
+  self.assertEqual(expected,runner.resolve_formal_system_ids(expected))
+  for value in ("semantic_id-2","v2_without_context_management","qa_only_reconstructed_baseline"):
+   self.assertFalse(runner._path_like_formal_id(value))
+  for value in ("evaluation/formal_qa_only_baseline_spec.json","a/b","a\\b","item.json","/absolute","./relative","../relative","C:\\path","file:///path","https://example.invalid/id"):
+   self.assertTrue(runner._path_like_formal_id(value))
+  mutations=[]
+  missing=copy.deepcopy(expected); del missing["v2"]; mutations.append(missing)
+  extra=copy.deepcopy(expected); extra["unknown"]="unknown_id"; mutations.append(extra)
+  duplicate=copy.deepcopy(expected); duplicate["v2"]=expected["single_turn"]; mutations.append(duplicate)
+  unknown=copy.deepcopy(expected); unknown["v2"]="unknown_formal_id"; mutations.append(unknown)
+  swapped=copy.deepcopy(expected); swapped["single_turn"]="context_aware"; mutations.append(swapped)
+  path=copy.deepcopy(expected); path["qa_only_reconstructed_baseline"]="evaluation/formal_qa_only_baseline_spec.json"; mutations.append(path)
+  for mapping in mutations:
+   with self.assertRaises(runner.Blocked): runner.resolve_formal_system_ids(mapping)
+ def test_baseline_success_row_uses_identity_not_spec_path_and_resume_rejects_legacy_path(self):
+  with tempfile.TemporaryDirectory() as t:
+   path=Path(t); baseline=next(unit for unit in self.plan if unit["system_config_id"]=="qa_only_reconstructed_baseline")
+   runner.run_plan(self.plan,path,max_new_successes=self.plan.index(baseline)+1)
+   rows=runner.load_jsonl(path/"responses.jsonl"); row=next(row for row in rows if row["request_id"]==baseline["request_id"])
+   self.assertEqual("qa_only_reconstructed_baseline",row["system_config_id"]); self.assertEqual("qa_only_reconstructed_baseline",row["formal_system_id"]); self.assertNotEqual("evaluation/formal_qa_only_baseline_spec.json",row["formal_system_id"])
+   row["formal_system_id"]="evaluation/formal_qa_only_baseline_spec.json"; runner.write_jsonl(path/"responses.jsonl",rows)
+   with self.assertRaises(runner.Blocked): runner.run_plan(self.plan,path,max_new_successes=1)
+ def test_corrected_manifest_sha_is_a_frozen_gate(self):
+  self.assertEqual("1c1c803d50a25a611c0317923cb2d60b668d0d9973b232fa89ab135ce4d3dc18",runner.FROZEN["evaluation/formal_evaluation_manifest.json"])
+  actual=runner.file_sha
+  for replacement in ("38f29a9714168b8b319023fb64c650e01051c7180727ac623e7c4ae8426b6d7c","0"*64):
+   def tampered(path, value=replacement): return value if path==runner.ROOT/"evaluation/formal_evaluation_manifest.json" else actual(path)
+   with patch("run_formal_evaluation.file_sha",side_effect=tampered):
+    with self.assertRaises(runner.Blocked): runner.verify_frozen()
  def test_fixed_generation_and_no_scoring_leak(self):
   self.assertEqual(0.0,runner.GENERATION["temperature"]); self.assertEqual(1.0,runner.GENERATION["top_p"]); self.assertEqual(512,runner.GENERATION["max_tokens"])
   forbidden={"reference_answer","gold_category","expected_action_type","required_elements","forbidden_elements","pass_rule","critical_turn","expected_state_before"}

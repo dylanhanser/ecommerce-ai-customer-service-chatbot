@@ -6,7 +6,7 @@ The real transport is intentionally a guarded stub until separately authorised.
 """
 from __future__ import annotations
 
-import argparse, copy, csv, hashlib, json, os, subprocess, sys, tempfile
+import argparse, ast, copy, csv, hashlib, json, os, re, subprocess, sys, tempfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable
@@ -20,6 +20,7 @@ BASE_SEED = 20260721
 CONFIRM = "FORMAL_EVAL_20260721"
 FROZEN = {
  "data/external_eval/review/final/external_store_v1_gold_51.csv":"773535bf13c1d2a80ebff5410c2f16c96b6f297b2b3f17cd99628165b26fc444",
+ "evaluation/formal_evaluation_manifest.json":"1c1c803d50a25a611c0317923cb2d60b668d0d9973b232fa89ab135ce4d3dc18",
  "evaluation/formal_qa_only_baseline_spec.json":"ea776d7cd43e76cad9f42874a0d9da0fb9b0abd4007d752ea7cc1794bd5ed399",
  "evaluation/formal_rq1_scoring_schema.json":"a2854a92a5dff3c59215cfef5cc49416a4d64e5c89b0a915d95a43791f4bba9b",
  "evaluation/formal_rq2_boundary_cases.json":"4a5680a7cd21ba434c958b3c3cdd9407a84b77d7f3741b10476fa86fa9851417",
@@ -28,6 +29,14 @@ FROZEN = {
 GENERATION = {"provider":"DeepSeek","base_url":"https://api.deepseek.com","model":"deepseek-chat","temperature":0.0,"top_p":1.0,"max_tokens":512,"stream":False,"thinking":"not_applicable"}
 PLAN_FINGERPRINT = "4d8b22f755d3906762a9d680700fa87fc91155aeceb33e7bce9bb293067f78a5"
 CHECKPOINT_SCHEMA_VERSION = 1
+FORMAL_SYSTEM_IDS = {
+ "qa_only_reconstructed_baseline":"qa_only_reconstructed_baseline",
+ "v2":"current_v2",
+ "single_turn":"v2_without_context_management",
+ "context_aware":"v21b_context_aware",
+}
+BASELINE_SPECIFICATION_PATH = "evaluation/formal_qa_only_baseline_spec.json"
+BASELINE_ADAPTER_PATH = "scripts/formal_qa_only_baseline/adapter.py"
 
 class Blocked(RuntimeError): pass
 def sha_bytes(b: bytes) -> str: return hashlib.sha256(b).hexdigest()
@@ -36,18 +45,52 @@ def sha(x: Any) -> str: return sha_bytes(canonical(x).encode())
 def file_sha(p: Path) -> str: return sha_bytes(p.read_bytes())
 def derive(namespace: str, *parts: str) -> str: return sha_bytes((namespace+"|"+str(BASE_SEED)+"|"+"|".join(parts)).encode())
 def read_json(name: str) -> Any: return json.loads((ROOT/name).read_text(encoding="utf-8"))
-def formal_system_id(system_config_id: str) -> str:
- mapping=read_json("evaluation/formal_evaluation_manifest.json").get("formal_system_ids")
- if not isinstance(mapping,dict) or set(mapping)!={"qa_only_reconstructed_baseline","v2","single_turn","context_aware"}:
+def _path_like_formal_id(value: str) -> bool:
+ return (not value or "/" in value or "\\" in value or value.lower().endswith(".json")
+         or value.startswith(("./","../","/","\\")) or bool(re.match(r"^[A-Za-z]:",value))
+         or bool(re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:",value)))
+def resolve_formal_system_ids(mapping: object) -> dict[str,str]:
+ if not isinstance(mapping,dict) or set(mapping)!=set(FORMAL_SYSTEM_IDS):
   raise Blocked("BLOCKED FORMAL SYSTEM ID MANIFEST")
- value=mapping.get(system_config_id)
- if not isinstance(value,str) or not value: raise Blocked("BLOCKED FORMAL SYSTEM ID MANIFEST")
- return value
+ values=[]
+ for config_id,expected in FORMAL_SYSTEM_IDS.items():
+  value=mapping.get(config_id)
+  if not isinstance(value,str) or _path_like_formal_id(value) or value!=expected:
+   raise Blocked("BLOCKED FORMAL SYSTEM ID MANIFEST")
+  values.append(value)
+ if len(values)!=len(set(values)):
+  raise Blocked("BLOCKED FORMAL SYSTEM ID MANIFEST")
+ return dict(mapping)
+def _baseline_adapter_system_id() -> str:
+ try: tree=ast.parse((ROOT/BASELINE_ADAPTER_PATH).read_text(encoding="utf-8"))
+ except (OSError,SyntaxError) as exc: raise Blocked("BLOCKED BASELINE IDENTITY") from exc
+ for node in tree.body:
+  if isinstance(node,ast.Assign) and any(isinstance(target,ast.Name) and target.id=="SYSTEM_ID" for target in node.targets):
+   if isinstance(node.value,ast.Constant) and isinstance(node.value.value,str): return node.value.value
+ raise Blocked("BLOCKED BASELINE IDENTITY")
+def validate_baseline_identity(mapping: dict[str,str]) -> None:
+ try: spec=read_json(BASELINE_SPECIFICATION_PATH)
+ except (OSError,json.JSONDecodeError) as exc: raise Blocked("BLOCKED BASELINE IDENTITY") from exc
+ expected=FORMAL_SYSTEM_IDS["qa_only_reconstructed_baseline"]
+ if mapping["qa_only_reconstructed_baseline"]!=expected or not isinstance(spec,dict) or spec.get("system_id")!=expected or _baseline_adapter_system_id()!=expected:
+  raise Blocked("BLOCKED BASELINE IDENTITY")
+def formal_system_ids() -> dict[str,str]:
+ manifest=read_json("evaluation/formal_evaluation_manifest.json")
+ if not isinstance(manifest,dict): raise Blocked("BLOCKED FORMAL SYSTEM ID MANIFEST")
+ mapping=resolve_formal_system_ids(manifest.get("formal_system_ids"))
+ validate_baseline_identity(mapping)
+ return mapping
+def formal_system_id(system_config_id: str) -> str:
+ mapping=formal_system_ids()
+ if not isinstance(system_config_id,str) or system_config_id not in mapping:
+  raise Blocked("BLOCKED FORMAL SYSTEM ID MANIFEST")
+ return mapping[system_config_id]
 def frozen_hashes() -> dict[str,str]: return {p:file_sha(ROOT/p) for p in FROZEN}
 def verify_frozen() -> dict[str,str]:
  h=frozen_hashes()
  bad=[p for p in FROZEN if h[p] != FROZEN[p]]
  if bad: raise Blocked("BLOCKED FROZEN INPUT SHA MISMATCH: " + ", ".join(bad))
+ formal_system_ids()
  return h
 def clean_worktree() -> bool:
  return subprocess.run(["git","status","--short"], cwd=ROOT, text=True, capture_output=True, check=True).stdout == ""

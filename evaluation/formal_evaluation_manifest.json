@@ -23,7 +23,7 @@
   },
   "base_seed": 20260721,
   "formal_system_ids": {
-    "qa_only_reconstructed_baseline": "evaluation/formal_qa_only_baseline_spec.json",
+    "qa_only_reconstructed_baseline": "qa_only_reconstructed_baseline",
     "v2": "current_v2",
     "single_turn": "v2_without_context_management",
     "context_aware": "v21b_context_aware"
