@@ -7,14 +7,11 @@ The real transport is intentionally a guarded stub until separately authorised.
 from __future__ import annotations
 
 import argparse, ast, copy, csv, hashlib, json, os, re, subprocess, sys, tempfile
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from formal_evaluation_runtime import (EVALUATION_GENERATION_CONFIG, SNAPSHOT_SCHEMA_VERSION,
-    SnapshotValidationError, restore_runtime_snapshot)  # explicit existing config
 
 BASE_SEED = 20260721
 CONFIRM = "FORMAL_EVAL_20260721"
@@ -95,11 +92,21 @@ def verify_frozen() -> dict[str,str]:
 def clean_worktree() -> bool:
  return subprocess.run(["git","status","--short"], cwd=ROOT, text=True, capture_output=True, check=True).stdout == ""
 def generation_sha() -> str:
- # Enforce that the runner uses the existing explicit evaluation config.
- cfg=asdict(EVALUATION_GENERATION_CONFIG)
+ return sha(GENERATION)
+def _legacy_runtime():
+ # The legacy dry-run/checkpoint path alone needs the real runtime.  Keeping
+ # this import here leaves plan construction and both injected B1 interfaces
+ # independent of the real baseline/V2/V2.1b core.
+ from formal_evaluation_runtime import (EVALUATION_GENERATION_CONFIG,
+  SNAPSHOT_SCHEMA_VERSION, SnapshotValidationError, restore_runtime_snapshot)
+ return (EVALUATION_GENERATION_CONFIG,SNAPSHOT_SCHEMA_VERSION,
+  SnapshotValidationError,restore_runtime_snapshot)
+def _validate_legacy_generation_config() -> None:
+ from dataclasses import asdict
+ evaluation_config,_,_,_=_legacy_runtime()
+ cfg=asdict(evaluation_config)
  if cfg != {k:GENERATION[k] for k in ("temperature","top_p","max_tokens","stream")}:
   raise Blocked("BLOCKED EVALUATION GENERATION CONFIG MISMATCH")
- return sha(GENERATION)
 
 def _payload(user: str, system: str, rq: str, history: list[dict[str,str]] | None=None) -> dict[str,Any]:
  return {"protocol_version":"1.0","rq":rq,"system_config":system,"generation":GENERATION,"user_input":user,"history":history or []}
@@ -135,17 +142,97 @@ def build_plan() -> list[dict[str,Any]]:
  validate_plan(plan); return plan
 def validate_plan(plan: list[dict[str,Any]]) -> None:
  from collections import Counter
- c=Counter(x["rq"] for x in plan)
- if len(plan)!=190 or c!={"RQ1":102,"RQ2":40,"RQ3":48}: raise Blocked("BLOCKED REQUEST PLAN COUNT")
- if len({x["request_id"] for x in plan}) != len(plan): raise Blocked("BLOCKED DUPLICATE REQUEST ID")
- if len({(x["rq"],x["case_id"],x["turn_index"],x["system_config_id"]) for x in plan}) != 190: raise Blocked("BLOCKED INCOMPLETE CASE IDS")
+ if type(plan) is not list or len(plan)!=190: raise Blocked("BLOCKED REQUEST PLAN COUNT")
+ if all(type(unit) is dict for unit in plan) and len({unit.get("request_id") for unit in plan})!=190: raise Blocked("BLOCKED DUPLICATE REQUEST ID")
+ common={"request_id","rq","case_id","turn_index","system_config_id","input_sha256","payload","payload_sha256","frozen_test_file_sha256","execution_order"}
+ payload_fields={"protocol_version","rq","system_config","generation","user_input","history"}
+ rq_counts=Counter()
+ system_counts=Counter()
+ identities=[]
+ for unit in plan:
+  if type(unit) is not dict: raise Blocked("BLOCKED FORMAL PLAN UNIT SCHEMA")
+  rq=unit.get("rq")
+  expected_fields=common|({"review_id"} if rq=="RQ1" else set())
+  if set(unit)!=expected_fields: raise Blocked("BLOCKED FORMAL PLAN UNIT SCHEMA")
+  payload=unit.get("payload")
+  if type(payload) is not dict or set(payload)!=payload_fields: raise Blocked("BLOCKED FORMAL PLAN UNIT SCHEMA")
+  if (rq not in {"RQ1","RQ2","RQ3"} or type(unit["request_id"]) is not str
+      or type(unit["case_id"]) is not str or not unit["case_id"]
+      or type(unit["turn_index"]) is not int or unit["turn_index"] not in {1,2}
+      or unit["system_config_id"] not in FORMAL_SYSTEM_IDS
+      or type(unit["execution_order"]) is not int):
+   raise Blocked("BLOCKED UNSUPPORTED PLAN UNIT")
+  matrix=((rq in {"RQ1","RQ2"} and unit["system_config_id"] in {"qa_only_reconstructed_baseline","v2"} and unit["turn_index"]==1)
+          or (rq=="RQ3" and unit["system_config_id"] in {"single_turn","context_aware"} and unit["turn_index"] in {1,2}))
+  if not matrix: raise Blocked("BLOCKED UNSUPPORTED PLAN UNIT")
+  expected_frozen={"RQ1":FROZEN["data/external_eval/review/final/external_store_v1_gold_51.csv"],
+                   "RQ2":FROZEN["evaluation/formal_rq2_boundary_cases.json"],
+                   "RQ3":FROZEN["evaluation/formal_rq3_multiturn_cases.json"]}[rq]
+  user=payload.get("user_input")
+  if (payload.get("protocol_version")!="1.0" or payload.get("rq")!=rq
+      or payload.get("system_config")!=unit["system_config_id"] or payload.get("generation")!=GENERATION
+      or type(user) is not str or not user
+      or unit["input_sha256"]!=sha_bytes(user.encode("utf-8"))
+      or unit["payload_sha256"]!=sha(payload)
+      or unit["frozen_test_file_sha256"]!=expected_frozen):
+   raise Blocked("BLOCKED FORMAL PLAN PAYLOAD INTEGRITY")
+  history=payload["history"]
+  if unit["system_config_id"]=="context_aware" and unit["turn_index"]==2:
+   if (type(history) is not list or len(history)!=1 or type(history[0]) is not dict
+       or set(history[0])!={"user_input","assistant_answer"}
+       or type(history[0]["user_input"]) is not str or not history[0]["user_input"]
+       or history[0]["assistant_answer"]!="__PRIOR_RESPONSE_BY_SAME_REQUEST_SEQUENCE__"):
+    raise Blocked("BLOCKED FORMAL PLAN PAYLOAD INTEGRITY")
+  elif history!=[]: raise Blocked("BLOCKED FORMAL PLAN PAYLOAD INTEGRITY")
+  if rq=="RQ1" and unit["review_id"]!=unit["case_id"]: raise Blocked("BLOCKED FORMAL PLAN UNIT SCHEMA")
+  expected_request=derive("formal-evaluation-request-id-v1","1.0",rq,unit["case_id"],str(unit["turn_index"]),unit["system_config_id"],unit["input_sha256"],generation_sha(),expected_frozen)
+  if unit["request_id"]!=expected_request: raise Blocked("BLOCKED FORMAL PLAN REQUEST ID")
+  rq_counts[rq]+=1; system_counts[unit["system_config_id"]]+=1
+  identities.append((rq,unit["case_id"],unit["turn_index"],unit["system_config_id"]))
+ if rq_counts!={"RQ1":102,"RQ2":40,"RQ3":48}: raise Blocked("BLOCKED REQUEST PLAN RQ COUNT")
+ if system_counts!={"qa_only_reconstructed_baseline":71,"v2":71,"single_turn":24,"context_aware":24}: raise Blocked("BLOCKED REQUEST PLAN SYSTEM COUNT")
+ if [unit["execution_order"] for unit in plan]!=list(range(1,191)): raise Blocked("BLOCKED REQUEST PLAN EXECUTION ORDER")
+ if len({unit["request_id"] for unit in plan})!=190: raise Blocked("BLOCKED DUPLICATE REQUEST ID")
+ if len(set(identities))!=190: raise Blocked("BLOCKED INCOMPLETE CASE IDS")
+ groups={}
+ for rq,case_id,turn,system in identities: groups.setdefault((rq,case_id),set()).add((system,turn))
+ for (rq,_case_id),members in groups.items():
+  expected=({("qa_only_reconstructed_baseline",1),("v2",1)} if rq in {"RQ1","RQ2"}
+            else {("single_turn",1),("single_turn",2),("context_aware",1),("context_aware",2)})
+  if members!=expected: raise Blocked("BLOCKED INCOMPLETE CASE IDS")
+ if _plan_fingerprint_bytes(plan)!=PLAN_FINGERPRINT: raise Blocked("BLOCKED FORMAL PLAN FINGERPRINT MISMATCH")
+
+def _plan_fingerprint_bytes(plan: list[dict[str,Any]]) -> str:
+ plan_bytes="".join(canonical(unit)+"\r\n" for unit in plan).encode("utf-8")
+ return sha_bytes(plan_bytes)
 
 def plan_fingerprint(plan: list[dict[str,Any]]) -> str:
  # This is the exact byte representation used when the reconstructed-baseline
  # plan was frozen on Windows: ordered canonical JSONL, including final CRLF.
+ return _plan_fingerprint_bytes(plan)
+
+def orchestrate_offline_unit(plan: list[dict[str,Any]], unit: dict[str,Any], **dependencies: Any) -> Any:
+ """Validate the frozen plan, then enter only the Stage A-backed fake B1 path.
+
+ This path is intentionally separate from ``run_plan`` and never consults the
+ legacy dry-run ``retryable`` helper or its marker-output persistence.
+ """
+ verify_frozen()
  validate_plan(plan)
- plan_bytes="".join(canonical(unit)+"\r\n" for unit in plan).encode("utf-8")
- return sha_bytes(plan_bytes)
+ if _plan_fingerprint_bytes(plan)!=PLAN_FINGERPRINT: raise Blocked("BLOCKED FORMAL PLAN FINGERPRINT MISMATCH")
+ matching=[candidate for candidate in plan if candidate["request_id"]==unit.get("request_id")]
+ if len(matching)!=1 or matching[0]!=unit: raise Blocked("BLOCKED SELECTED PLAN UNIT MISMATCH")
+ turn_one=None; turn_two=None
+ if unit["rq"]=="RQ3" and unit["system_config_id"]=="context_aware":
+   turn_one=next((candidate for candidate in plan if candidate["rq"]=="RQ3" and candidate["case_id"]==unit["case_id"] and candidate["system_config_id"]=="context_aware" and candidate["turn_index"]==1),None)
+   turn_two=next((candidate for candidate in plan if candidate["rq"]=="RQ3" and candidate["case_id"]==unit["case_id"] and candidate["system_config_id"]=="context_aware" and candidate["turn_index"]==2),None)
+   if turn_one is None or turn_two is None: raise Blocked("BLOCKED INCOMPLETE RQ3 CHECKPOINT PAIR")
+ supplied_turn_one=dependencies.pop("turn_one_unit",turn_one)
+ supplied_turn_two=dependencies.pop("turn_two_unit",turn_two)
+ if supplied_turn_one!=turn_one or supplied_turn_two!=turn_two:
+  raise Blocked("BLOCKED RQ3 PAIR MISMATCH")
+ from formal_evaluation_orchestration import _orchestrate_plan_member
+ return _orchestrate_plan_member(unit,turn_one_unit=turn_one,turn_two_unit=turn_two,**dependencies)
 
 def write_json(p: Path, obj: Any) -> None: p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(obj,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 def write_jsonl(p: Path, rows: list[dict[str,Any]]) -> None: p.parent.mkdir(parents=True,exist_ok=True); p.write_text("".join(canonical(r)+"\n" for r in rows),encoding="utf-8")
@@ -161,7 +248,8 @@ def fake_executor(unit: dict[str,Any], attempt: int) -> dict[str,Any]:
  marker="DRY_RUN_NOT_MODEL_OUTPUT " + sha_bytes((unit["request_id"]+"|"+unit["payload_sha256"]).encode())[:24]
  result={"response_text":marker,"action_type":"dry_run_unclassified","guard_decision":"not_executed","retrieval_performed":False,"retrieved_ids":[],"retrieval_scores":[],"latency_ms":0}
  if unit["rq"]=="RQ3" and unit["system_config_id"]=="context_aware" and unit["turn_index"]==1:
-  result["runtime_snapshot"]={"schema_version":SNAPSHOT_SCHEMA_VERSION,"completed_turn_index":1,"conversation_state":{"current_topic":"none","query_type":"normal","risk_type":"none","requires_backend_api":False,"last_safe_answer_type":"none","last_user_query":unit["payload"]["user_input"],"last_assistant_answer":marker,"last_retrieval_query":"","last_contextual_query":"","last_successful_contextual_query":"","state_confidence":0.0,"state_turn_count":0,"updated_at_turn":1,"should_reset":False},"previous_user_text":unit["payload"]["user_input"],"previous_assistant_text":marker}
+  _,snapshot_schema_version,_,_=_legacy_runtime()
+  result["runtime_snapshot"]={"schema_version":snapshot_schema_version,"completed_turn_index":1,"conversation_state":{"current_topic":"none","query_type":"normal","risk_type":"none","requires_backend_api":False,"last_safe_answer_type":"none","last_user_query":unit["payload"]["user_input"],"last_assistant_answer":marker,"last_retrieval_query":"","last_contextual_query":"","last_successful_contextual_query":"","state_confidence":0.0,"state_turn_count":0,"updated_at_turn":1,"should_reset":False},"previous_user_text":unit["payload"]["user_input"],"previous_assistant_text":marker}
  return result
 def resolved_execution_unit(unit: dict[str,Any], known: dict[str,dict[str,Any]]) -> dict[str,Any]:
  """Resolve only the permitted, already-locked prior answer at execution time.
@@ -212,6 +300,7 @@ def _validate_success_row(row: object, unit: dict[str,Any], plan_sha: str, resol
 def _checkpoint_envelope(turn_one: dict[str,Any], turn_two: dict[str,Any], row: dict[str,Any], snapshot: dict[str,Any], plan: list[dict[str,Any]]) -> dict[str,Any]:
  return {"checkpoint_schema_version":CHECKPOINT_SCHEMA_VERSION,"rq":"RQ3","system_config_id":"context_aware","formal_system_id":formal_system_id("context_aware"),"dialogue_id":turn_one["case_id"],"completed_through_turn":1,"turn_one_request_id":turn_one["request_id"],"turn_one_payload_sha256":turn_one["payload_sha256"],"turn_one_response_sha256":row["response_sha256"],"expected_turn_two_request_id":turn_two["request_id"],"resolved_turn_two_payload_sha256":sha(resolved_execution_unit(turn_two,{turn_one["request_id"]:row})["payload"]),"plan_fingerprint":plan_fingerprint(plan),"runtime_implementation_sha256":_runtime_sha(),"v21b_core_sha256":_core_sha(),"runtime_snapshot":snapshot,"runtime_snapshot_sha256":sha(snapshot),"previous_user_text":snapshot["previous_user_text"],"previous_assistant_text":snapshot["previous_assistant_text"],"turn_one_success":row}
 def _load_checkpoint(path: Path, turn_one: dict[str,Any], turn_two: dict[str,Any], plan: list[dict[str,Any]]) -> dict[str,Any]:
+ _,_,snapshot_validation_error,restore_runtime_snapshot=_legacy_runtime()
  try: envelope=json.loads(path.read_text(encoding="utf-8"))
  except (OSError,json.JSONDecodeError) as exc: raise Blocked("BLOCKED CORRUPT RQ3 CHECKPOINT") from exc
  required={"checkpoint_schema_version","rq","system_config_id","formal_system_id","dialogue_id","completed_through_turn","turn_one_request_id","turn_one_payload_sha256","turn_one_response_sha256","expected_turn_two_request_id","resolved_turn_two_payload_sha256","plan_fingerprint","runtime_implementation_sha256","v21b_core_sha256","runtime_snapshot","runtime_snapshot_sha256","previous_user_text","previous_assistant_text","turn_one_success"}
@@ -228,7 +317,7 @@ def _load_checkpoint(path: Path, turn_one: dict[str,Any], turn_two: dict[str,Any
  _validate_success_row(row,turn_one,plan_sha,turn_one["payload_sha256"])
  if row["response_sha256"]!=envelope["turn_one_response_sha256"]: raise Blocked("BLOCKED RQ3 CHECKPOINT RESPONSE MISMATCH")
  try: snapshot=restore_runtime_snapshot(envelope["runtime_snapshot"])
- except SnapshotValidationError as exc: raise Blocked("BLOCKED INVALID RQ3 RUNTIME SNAPSHOT") from exc
+ except snapshot_validation_error as exc: raise Blocked("BLOCKED INVALID RQ3 RUNTIME SNAPSHOT") from exc
  if snapshot.completed_turn_index!=1: raise Blocked("BLOCKED RQ3 CHECKPOINT COMPLETED TURN")
  if sha(snapshot.to_dict())!=envelope["runtime_snapshot_sha256"] or envelope["previous_user_text"]!=turn_one["payload"]["user_input"] or envelope["previous_user_text"]!=snapshot.previous_user_text or envelope["previous_assistant_text"]!=row["response_text"] or envelope["previous_assistant_text"]!=snapshot.previous_assistant_text: raise Blocked("BLOCKED RQ3 CHECKPOINT SNAPSHOT MISMATCH")
  resolved=resolved_execution_unit(turn_two,{turn_one["request_id"]:row})
@@ -245,6 +334,7 @@ def _validate_turn_two_provenance(row: dict[str,Any], envelope: dict[str,Any]) -
   raise Blocked("BLOCKED COMPLETED TURN 2 CHECKPOINT CONFLICT")
 
 def run_plan(plan: list[dict[str,Any]], directory: Path, executor: Callable[[dict[str,Any],int],dict[str,Any]]=fake_executor, *, context_executor: Callable[[dict[str,Any],int,dict[str,Any] | None],dict[str,Any]] | None=None, max_new_successes: int | None=None, _stats: dict[str,int] | None=None) -> list[dict[str,Any]]:
+ _,_,snapshot_validation_error,restore_runtime_snapshot=_legacy_runtime()
  if max_new_successes is not None and (type(max_new_successes) is not int or max_new_successes<=0): raise ValueError("max_new_successes must be a positive integer")
  plan_sha=plan_fingerprint(plan)
  if plan_sha!=PLAN_FINGERPRINT: raise Blocked("BLOCKED FORMAL PLAN FINGERPRINT MISMATCH")
@@ -301,7 +391,7 @@ def run_plan(plan: list[dict[str,Any]], directory: Path, executor: Callable[[dic
     if _is_context_turn_one(unit):
      second=pairs[(unit["case_id"],unit["system_config_id"])]
      try: valid_snapshot_object=restore_runtime_snapshot(snapshot_result)
-     except SnapshotValidationError as exc: raise Blocked("BLOCKED RQ3 TURN 1 DID NOT PRODUCE VALID SNAPSHOT") from exc
+     except snapshot_validation_error as exc: raise Blocked("BLOCKED RQ3 TURN 1 DID NOT PRODUCE VALID SNAPSHOT") from exc
      if valid_snapshot_object.completed_turn_index!=1: raise Blocked("BLOCKED RQ3 TURN 1 SNAPSHOT COMPLETED TURN")
      valid_snapshot=valid_snapshot_object.to_dict()
      _validate_success_row(row,unit,plan_sha,unit["payload_sha256"])
@@ -363,7 +453,7 @@ def templates(plan: list[dict[str,Any]], responses: list[dict[str,Any]], d: Path
  return {"rq1_primary":len(p1),"rq1_secondary":len(p2),"rq2":n2,"rq3":len(rows)}
 
 def prepare(directory: Path, *, max_new_successes: int | None=None) -> dict[str,Any]:
- hashes=verify_frozen(); plan=build_plan(); write_jsonl(directory/"request_plan.jsonl",plan); stats={}; run_plan(plan,directory,max_new_successes=max_new_successes,_stats=stats); responses=load_jsonl(directory/"responses.jsonl"); counts=templates(plan,responses,directory) if len(responses)==len(plan) else {}
+ hashes=verify_frozen(); _validate_legacy_generation_config(); plan=build_plan(); write_jsonl(directory/"request_plan.jsonl",plan); stats={}; run_plan(plan,directory,max_new_successes=max_new_successes,_stats=stats); responses=load_jsonl(directory/"responses.jsonl"); counts=templates(plan,responses,directory) if len(responses)==len(plan) else {}
  manifest={"protocol_version":"1.1","base_seed":BASE_SEED,"frozen_input_sha256":hashes,"generation":GENERATION,"transport":"fake","responses_are_not_model_outputs":True,"request_count":190,"plan_fingerprint":plan_fingerprint(plan),"invocation_new_successes":stats["new_successes"],"total_locked_successes":stats["total_locked_successes"],"remaining_units":stats["remaining_units"],"system_configurations":{"qa_only_reconstructed_baseline":{"corpus":"qa_only","qa_count":15333,"top_k":5},"v2":{"corpus":"mixed","qa_count":15333,"snippet_count":355,"top_k":10},"single_turn":{"context":"disabled","top_k":10},"context_aware":{"context":"enabled","top_k":10}},"template_rows":counts}
  write_json(directory/"run_manifest.json",manifest); write_jsonl(directory/"execution_events.jsonl",[{"request_id":r["request_id"],"execution_status":r["execution_status"],"transport":"fake"} for r in responses]); return manifest
 def real_gate(args: argparse.Namespace) -> None:
