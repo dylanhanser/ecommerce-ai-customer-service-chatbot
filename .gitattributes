@@ -1,2 +1,3 @@
 scripts/formal_qa_only_baseline/vendor/rag_answer_demo_12136b7.py -text
 evaluation/formal_evaluation_manifest.json text eol=lf
+docs/evaluation/formal_evaluation_stage_b3_plan.md text eol=lf
