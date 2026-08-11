@@ -1,6 +1,6 @@
 """Offline safety and structural tests for the formal runner."""
 from __future__ import annotations
-import copy, csv, hashlib, io, json, os, sys, tempfile, unittest
+import copy, csv, hashlib, inspect, io, json, os, sys, tempfile, unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
@@ -306,4 +306,22 @@ class RunnerTests(unittest.TestCase):
    text=output.getvalue(); self.assertIn("frozen plan contains 190 units",text); self.assertIn("added 1 new successes",text)
    self.assertIn("total locked successes is 1",text); self.assertIn("remaining units is 189",text)
    self.assertNotIn("COMPLETE: 190 response units",text)
+class StageB2RunnerSignatureTests(unittest.TestCase):
+ def test_offline_wrapper_exact_persistence_signature(self):
+  signature=inspect.signature(runner.orchestrate_offline_unit)
+  self.assertEqual(
+   ["plan","unit","journal_persistence_callback","retry_predecessor","dependencies"],
+   list(signature.parameters),
+  )
+  self.assertIsNone(signature.parameters["journal_persistence_callback"].default)
+  self.assertIsNone(signature.parameters["retry_predecessor"].default)
+
+ def test_durable_public_signatures_reject_dependency_injection(self):
+  self.assertEqual(["plan"],list(inspect.signature(runner.build_durable_run_contract).parameters))
+  self.assertEqual(["plan"],list(inspect.signature(runner.durable_progress).parameters))
+  self.assertEqual(
+   ["plan","unit"],
+   list(inspect.signature(runner.orchestrate_durable_offline_unit).parameters),
+  )
+
 if __name__=="__main__": unittest.main()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import copy
 import importlib
+import inspect
 import os
 import socket
 import subprocess
@@ -2494,6 +2495,263 @@ assert not any(
         }
         self.assertNotIn("retryable", wrapper_names)
         self.assertNotIn("run_plan", wrapper_names)
+
+class StageB2PersistenceIntegrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.plan = runner.build_plan()
+        cls.bundle = resources()
+
+    def unit(self, *, config="v2", rq=None, turn=1):
+        return next(
+            unit
+            for unit in self.plan
+            if unit["system_config_id"] == config
+            and unit["turn_index"] == turn
+            and (rq is None or unit["rq"] == rq)
+        )
+
+    def execute(self, unit, executor, client, **extra):
+        dependencies = {
+            "resources": self.bundle,
+            "executors": registry_for(unit["system_config_id"], executor),
+            "fake_raw_client": client,
+            "clock": extra.pop("clock", Clock()),
+            "transport_implementation_sha256": TRANSPORT_SHA,
+            "runtime_identity_sha256": RUNTIME_SHA,
+            "snapshot_validator": validate_synthetic_snapshot,
+        }
+        dependencies.update(extra)
+        return runner.orchestrate_offline_unit(self.plan, unit, **dependencies)
+
+    def test_exact_public_and_private_signature_order(self):
+        public = inspect.signature(o.orchestrate_validated_unit)
+        self.assertEqual(
+            list(public.parameters),
+            [
+                "plan",
+                "unit",
+                "journal_persistence_callback",
+                "retry_predecessor",
+                "dependencies",
+            ],
+        )
+        self.assertIsNone(
+            public.parameters["journal_persistence_callback"].default
+        )
+        self.assertIsNone(public.parameters["retry_predecessor"].default)
+        private = inspect.signature(o._orchestrate_plan_member)
+        names = list(private.parameters)
+        snapshot = names.index("snapshot_validator")
+        self.assertEqual(
+            names[snapshot + 1 :],
+            [
+                "journal_persistence_callback",
+                "retry_predecessor",
+                "journal",
+                "authoritative_success",
+                "checkpoint_evidence",
+                "turn_one_unit",
+                "turn_two_unit",
+                "claimed_ids",
+            ],
+        )
+
+    def test_local_initial_publishes_prepared_once(self):
+        unit = self.unit()
+        client = FakeRawClient()
+        executor = ExecutorSpy(client=client, mode="local")
+        published = []
+        outcome = self.execute(
+            unit,
+            executor,
+            client,
+            journal_persistence_callback=lambda journal: published.append(
+                journal
+            ),
+        )
+        self.assertEqual("local_success", outcome.action)
+        self.assertEqual(["prepared"], [item.state for item in published])
+        self.assertTrue(all(type(item) is f.InflightJournal for item in published))
+        self.assertEqual([], client.calls)
+
+    def test_provider_publication_order_is_prepared_started_returned(self):
+        events = []
+        unit = self.unit()
+        client = FakeRawClient(events=events)
+        executor = ExecutorSpy(client=client, mode="provider")
+
+        def persist(journal):
+            events.append("persist:" + journal.state)
+
+        outcome = self.execute(
+            unit,
+            executor,
+            client,
+            journal_persistence_callback=persist,
+        )
+        self.assertEqual("success", outcome.action)
+        self.assertEqual(
+            [
+                "persist:prepared",
+                "persist:call_started",
+                "fake_client",
+                "persist:provider_returned",
+            ],
+            events,
+        )
+
+    def test_callback_requires_exact_none_return(self):
+        unit = self.unit()
+        for value in (False, 0, object()):
+            with self.subTest(value=repr(value)):
+                client = FakeRawClient()
+                executor = ExecutorSpy(client=client, mode="local")
+                with self.assertRaises(o.OrchestrationError) as caught:
+                    self.execute(
+                        unit,
+                        executor,
+                        client,
+                        journal_persistence_callback=lambda _journal, result=value: result,
+                    )
+                self.assertEqual(
+                    "JOURNAL_PERSISTENCE_CALLBACK_RETURN_INVALID",
+                    caught.exception.category,
+                )
+                self.assertEqual([], executor.calls)
+                self.assertEqual([], client.calls)
+
+    def test_callback_exception_identity_propagates(self):
+        unit = self.unit()
+        client = FakeRawClient()
+        executor = ExecutorSpy(client=client, mode="local")
+        failure = RuntimeError("private persistence failure")
+
+        def persist(_journal):
+            raise failure
+
+        with self.assertRaises(RuntimeError) as caught:
+            self.execute(
+                unit,
+                executor,
+                client,
+                journal_persistence_callback=persist,
+            )
+        self.assertIs(failure, caught.exception)
+        self.assertEqual([], executor.calls)
+        self.assertEqual([], client.calls)
+
+    def test_call_started_failure_precedes_tracker_and_fake_call(self):
+        unit = self.unit()
+        client = FakeRawClient()
+        executor = ExecutorSpy(client=client, mode="provider")
+        failure = RuntimeError("call-start persistence failure")
+        states = []
+
+        def persist(journal):
+            states.append(journal.state)
+            if journal.state == "call_started":
+                raise failure
+
+        with self.assertRaises(RuntimeError) as caught:
+            self.execute(
+                unit,
+                executor,
+                client,
+                journal_persistence_callback=persist,
+            )
+        self.assertIs(failure, caught.exception)
+        self.assertEqual(["prepared", "call_started"], states)
+        self.assertEqual([], client.calls)
+
+    def test_provider_returned_failure_is_nonrecallable(self):
+        unit = self.unit()
+        client = FakeRawClient()
+        executor = ExecutorSpy(client=client, mode="provider")
+        failure = RuntimeError("provider-returned persistence failure")
+
+        def persist(journal):
+            if journal.state == "provider_returned":
+                raise failure
+
+        with self.assertRaises(RuntimeError) as caught:
+            self.execute(
+                unit,
+                executor,
+                client,
+                journal_persistence_callback=persist,
+            )
+        self.assertIs(failure, caught.exception)
+        self.assertEqual(1, len(client.calls))
+
+    def test_same_attempt_prepared_resume_does_not_republish(self):
+        unit = self.unit()
+        initial_client = FakeRawClient()
+        initial_executor = ExecutorSpy(client=initial_client, mode="local")
+        first = self.execute(unit, initial_executor, initial_client)
+        resumed_client = FakeRawClient()
+        resumed_executor = ExecutorSpy(client=resumed_client, mode="local")
+        published = []
+        resumed = self.execute(
+            unit,
+            resumed_executor,
+            resumed_client,
+            journal=first.journal,
+            journal_persistence_callback=lambda journal: published.append(
+                journal
+            ),
+        )
+        self.assertEqual("local_success", resumed.action)
+        self.assertEqual([], published)
+
+    def test_resumed_retry_requires_exact_predecessor_and_does_not_republish(self):
+        unit = self.unit()
+        first_client = FakeRawClient(error=ProviderFailure(status_code=429))
+        first_executor = ExecutorSpy(client=first_client, mode="provider")
+        first = self.execute(unit, first_executor, first_client)
+        self.assertEqual("retry_available", first.action)
+        prepared = f.next_retry_journal(first.journal, "2026-07-23T10:00:09Z")
+        resumed_client = FakeRawClient()
+        resumed_executor = ExecutorSpy(client=resumed_client, mode="local")
+        published = []
+        resumed = self.execute(
+            unit,
+            resumed_executor,
+            resumed_client,
+            journal=prepared,
+            retry_predecessor=first.journal,
+            clock=Clock(start=10),
+            journal_persistence_callback=lambda journal: published.append(
+                journal
+            ),
+        )
+        self.assertEqual("local_success", resumed.action)
+        self.assertEqual([], published)
+        self.assertEqual(first.journal, resumed.predecessor_journal)
+        with self.assertRaises(o.OrchestrationError) as missing:
+            self.execute(
+                unit,
+                resumed_executor,
+                resumed_client,
+                journal=prepared,
+                clock=Clock(start=10),
+            )
+        self.assertEqual("RECOVERY_PREDECESSOR_REQUIRED", missing.exception.category)
+        # The prepared timestamp itself is not authority: the frozen contract
+        # reconstructs from ``journal.prepared_at``.  Use an attempt-2
+        # prepared journal as purported predecessor instead, which cannot be
+        # the exact immediately preceding retryable terminal journal.
+        wrong = f.next_retry_journal(first.journal, "2026-07-23T10:00:08Z")
+        with self.assertRaises(o.OrchestrationError) as invalid:
+            self.execute(
+                unit,
+                resumed_executor,
+                FakeRawClient(),
+                journal=prepared,
+                retry_predecessor=wrong,
+                clock=Clock(start=10),
+            )
+        self.assertEqual("RECOVERY_PREDECESSOR_INVALID", invalid.exception.category)
 
 
 if __name__ == "__main__":

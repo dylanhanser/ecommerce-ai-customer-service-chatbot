@@ -6,9 +6,16 @@ The real transport is intentionally a guarded stub until separately authorised.
 """
 from __future__ import annotations
 
-import argparse, ast, copy, csv, hashlib, json, os, re, subprocess, sys, tempfile
+import argparse, ast, copy, csv, hashlib, json, math, os, re, subprocess, sys, tempfile
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+ from formal_evaluation_inflight import InflightJournal
+ from formal_evaluation_orchestration import OrchestrationOutcome
+ from formal_evaluation_store import DurableExecutionOutcome, DurableProgress
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -211,7 +218,14 @@ def plan_fingerprint(plan: list[dict[str,Any]]) -> str:
  # plan was frozen on Windows: ordered canonical JSONL, including final CRLF.
  return _plan_fingerprint_bytes(plan)
 
-def orchestrate_offline_unit(plan: list[dict[str,Any]], unit: dict[str,Any], **dependencies: Any) -> Any:
+def orchestrate_offline_unit(
+ plan: list[dict[str,Any]],
+ unit: dict[str,Any],
+ *,
+ journal_persistence_callback: Callable[[InflightJournal], None] | None = None,
+ retry_predecessor: InflightJournal | None = None,
+ **dependencies: Any,
+) -> OrchestrationOutcome:
  """Validate the frozen plan, then enter only the Stage A-backed fake B1 path.
 
  This path is intentionally separate from ``run_plan`` and never consults the
@@ -232,7 +246,530 @@ def orchestrate_offline_unit(plan: list[dict[str,Any]], unit: dict[str,Any], **d
  if supplied_turn_one!=turn_one or supplied_turn_two!=turn_two:
   raise Blocked("BLOCKED RQ3 PAIR MISMATCH")
  from formal_evaluation_orchestration import _orchestrate_plan_member
- return _orchestrate_plan_member(unit,turn_one_unit=turn_one,turn_two_unit=turn_two,**dependencies)
+ return _orchestrate_plan_member(
+  unit,
+  journal_persistence_callback=journal_persistence_callback,
+  retry_predecessor=retry_predecessor,
+  turn_one_unit=turn_one,
+  turn_two_unit=turn_two,
+ **dependencies,
+ )
+
+
+_STAGE_B2_TRANSPORT_IMPLEMENTATION_SHA256 = "464890905866d517bb036569458e6dd69578a2dbacd0eab272c4f0f6ec6fb927"
+_STAGE_B2_RUNTIME_IDENTITY_SHA256 = "0d96cec3538ab20a1ded87990dd1a79ea2d7a5e4a3166136f435839cffa89f12"
+_SYNTHETIC_SNAPSHOT_RESPONSE = re.compile(
+ r"^STAGE_B2_SYNTHETIC_(?:LOCAL|PROVIDER) [0-9a-f]{24}$"
+)
+_SYNTHETIC_STATE_FIELDS = (
+ "current_topic",
+ "query_type",
+ "risk_type",
+ "requires_backend_api",
+ "last_safe_answer_type",
+ "last_user_query",
+ "last_assistant_answer",
+ "last_retrieval_query",
+ "last_contextual_query",
+ "last_successful_contextual_query",
+ "state_confidence",
+ "state_turn_count",
+ "updated_at_turn",
+ "should_reset",
+)
+_SYNTHETIC_SNAPSHOT_FIELDS = (
+ "schema_version",
+ "completed_turn_index",
+ "conversation_state",
+ "previous_user_text",
+ "previous_assistant_text",
+)
+
+
+def _lf_canonical_source_bytes_for_tests(raw: bytes) -> bytes:
+ from formal_evaluation_store import StoreError
+ if type(raw) is not bytes or raw.startswith(b"\xef\xbb\xbf"):
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ index=0
+ lf_count=0
+ crlf_count=0
+ while index<len(raw):
+  value=raw[index]
+  if value==13:
+   if index+1>=len(raw) or raw[index+1]!=10:
+    raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+   crlf_count+=1
+   index+=2
+   continue
+  if value==10:
+   lf_count+=1
+  index+=1
+ if lf_count and crlf_count:
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ return raw.replace(b"\r\n",b"\n") if crlf_count else raw
+
+
+def _transport_implementation_sha256() -> str:
+ from formal_evaluation_store import StoreError
+ try:
+  raw=(ROOT/"scripts/formal_evaluation_transport.py").read_bytes()
+ except OSError as exc:
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH") from exc
+ digest=sha_bytes(_lf_canonical_source_bytes_for_tests(raw))
+ if digest!=_STAGE_B2_TRANSPORT_IMPLEMENTATION_SHA256:
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ return digest
+
+
+def _validate_fixed_synthetic_snapshot_v1(value: object) -> dict[str,Any]:
+ from formal_evaluation_orchestration import OrchestrationError
+ try:
+  if type(value) is not dict or set(value)!=set(_SYNTHETIC_SNAPSHOT_FIELDS):
+   raise ValueError
+  if type(value["schema_version"]) is not int or value["schema_version"]!=1:
+   raise ValueError
+  if type(value["completed_turn_index"]) is not int or value["completed_turn_index"]!=1:
+   raise ValueError
+  state=value["conversation_state"]
+  if type(state) is not dict or set(state)!=set(_SYNTHETIC_STATE_FIELDS):
+   raise ValueError
+  previous_user=value["previous_user_text"]
+  previous_assistant=value["previous_assistant_text"]
+  if (
+   type(previous_user) is not str
+   or not 1<=len(previous_user.encode("utf-8"))<=16_384
+   or type(previous_assistant) is not str
+   or not 1<=len(previous_assistant.encode("utf-8"))<=16_384
+   or _SYNTHETIC_SNAPSHOT_RESPONSE.fullmatch(previous_assistant) is None
+  ):
+   raise ValueError
+  fixed_strings={
+   "current_topic":"none",
+   "query_type":"normal",
+   "risk_type":"none",
+   "last_safe_answer_type":"none",
+   "last_retrieval_query":"",
+   "last_contextual_query":"",
+   "last_successful_contextual_query":"",
+  }
+  if any(type(state.get(key)) is not str or state[key]!=expected for key,expected in fixed_strings.items()):
+   raise ValueError
+  if (
+   type(state["requires_backend_api"]) is not bool
+   or state["requires_backend_api"] is not False
+   or type(state["should_reset"]) is not bool
+   or state["should_reset"] is not False
+   or type(state["last_user_query"]) is not str
+   or state["last_user_query"]!=previous_user
+   or type(state["last_assistant_answer"]) is not str
+   or state["last_assistant_answer"]!=previous_assistant
+   or type(state["state_confidence"]) is not float
+   or not math.isfinite(state["state_confidence"])
+   or state["state_confidence"]!=0.0
+   or math.copysign(1.0,state["state_confidence"])!=1.0
+   or type(state["state_turn_count"]) is not int
+   or state["state_turn_count"]!=0
+   or type(state["updated_at_turn"]) is not int
+   or state["updated_at_turn"]!=1
+  ):
+   raise ValueError
+  rebuilt={
+   "schema_version":1,
+   "completed_turn_index":1,
+   "conversation_state":{
+    "current_topic":"none",
+    "query_type":"normal",
+    "risk_type":"none",
+    "requires_backend_api":False,
+    "last_safe_answer_type":"none",
+    "last_user_query":previous_user,
+    "last_assistant_answer":previous_assistant,
+    "last_retrieval_query":"",
+    "last_contextual_query":"",
+    "last_successful_contextual_query":"",
+    "state_confidence":0.0,
+    "state_turn_count":0,
+    "updated_at_turn":1,
+    "should_reset":False,
+   },
+   "previous_user_text":previous_user,
+   "previous_assistant_text":previous_assistant,
+  }
+  encoded=json.dumps(rebuilt,ensure_ascii=False,sort_keys=True,separators=(",",":"),allow_nan=False).encode("utf-8")
+  if len(encoded)>65_536:
+   raise ValueError
+  return copy.deepcopy(rebuilt)
+ except (KeyError,TypeError,ValueError,UnicodeError) as exc:
+  raise OrchestrationError("CHECKPOINT_SNAPSHOT_INVALID") from exc
+
+
+def _fixed_synthetic_snapshot(
+ unit: Mapping[str,Any], response_text: str
+) -> dict[str,Any]:
+ value={
+  "schema_version":1,
+  "completed_turn_index":1,
+  "conversation_state":{
+   "current_topic":"none",
+   "query_type":"normal",
+   "risk_type":"none",
+   "requires_backend_api":False,
+   "last_safe_answer_type":"none",
+   "last_user_query":unit["payload"]["user_input"],
+   "last_assistant_answer":response_text,
+   "last_retrieval_query":"",
+   "last_contextual_query":"",
+   "last_successful_contextual_query":"",
+   "state_confidence":0.0,
+   "state_turn_count":0,
+   "updated_at_turn":1,
+   "should_reset":False,
+  },
+  "previous_user_text":unit["payload"]["user_input"],
+  "previous_assistant_text":response_text,
+ }
+ return _validate_fixed_synthetic_snapshot_v1(value)
+
+
+class _FixedSyntheticClockV1:
+ def __init__(self, greatest_timestamp: str | None):
+  if greatest_timestamp is None:
+   self._current=datetime(2026,7,23,9,59,59,tzinfo=timezone.utc)
+  else:
+   try:
+    self._current=datetime.fromisoformat(greatest_timestamp.replace("Z","+00:00"))
+   except (TypeError,ValueError) as exc:
+    from formal_evaluation_store import StoreError
+    raise StoreError("STORE_SCHEMA_INVALID") from exc
+ def __call__(self) -> str:
+  self._current+=timedelta(seconds=1)
+  return self._current.isoformat(timespec="seconds").replace("+00:00","Z")
+
+
+class _FixedFakeRawClientV1:
+ def __init__(self, unit: Mapping[str,Any]):
+  self._unit=copy.deepcopy(dict(unit))
+  self._provider_request_id=None
+  self.call_count=0
+ def create(self, **request: Any) -> dict[str,Any]:
+  from formal_evaluation_store import _stage_b2_fake_client_fault_hook
+  from formal_evaluation_transport import validate_fixed_request
+  validate_fixed_request(request)
+  if self.call_count!=0:
+   raise RuntimeError("multiple synthetic calls")
+  provider_request_id=self._provider_request_id
+  if type(provider_request_id) is not str or not provider_request_id.startswith("call_") or len(provider_request_id)!=69:
+   from formal_evaluation_transport import TransportError
+   raise TransportError("FIXED_REQUEST_INVALID")
+  self.call_count=1
+  response={
+   "request_id":provider_request_id,
+   "id":"synthetic_response_"+provider_request_id[5:29],
+   "choices":[{"message":{"content":"STAGE_B2_SYNTHETIC_PROVIDER "+self._unit["request_id"][:24]}}],
+  }
+  _stage_b2_fake_client_fault_hook(self.call_count)
+  return response
+
+
+class _FixedOfflineExecutorRegistryV1:
+ @staticmethod
+ def build(unit: Mapping[str,Any], fake_raw_client: _FixedFakeRawClientV1):
+  from formal_evaluation_orchestration import ExecutorRegistry
+  from formal_evaluation_inflight import derive_provider_request_id
+  def execute(context):
+   provider_mode=int(unit["request_id"][0],16)>=8
+   prefix="STAGE_B2_SYNTHETIC_PROVIDER " if provider_mode else "STAGE_B2_SYNTHETIC_LOCAL "
+   response_text=prefix+unit["request_id"][:24]
+   if provider_mode:
+    fake_raw_client._provider_request_id=derive_provider_request_id(context.identity)
+    normalized=context.invoke_provider(
+     [{"role":"user","content":unit["payload"]["user_input"]}]
+    )
+    if normalized.content!=response_text:
+     from formal_evaluation_orchestration import OrchestrationError
+     raise OrchestrationError("PROVIDER_CORE_RESPONSE_MISMATCH")
+   result={
+    "response_text":response_text,
+    "route":"provider" if provider_mode else "local_guard",
+    "guard_category":"synthetic_validation",
+    "requires_backend_api":False,
+    "retrieval_used":provider_mode,
+    "retrieved_document_ids":["synthetic_doc"] if provider_mode else [],
+    "retrieved_scores":[0.5] if provider_mode else [],
+   }
+   if unit["rq"]=="RQ3" and unit["system_config_id"]=="context_aware" and unit["turn_index"]==1:
+    result["runtime_snapshot"]=_fixed_synthetic_snapshot(unit,response_text)
+   return result
+  return ExecutorRegistry({config:execute for config in FORMAL_SYSTEM_IDS})
+
+
+def _fixed_resource_mapping(config: str) -> dict[str,Any]:
+ from formal_evaluation_transport import formal_identity
+ identity=formal_identity(config)
+ is_v2=identity.resource_family=="v2_mixed"
+ return {
+  "schema_version":1,
+  "resource_type":"synthetic_fixture",
+  "logical_resource_id":f"synthetic_fixture_{identity.resource_family}_synthetic_v1",
+  "system_config_id":config,
+  "formal_system_id":identity.formal_system_id,
+  "corpus_path":f"synthetic/{identity.resource_family}/corpus.json",
+  "embeddings_path":f"synthetic/{identity.resource_family}/embeddings.npy",
+  "corpus_sha256":"a"*64,
+  "embeddings_sha256":"b"*64,
+  "cache_family":identity.resource_family,
+  "corpus_version":"synthetic_v1",
+  "row_count":15688 if is_v2 else 15333,
+  "qa_count":15333,
+  "snippet_count":355 if is_v2 else 0,
+  "embedding_model":"sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "embedding_rows":15688 if is_v2 else 15333,
+  "embedding_dimensions":384,
+  "synthetic":True,
+ }
+
+
+@dataclass(frozen=True)
+class _FixedOfflineAuthorityV1:
+ resources: Any
+ resource_wrappers: Mapping[str,Mapping[str,Any]]
+ transport_implementation_sha256: str
+ runtime_identity_sha256: str
+ snapshot_validator: Callable[[object],dict[str,Any]]
+ executor_registry_type: type
+ fake_raw_client_type: type
+ clock_type: type
+ test_fault_controller_type: type
+ mode: str
+ def clock_for(self, _unit: Mapping[str,Any], state: Any) -> _FixedSyntheticClockV1:
+  timestamps=[]
+  for archive in state.archives:
+   journal=archive.journal
+   timestamps.extend(
+    value for value in (
+     journal.prepared_at,journal.call_started_at,journal.provider_returned_at,
+     journal.failed_at,journal.committed_at,journal.updated_at
+    ) if value is not None
+   )
+  return self.clock_type(max(timestamps) if timestamps else None)
+ def dependencies_for(self, unit: Mapping[str,Any], state: Any) -> dict[str,Any]:
+  fake=self.fake_raw_client_type(unit)
+  return {
+   "resources":self.resources,
+   "executors":self.executor_registry_type.build(unit,fake),
+   "fake_raw_client":fake,
+   "clock":self.clock_for(unit,state),
+   "transport_implementation_sha256":self.transport_implementation_sha256,
+   "runtime_identity_sha256":self.runtime_identity_sha256,
+   "snapshot_validator":self.snapshot_validator,
+  }
+
+
+def _fixed_offline_authority() -> _FixedOfflineAuthorityV1:
+ from formal_evaluation_orchestration import SyntheticResourceBundle
+ from formal_evaluation_store import _StageB2TestFaultControllerV1, StoreError
+ from formal_evaluation_transport import (
+  ProductionResourceIdentity, resource_identity_sha256, validate_resource_identity
+ )
+ mappings={config:_fixed_resource_mapping(config) for config in FORMAL_SYSTEM_IDS}
+ bundle=SyntheticResourceBundle.from_mappings(mappings)
+ wrappers={}
+ for config in FORMAL_SYSTEM_IDS:
+  resource=bundle.resource_for(config)
+  validate_resource_identity(resource)
+  wrappers[config]={
+   "resource_identity":resource.to_dict(),
+   "resource_identity_sha256":resource_identity_sha256(resource),
+  }
+ runtime_preimage={
+  "checkpoint_evidence_schema_version":1,
+  "domain":"formal-evaluation-synthetic-runtime-identity-v1",
+  "snapshot_validator_id":"run_formal_evaluation._validate_fixed_synthetic_snapshot_v1",
+  "synthetic_snapshot_schema_version":1,
+ }
+ runtime_sha=sha(runtime_preimage)
+ if runtime_sha!=_STAGE_B2_RUNTIME_IDENTITY_SHA256:
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ return _FixedOfflineAuthorityV1(
+  resources=bundle,
+  resource_wrappers=wrappers,
+  transport_implementation_sha256=_transport_implementation_sha256(),
+  runtime_identity_sha256=runtime_sha,
+  snapshot_validator=_validate_fixed_synthetic_snapshot_v1,
+  executor_registry_type=_FixedOfflineExecutorRegistryV1,
+  fake_raw_client_type=_FixedFakeRawClientV1,
+  clock_type=_FixedSyntheticClockV1,
+  test_fault_controller_type=_StageB2TestFaultControllerV1,
+  mode="offline_fake_only",
+ )
+
+
+def _validate_fixed_offline_authority_for_tests(candidate: object) -> None:
+ from formal_evaluation_store import StoreError, _StageB2TestFaultControllerV1
+ expected=_fixed_offline_authority()
+ if (
+  type(candidate) is not _FixedOfflineAuthorityV1
+  or candidate.resources.resources!=expected.resources.resources
+  or dict(candidate.resource_wrappers)!=dict(expected.resource_wrappers)
+  or candidate.transport_implementation_sha256!=expected.transport_implementation_sha256
+  or candidate.runtime_identity_sha256!=expected.runtime_identity_sha256
+  or candidate.snapshot_validator is not _validate_fixed_synthetic_snapshot_v1
+  or candidate.executor_registry_type is not _FixedOfflineExecutorRegistryV1
+  or candidate.fake_raw_client_type is not _FixedFakeRawClientV1
+  or candidate.clock_type is not _FixedSyntheticClockV1
+  or candidate.test_fault_controller_type is not _StageB2TestFaultControllerV1
+  or candidate.mode!="offline_fake_only"
+ ):
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+
+
+def build_durable_run_contract(
+ plan: list[dict[str,Any]],
+) -> Mapping[str,Any]:
+ from collections import Counter
+ from formal_evaluation_store import StoreError
+ from formal_evaluation_transport import (
+  fixed_generation_snapshot, formal_identity, generation_contract_id,
+  generation_contract_sha256, resource_identity_sha256,
+  transport_contract_id, transport_contract_sha256, transport_contract_snapshot,
+  validate_registry,
+ )
+ verify_frozen()
+ validate_plan(plan)
+ if plan_fingerprint(plan)!=PLAN_FINGERPRINT:
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ authority=_fixed_offline_authority()
+ _validate_fixed_offline_authority_for_tests(authority)
+ validate_registry()
+ rq_counts=Counter(unit["rq"] for unit in plan)
+ system_counts=Counter(unit["system_config_id"] for unit in plan)
+ if (
+  len(plan)!=190
+  or len({unit["request_id"] for unit in plan})!=190
+  or [unit["execution_order"] for unit in plan]!=list(range(1,191))
+  or rq_counts!={"RQ1":102,"RQ2":40,"RQ3":48}
+  or system_counts!={"qa_only_reconstructed_baseline":71,"v2":71,"single_turn":24,"context_aware":24}
+ ):
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ for config in FORMAL_SYSTEM_IDS:
+  modes={int(unit["request_id"][0],16)>=8 for unit in plan if unit["system_config_id"]==config}
+  if modes!={False,True}:
+   raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ systems={}
+ for config in FORMAL_SYSTEM_IDS:
+  identity=formal_identity(config)
+  systems[config]={
+   "formal_system_id":identity.formal_system_id,
+   "resolved_runtime_system_id":identity.resolved_runtime_system_id,
+   "resource_family":identity.resource_family,
+   "top_k":identity.top_k,
+   "uses_context":identity.uses_context,
+   "uses_checkpoint":identity.uses_checkpoint,
+  }
+ generation={
+  "contract_id":generation_contract_id(),
+  "contract_sha256":generation_contract_sha256(),
+  "runner_generation_sha256":generation_sha(),
+  "snapshot":dict(fixed_generation_snapshot()),
+ }
+ transport={
+  "contract_id":transport_contract_id(),
+  "contract_sha256":transport_contract_sha256(),
+  "snapshot":dict(transport_contract_snapshot()),
+ }
+ expected_generation={
+  "contract_id":"deepseek_fixed_generation_v1",
+  "contract_sha256":"864a2c75b13be02f1a4a017bb61f29df7a65eb7f9dfcada51e9e52af5ec3e9e2",
+  "runner_generation_sha256":"71158e109dd4997dfd18b94ad73d25cc1b7142398225ad2405b690a24bf53406",
+  "snapshot":{"model":"deepseek-chat","temperature":0.0,"top_p":1.0,"max_tokens":512,"stream":False},
+ }
+ expected_transport={
+  "contract_id":"formal_transport_v1",
+  "contract_sha256":"5fdcbab6a6058f7747a9b059876e3b0b413500b226123fcbcb3067343c8c1057",
+  "snapshot":{"schema_version":1,"contract_id":"formal_transport_v1","provider":"DeepSeek","base_url":"https://api.deepseek.com","provider_api":"openai_compatible_chat_completions","maximum_attempts":3,"success_receipt_schema":1},
+ }
+ if generation!=expected_generation or transport!=expected_transport:
+  raise StoreError("STORE_FIXED_AUTHORITY_MISMATCH")
+ without_hash={
+  "schema_version":1,
+  "stage_id":"B2",
+  "plan_authority":{
+   "plan_fingerprint":PLAN_FINGERPRINT,
+   "base_seed":BASE_SEED,
+   "execution_unit_count":190,
+   "unique_request_id_count":190,
+   "execution_order_first":1,
+   "execution_order_last":190,
+   "rq_counts":{"RQ1":102,"RQ2":40,"RQ3":48},
+   "system_counts":{"context_aware":24,"qa_only_reconstructed_baseline":71,"single_turn":24,"v2":71},
+  },
+  "frozen_input_sha256":frozen_hashes(),
+  "formal_system_authority":systems,
+  "provider_generation_authority":{
+   "generation":generation,
+   "transport":transport,
+   "offline_execution":{
+    "authority_bundle_id":"run_formal_evaluation._FixedOfflineAuthorityV1",
+    "clock_id":"run_formal_evaluation._FixedSyntheticClockV1",
+    "executor_registry_id":"run_formal_evaluation._FixedOfflineExecutorRegistryV1",
+    "fake_raw_client_id":"run_formal_evaluation._FixedFakeRawClientV1",
+    "mode":"offline_fake_only",
+    "snapshot_validator_id":"run_formal_evaluation._validate_fixed_synthetic_snapshot_v1",
+    "test_fault_controller_id":"formal_evaluation_store._StageB2TestFaultControllerV1",
+   },
+  },
+  "runtime_resource_authority":{
+   "transport_implementation_sha256":authority.transport_implementation_sha256,
+   "runtime_identity_sha256":authority.runtime_identity_sha256,
+   "resources":dict(authority.resource_wrappers),
+  },
+  "schema_authority":{
+   "attempt_archive_schema_version":1,
+   "b1_checkpoint_evidence_schema_version":1,
+   "formal_result_schema_version":1,
+   "journal_wrapper_schema_version":1,
+   "private_commit_envelope_schema_version":1,
+   "run_contract_schema_version":1,
+   "stage_a_authoritative_success_schema_version":1,
+   "stage_a_inflight_journal_schema_version":3,
+   "stage_a_resource_identity_schema_version":1,
+  },
+ }
+ contract=dict(without_hash)
+ contract["run_contract_sha256"]=sha({
+  "domain":"formal-evaluation-run-contract-v1",
+  "contract":without_hash,
+ })
+ return contract
+
+
+def durable_progress(
+ plan: list[dict[str,Any]],
+) -> DurableProgress:
+ from formal_evaluation_store import _durable_progress
+ contract=build_durable_run_contract(plan)
+ return _durable_progress(plan,contract)
+
+
+def orchestrate_durable_offline_unit(
+ plan: list[dict[str,Any]],
+ unit: dict[str,Any] | None=None,
+) -> DurableExecutionOutcome:
+ from formal_evaluation_store import StoreError, _orchestrate_durable_offline_unit
+ verify_frozen()
+ validate_plan(plan)
+ if unit is not None:
+  if type(unit) is not dict:
+   raise Blocked("BLOCKED SELECTED PLAN UNIT MISMATCH")
+  matching=[candidate for candidate in plan if candidate["request_id"]==unit.get("request_id")]
+  if len(matching)!=1 or matching[0]!=unit:
+   raise Blocked("BLOCKED SELECTED PLAN UNIT MISMATCH")
+ contract=build_durable_run_contract(plan)
+ authority=_fixed_offline_authority()
+ _validate_fixed_offline_authority_for_tests(authority)
+ return _orchestrate_durable_offline_unit(
+  plan,unit,expected_contract=contract,authority=authority
+ )
 
 def write_json(p: Path, obj: Any) -> None: p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(obj,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
 def write_jsonl(p: Path, rows: list[dict[str,Any]]) -> None: p.parent.mkdir(parents=True,exist_ok=True); p.write_text("".join(canonical(r)+"\n" for r in rows),encoding="utf-8")

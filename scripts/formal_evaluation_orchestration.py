@@ -375,7 +375,7 @@ class OrchestrationOutcome:
 
 
 class _RawClientBoundary:
-    """Transition the journal at the last instant before the injected call."""
+    """Enter the injected raw client after the caller persisted call start."""
 
     def __init__(
         self,
@@ -394,12 +394,8 @@ class _RawClientBoundary:
     def create(self, **request: Any) -> Any:
         if self.call_count != 0:
             raise OrchestrationError("MULTIPLE_PROVIDER_CALLS_FORBIDDEN")
-        self.journal = transition(
-            self.journal,
-            "call_started",
-            self.clock(),
-            provider_request_id=self.provider_request_id,
-        )
+        if self.journal.state != "call_started":
+            raise OrchestrationError("JOURNAL_CALL_START_NOT_PERSISTED")
         self.call_count = 1
         try:
             create = getattr(self.fake_raw_client, "create", None)
@@ -858,13 +854,22 @@ def _projection_base(
 def orchestrate_validated_unit(
     plan: Sequence[Mapping[str, Any]],
     unit: Mapping[str, Any],
+    *,
+    journal_persistence_callback: Callable[[InflightJournal], None] | None = None,
+    retry_predecessor: InflightJournal | None = None,
     **dependencies: Any,
 ) -> OrchestrationOutcome:
     """Public B1 entry routed through the runner's complete frozen-plan authority."""
 
     from run_formal_evaluation import orchestrate_offline_unit
 
-    return orchestrate_offline_unit(list(plan), dict(unit), **dependencies)
+    return orchestrate_offline_unit(
+        list(plan),
+        dict(unit),
+        journal_persistence_callback=journal_persistence_callback,
+        retry_predecessor=retry_predecessor,
+        **dependencies,
+    )
 
 
 def _orchestrate_plan_member(
@@ -877,6 +882,8 @@ def _orchestrate_plan_member(
     transport_implementation_sha256: str,
     runtime_identity_sha256: str,
     snapshot_validator: Callable[[Mapping[str, Any]], Any],
+    journal_persistence_callback: Callable[[InflightJournal], None] | None = None,
+    retry_predecessor: InflightJournal | None = None,
     journal: InflightJournal | None = None,
     authoritative_success: AuthoritativeSuccess | Mapping[str, Any] | None = None,
     checkpoint_evidence: CheckpointEvidence | Mapping[str, Any] | None = None,
@@ -901,6 +908,23 @@ def _orchestrate_plan_member(
         raise OrchestrationError(exc.category) from exc
     if type(resources) is not SyntheticResourceBundle or type(executors) is not ExecutorRegistry:
         raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
+    if journal_persistence_callback is not None and not callable(
+        journal_persistence_callback
+    ):
+        raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
+
+    def persist_new_journal(value: InflightJournal) -> None:
+        validate_journal(value)
+        if journal_persistence_callback is None:
+            return
+        try:
+            result = journal_persistence_callback(value)
+        except BaseException:
+            raise
+        if result is not None:
+            raise OrchestrationError(
+                "JOURNAL_PERSISTENCE_CALLBACK_RETURN_INVALID"
+            )
 
     checkpoint: CheckpointEvidence | None = None
     resolved_payload = copy.deepcopy(checked["payload"])
@@ -984,9 +1008,42 @@ def _orchestrate_plan_member(
 
     initial_decision = decision
     predecessor: InflightJournal | None = None
+    resumed_retry_predecessor: InflightJournal | None = None
+    if journal is None:
+        if retry_predecessor is not None:
+            raise OrchestrationError("RECOVERY_PREDECESSOR_INVALID")
+    elif (
+        journal.state == "prepared"
+        and journal.identity.attempt_number in {2, 3}
+    ):
+        if retry_predecessor is None:
+            raise OrchestrationError("RECOVERY_PREDECESSOR_REQUIRED")
+        if type(retry_predecessor) is not InflightJournal:
+            raise OrchestrationError("RECOVERY_PREDECESSOR_INVALID")
+        try:
+            validate_journal(retry_predecessor)
+            expected_prepared = next_retry_journal(
+                retry_predecessor,
+                journal.prepared_at,
+            )
+        except JournalError as exc:
+            raise OrchestrationError("RECOVERY_PREDECESSOR_INVALID") from exc
+        if (
+            retry_predecessor.state != "retryable_failed"
+            or retry_predecessor.identity.attempt_number
+            != journal.identity.attempt_number - 1
+            or expected_prepared != journal
+        ):
+            raise OrchestrationError("RECOVERY_PREDECESSOR_INVALID")
+        resumed_retry_predecessor = retry_predecessor
+    elif retry_predecessor is not None:
+        raise OrchestrationError("RECOVERY_PREDECESSOR_INVALID")
+
     if decision == "begin":
         journal = create_initial_journal(identity, clock())
         decision = recovery_decision(journal, expected=identity)
+        validate_journal(journal, identity)
+        persist_new_journal(journal)
     elif decision == "retry":
         if journal is None:
             raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
@@ -1005,8 +1062,10 @@ def _orchestrate_plan_member(
         provider_request_id = derive_provider_request_id(identity)
         _validate_claimed_ids(claimed_ids, identity, provider_request_id)
         decision = recovery_decision(journal, expected=identity)
+        validate_journal(journal, identity)
+        persist_new_journal(journal)
     elif decision == "continue_before_provider":
-        pass
+        predecessor = resumed_retry_predecessor
     elif decision in {
         "authoritative_success",
         "reconcile_committed",
@@ -1098,6 +1157,8 @@ def _orchestrate_plan_member(
                     )
         except (JournalError, OrchestrationError):
             failed = boundary.journal
+        if failed != boundary.journal:
+            persist_new_journal(failed)
         boundary.journal = failed
         retry_available = (
             failed.state == "retryable_failed" and _may_retry_journal(failed)
@@ -1121,6 +1182,14 @@ def _orchestrate_plan_member(
     ) -> NormalizedProviderResponse:
         nonlocal provider_invocation_attempted
         provider_invocation_attempted = True
+        call_started = transition(
+            boundary.journal,
+            "call_started",
+            clock(),
+            provider_request_id=provider_request_id,
+        )
+        persist_new_journal(call_started)
+        boundary.journal = call_started
         response = proxy.invoke(
             boundary,
             tracker,
@@ -1142,6 +1211,31 @@ def _orchestrate_plan_member(
         raw_core_result = executors.dispatch(context)
     except TransportError as exc:
         if boundary.call_count == 0:
+            if (
+                exc.category == "pre_send_failure"
+                and boundary.journal.state == "prepared"
+            ):
+                failed = transition(
+                    boundary.journal,
+                    "retryable_failed",
+                    clock(),
+                    sanitized_outcome_category="pre_send_failure",
+                )
+                persist_new_journal(failed)
+                boundary.journal = failed
+                return OrchestrationOutcome(
+                    action="retry_available",
+                    recovery_action=initial_decision,
+                    identity=identity,
+                    journal=failed,
+                    predecessor_journal=predecessor,
+                    tracker_state=tracker.state,
+                    provider_call_count=0,
+                    formal_result=None,
+                    authoritative_success=None,
+                    checkpoint_evidence=checkpoint,
+                    failure_category="pre_send_failure",
+                )
             raise OrchestrationError(exc.category) from exc
         return post_call_failure(exc.category)
     except (JournalError, OrchestrationError) as exc:
@@ -1150,6 +1244,13 @@ def _orchestrate_plan_member(
         return post_call_failure(exc.category)
     except Exception as exc:
         if boundary.call_count == 0:
+            # A durable call-start publication failure occurs inside the
+            # executor callback, before the fake client is entered.  It
+            # is the primary persistence failure and must retain its
+            # original identity rather than being recategorised as an
+            # executor failure.
+            if provider_invocation_attempted:
+                raise
             raise OrchestrationError("EXECUTOR_FAILURE") from exc
         return post_call_failure("EXECUTOR_FAILURE")
 
@@ -1182,9 +1283,7 @@ def _orchestrate_plan_member(
 
     success: AuthoritativeSuccess | None = None
     if tracker.state == "not_called":
-        if provider_invocation_attempted or boundary.call_count != 0 or (
-            predecessor is not None and predecessor.provider_called
-        ):
+        if provider_invocation_attempted or boundary.call_count != 0:
             raise OrchestrationError("LOCAL_SUCCESS_AFTER_PROVIDER_CALL")
         if core_result["route"] not in _LOCAL_ROUTES:
             raise OrchestrationError("LOCAL_PROVENANCE_INVALID")
@@ -1236,6 +1335,7 @@ def _orchestrate_plan_member(
                 provider_response_sha256=provider_result.response_sha256,
                 response_sha256=sha256_text(response_text),
             )
+            persist_new_journal(returned_journal)
             boundary.journal = returned_journal
             committed_at = clock()
             success = AuthoritativeSuccess(
