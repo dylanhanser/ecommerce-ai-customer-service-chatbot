@@ -133,6 +133,117 @@ def _require_sha(value: object) -> str:
     return value
 
 
+@dataclass(frozen=True, slots=True)
+class CanonicalPrivateResultV1:
+    """Detached, read-only projection of one validated canonical commit."""
+
+    schema_version: int
+    plan_fingerprint: str
+    run_contract_sha256: str
+    plan_member_sha256: str
+    execution_unit_id: str
+    execution_order: int
+    request_id: str
+    rq: str
+    case_id: str
+    dialogue_id: str | None
+    turn_index: int
+    system_config_id: str
+    formal_system_id: str
+    envelope_sha256: str
+    response_text: str
+    response_sha256: str
+    rq3_relationship_kind: str
+    turn_one_commit_sha256: str | None
+    checkpoint_record_sha256: str | None
+
+    def __post_init__(self) -> None:
+        try:
+            _require_exact_int(self.schema_version, 1, 1)
+            _require_exact_int(self.execution_order, 1, 190)
+            _require_exact_int(self.turn_index, 1, 2)
+            for name in (
+                "plan_fingerprint",
+                "run_contract_sha256",
+                "plan_member_sha256",
+                "execution_unit_id",
+                "request_id",
+                "envelope_sha256",
+                "response_sha256",
+            ):
+                _require_sha(getattr(self, name))
+            for name in (
+                "turn_one_commit_sha256",
+                "checkpoint_record_sha256",
+            ):
+                value = getattr(self, name)
+                if value is not None:
+                    _require_sha(value)
+            if self.plan_fingerprint != _PLAN_FINGERPRINT:
+                raise ValueError
+            if self.rq not in {"RQ1", "RQ2", "RQ3"}:
+                raise ValueError
+            for value in (
+                self.case_id,
+                self.system_config_id,
+                self.formal_system_id,
+            ):
+                if (
+                    type(value) is not str
+                    or not value
+                    or len(value.encode("utf-8")) > 262_144
+                    or re.search(r"[\x00-\x1f\x7f]", value) is not None
+                ):
+                    raise ValueError
+            if (
+                type(self.response_text) is not str
+                or not self.response_text
+                or not self.response_text.strip()
+                or len(self.response_text) > 32_768
+                or re.search(r"[\x00-\x1f\x7f]", self.response_text) is not None
+                or hashlib.sha256(self.response_text.encode("utf-8")).hexdigest()
+                != self.response_sha256
+            ):
+                raise ValueError
+            if self.rq != "RQ3":
+                valid_relationship = (
+                    self.dialogue_id is None
+                    and self.turn_index == 1
+                    and self.rq3_relationship_kind == "none"
+                    and self.turn_one_commit_sha256 is None
+                    and self.checkpoint_record_sha256 is None
+                )
+            elif (
+                type(self.dialogue_id) is not str
+                or not self.dialogue_id
+                or self.dialogue_id != self.case_id
+            ):
+                valid_relationship = False
+            elif self.rq3_relationship_kind == "single_turn":
+                valid_relationship = (
+                    self.turn_one_commit_sha256 is None
+                    and self.checkpoint_record_sha256 is None
+                )
+            elif self.rq3_relationship_kind == "context_turn_one":
+                valid_relationship = (
+                    self.turn_index == 1
+                    and self.turn_one_commit_sha256 is None
+                    and self.checkpoint_record_sha256 is not None
+                )
+            elif self.rq3_relationship_kind == "context_turn_two":
+                valid_relationship = (
+                    self.turn_index == 2
+                    and self.turn_one_commit_sha256 is not None
+                    and self.checkpoint_record_sha256 is not None
+                )
+            else:
+                valid_relationship = False
+            if not valid_relationship:
+                raise ValueError
+        except (UnicodeError, ValueError) as exc:
+            raise ValueError("invalid CanonicalPrivateResultV1") from exc
+
+
 _RUN_STATES = frozenset(
     {"in_progress", "temporarily_blocked", "permanently_blocked", "complete"}
 )
@@ -578,8 +689,11 @@ _LEASED_PATHS_GUARD = threading.Lock()
 
 
 class _RunWideLock:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, *, create_missing: bool = True):
+        if type(create_missing) is not bool:
+            raise StoreError("STORE_PATH_INVALID")
         self.root = _validate_root(root)
+        self.create_missing = create_missing
         self.path = self.root / "run.lock"
         self.handle: Any = None
         self.locked = False
@@ -596,6 +710,8 @@ class _RunWideLock:
             raise StoreError("STORE_PLATFORM_UNSUPPORTED") from exc
         _validate_root(self.root)
         if not self.root.exists():
+            if not self.create_missing:
+                raise StoreError("STORE_PATH_INVALID")
             try:
                 self.root.mkdir(parents=True)
             except OSError as exc:
@@ -603,6 +719,8 @@ class _RunWideLock:
         if _is_reparse(self.root) or not self.root.is_dir():
             raise StoreError("STORE_PATH_INVALID")
         if not self.path.exists():
+            if not self.create_missing:
+                raise StoreError("STORE_LOCK_FILE_INVALID")
             try:
                 descriptor = os.open(
                     self.path,
@@ -726,6 +844,16 @@ def _atomic_target_kind(path: Path) -> str:
     ):
         return "archive"
     raise StoreError("STORE_PATH_INVALID")
+
+
+def _owned_temp_kind(path: Path) -> str | None:
+    match = _TEMP_NAME_RE.fullmatch(path.name)
+    if match is None:
+        return None
+    try:
+        return _atomic_target_kind(path.with_name(match.group("target")))
+    except StoreError:
+        return None
 
 
 def _active_fault_point() -> str | None:
@@ -2215,8 +2343,11 @@ def _load_unit_state_locked(
     run_contract: Mapping[str, Any],
     lock: _RunWideLock,
     repair_mutable: bool = True,
+    allow_owned_temps: bool = False,
 ) -> _UnitState:
     lock.require_active()
+    if type(repair_mutable) is not bool or type(allow_owned_temps) is not bool:
+        raise StoreError("STORE_SCHEMA_INVALID")
     try:
         _require_sha(execution_unit_id)
     except ValueError as exc:
@@ -2228,6 +2359,10 @@ def _load_unit_state_locked(
         if _is_reparse(attempt_directory) or not attempt_directory.is_dir():
             raise StoreError("STORE_PATH_INVALID")
         for path in attempt_directory.iterdir():
+            if allow_owned_temps and _owned_temp_kind(path) == "archive":
+                if _is_reparse(path) or not path.is_file():
+                    raise StoreError("STORE_PATH_INVALID")
+                continue
             if _is_reparse(path) or not path.is_file():
                 raise StoreError("STORE_PATH_INVALID")
             if _ARCHIVE_NAME_RE.fullmatch(path.name) is None:
@@ -2517,8 +2652,12 @@ def _publish_journal_locked(
     return MappingProxyType(value)
 
 
-def _validate_store_layout_locked(lock: _RunWideLock) -> None:
+def _validate_store_layout_locked(
+    lock: _RunWideLock, *, allow_owned_temps: bool = False
+) -> None:
     lock.require_active()
+    if type(allow_owned_temps) is not bool:
+        raise StoreError("STORE_SCHEMA_INVALID")
     root = lock.root
     allowed_root = {
         "run.lock",
@@ -2528,9 +2667,23 @@ def _validate_store_layout_locked(lock: _RunWideLock) -> None:
         "commits",
     }
     for path in root.iterdir():
+        if (
+            allow_owned_temps
+            and _owned_temp_kind(path) == "run_contract"
+            and not _is_reparse(path)
+            and path.is_file()
+        ):
+            continue
         if path.name not in allowed_root or _is_reparse(path):
             raise StoreError("STORE_PATH_INVALID")
     for path in (root / "journals").iterdir():
+        if (
+            allow_owned_temps
+            and _owned_temp_kind(path) == "mutable"
+            and not _is_reparse(path)
+            and path.is_file()
+        ):
+            continue
         if (
             _is_reparse(path)
             or not path.is_file()
@@ -2538,6 +2691,13 @@ def _validate_store_layout_locked(lock: _RunWideLock) -> None:
         ):
             raise StoreError("STORE_PATH_INVALID")
     for path in (root / "commits").iterdir():
+        if (
+            allow_owned_temps
+            and _owned_temp_kind(path) == "commit"
+            and not _is_reparse(path)
+            and path.is_file()
+        ):
+            continue
         if (
             _is_reparse(path)
             or not path.is_file()
@@ -2552,6 +2712,13 @@ def _validate_store_layout_locked(lock: _RunWideLock) -> None:
         ):
             raise StoreError("STORE_PATH_INVALID")
         for path in directory.iterdir():
+            if (
+                allow_owned_temps
+                and _owned_temp_kind(path) == "archive"
+                and not _is_reparse(path)
+                and path.is_file()
+            ):
+                continue
             if (
                 _is_reparse(path)
                 or not path.is_file()
@@ -3194,8 +3361,12 @@ def _load_commit_for_unit_locked(
     run_contract: Mapping[str, Any],
     lock: _RunWideLock,
     state: _UnitState | None = None,
+    repair_mutable: bool = True,
+    allow_owned_temps: bool = False,
 ) -> dict[str, Any] | None:
     lock.require_active()
+    if type(repair_mutable) is not bool or type(allow_owned_temps) is not bool:
+        raise StoreError("STORE_SCHEMA_INVALID")
     path = _commit_path(lock.root, unit)
     if not path.exists():
         return None
@@ -3213,6 +3384,8 @@ def _load_commit_for_unit_locked(
             _execution_unit_id(pair[0]),
             run_contract=run_contract,
             lock=lock,
+            repair_mutable=repair_mutable,
+            allow_owned_temps=allow_owned_temps,
         )
         turn_one_commit = _load_commit_for_unit_locked(
             plan,
@@ -3220,6 +3393,8 @@ def _load_commit_for_unit_locked(
             run_contract=run_contract,
             lock=lock,
             state=turn_one_state,
+            repair_mutable=repair_mutable,
+            allow_owned_temps=allow_owned_temps,
         )
         if turn_one_commit is None:
             raise StoreError("STORE_DEPENDENCY_INVALID")
@@ -3228,6 +3403,8 @@ def _load_commit_for_unit_locked(
             _execution_unit_id(unit),
             run_contract=run_contract,
             lock=lock,
+            repair_mutable=repair_mutable,
+            allow_owned_temps=allow_owned_temps,
         )
     try:
         return _validate_private_commit(
@@ -3350,7 +3527,10 @@ def _reconcile_commit_locked(
     *,
     run_contract: Mapping[str, Any],
     lock: _RunWideLock,
+    repair: bool = True,
 ) -> _UnitState:
+    if type(repair) is not bool:
+        raise StoreError("STORE_SCHEMA_INVALID")
     if state.tip is None:
         raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
     commit_sha = commit["envelope_sha256"]
@@ -3358,12 +3538,13 @@ def _reconcile_commit_locked(
     if commit["success_kind"] == "local":
         if state.tip.journal.state == "prepared":
             if state.tip.value["private_commit_sha256"] is None:
-                _publish_journal_locked(
-                    state.tip.journal,
-                    run_contract=run_contract,
-                    lock=lock,
-                    private_commit_sha256=commit_sha,
-                )
+                if repair:
+                    _publish_journal_locked(
+                        state.tip.journal,
+                        run_contract=run_contract,
+                        lock=lock,
+                        private_commit_sha256=commit_sha,
+                    )
             elif state.tip.value["private_commit_sha256"] != commit_sha:
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
         else:
@@ -3382,12 +3563,13 @@ def _reconcile_commit_locked(
                 committed = reconcile(state.tip.journal, success, identity)
             except JournalError as exc:
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT") from exc
-            _publish_journal_locked(
-                committed,
-                run_contract=run_contract,
-                lock=lock,
-                private_commit_sha256=commit_sha,
-            )
+            if repair:
+                _publish_journal_locked(
+                    committed,
+                    run_contract=run_contract,
+                    lock=lock,
+                    private_commit_sha256=commit_sha,
+                )
         elif state.tip.journal.state == "committed":
             if state.tip.value["private_commit_sha256"] != commit_sha:
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
@@ -3405,6 +3587,8 @@ def _reconcile_commit_locked(
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT") from exc
         else:
             raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
+    if not repair:
+        return state
     return _load_unit_state_locked(
         identity.execution_unit_id,
         run_contract=run_contract,
@@ -3518,10 +3702,17 @@ def _unit_category_locked(
 
 
 def _validate_known_store_members(
-    plan: Sequence[Mapping[str, Any]], lock: _RunWideLock
+    plan: Sequence[Mapping[str, Any]],
+    lock: _RunWideLock,
+    *,
+    allow_owned_temps: bool = False,
 ) -> None:
+    if type(allow_owned_temps) is not bool:
+        raise StoreError("STORE_SCHEMA_INVALID")
     known_ids = {_execution_unit_id(unit) for unit in plan}
     for path in (lock.root / "journals").iterdir():
+        if allow_owned_temps and _owned_temp_kind(path) == "mutable":
+            continue
         if path.stem not in known_ids:
             raise StoreError("STORE_SCHEMA_INVALID")
     for path in (lock.root / "attempts").iterdir():
@@ -3531,6 +3722,8 @@ def _validate_known_store_members(
         _commit_path(lock.root, unit).name for unit in plan
     }
     for path in (lock.root / "commits").iterdir():
+        if allow_owned_temps and _owned_temp_kind(path) == "commit":
+            continue
         if path.name not in expected_commits:
             raise StoreError("STORE_SCHEMA_INVALID")
 
@@ -3674,6 +3867,157 @@ def _open_store(
         _clean_owned_temps_locked(lock.root, lock)
         _validate_store_layout_locked(lock)
         yield contract, lock
+
+
+@contextmanager
+def _open_store_read_only(
+    expected_contract: Mapping[str, Any],
+) -> Iterator[tuple[dict[str, Any], _RunWideLock]]:
+    """Open an existing canonical store without creation, cleanup, or repair."""
+
+    if _STAGE_B2_TEST_FAULT_CONTROLLER is not None:
+        raise StoreError("STORE_TEST_FAULT_INVALID")
+    if type(expected_contract) is not dict:
+        raise StoreError("STORE_RUN_CONTRACT_MISMATCH")
+    _validate_run_contract_shape(json.loads(_canonical_bytes(expected_contract)))
+    root = _validate_root(_PRIVATE_STATE_ROOT)
+    if not root.exists() or _is_reparse(root) or not root.is_dir():
+        raise StoreError("STORE_PATH_INVALID")
+    required_files = (root / "run.lock", root / "run_contract.json")
+    required_directories = (
+        root / "journals",
+        root / "attempts",
+        root / "commits",
+    )
+    for path in required_files:
+        if not path.exists() or _is_reparse(path) or not path.is_file():
+            raise StoreError(
+                "STORE_LOCK_FILE_INVALID"
+                if path.name == "run.lock"
+                else "STORE_STATE_WITHOUT_CONTRACT"
+            )
+    for path in required_directories:
+        if not path.exists() or _is_reparse(path) or not path.is_dir():
+            raise StoreError("STORE_PATH_INVALID")
+    with _RunWideLock(root, create_missing=False) as lock:
+        contract_path = root / "run_contract.json"
+        contract = _read_json(contract_path, _RUN_CONTRACT_LIMIT)
+        _validate_run_contract_shape(contract)
+        if (
+            contract != dict(expected_contract)
+            or contract_path.read_bytes()
+            != _canonical_bytes(expected_contract) + b"\n"
+        ):
+            raise StoreError("STORE_RUN_CONTRACT_MISMATCH")
+        _validate_store_layout_locked(lock, allow_owned_temps=True)
+        yield contract, lock
+
+
+def _validate_observation_plan(plan: list[dict[str, Any]]) -> None:
+    try:
+        from run_formal_evaluation import (
+            PLAN_FINGERPRINT,
+            plan_fingerprint,
+            validate_plan,
+        )
+
+        if type(plan) is not list:
+            raise StoreError("STORE_SCHEMA_INVALID")
+        validate_plan(plan)
+        if (
+            PLAN_FINGERPRINT != _PLAN_FINGERPRINT
+            or plan_fingerprint(plan) != _PLAN_FINGERPRINT
+            or len(plan) != 190
+            or [unit["execution_order"] for unit in plan] != list(range(1, 191))
+        ):
+            raise StoreError("STORE_SCHEMA_INVALID")
+    except StoreError:
+        raise
+    except Exception as exc:
+        raise StoreError("STORE_SCHEMA_INVALID") from exc
+
+
+def _canonical_private_result(
+    commit: Mapping[str, Any],
+) -> CanonicalPrivateResultV1:
+    binding = commit["plan_member_binding"]
+    result = commit["formal_result"]
+    relationship = commit["rq3_relationship"]
+    try:
+        return CanonicalPrivateResultV1(
+            schema_version=1,
+            plan_fingerprint=binding["plan_fingerprint"],
+            run_contract_sha256=commit["run_contract_sha256"],
+            plan_member_sha256=binding["plan_member_sha256"],
+            execution_unit_id=binding["execution_unit_id"],
+            execution_order=binding["execution_order"],
+            request_id=binding["request_id"],
+            rq=binding["rq"],
+            case_id=binding["case_id"],
+            dialogue_id=binding["dialogue_id"],
+            turn_index=binding["turn_index"],
+            system_config_id=binding["system_config_id"],
+            formal_system_id=binding["formal_system_id"],
+            envelope_sha256=commit["envelope_sha256"],
+            response_text=result["response_text"],
+            response_sha256=commit["response_sha256"],
+            rq3_relationship_kind=relationship["kind"],
+            turn_one_commit_sha256=relationship["turn_one_commit_sha256"],
+            checkpoint_record_sha256=relationship[
+                "checkpoint_record_sha256"
+            ],
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise StoreError("STORE_COMMIT_INVALID") from exc
+
+
+def _observe_validated_canonical_private_results(
+    plan: list[dict[str, Any]],
+    expected_contract: Mapping[str, Any],
+) -> tuple[CanonicalPrivateResultV1, ...]:
+    """Return detached canonical commits while preserving all durable bytes."""
+
+    _validate_observation_plan(plan)
+    with _open_store_read_only(expected_contract) as (contract, lock):
+        _validate_known_store_members(
+            plan, lock, allow_owned_temps=True
+        )
+        observed: list[CanonicalPrivateResultV1] = []
+        for unit in plan:
+            execution_unit_id = _execution_unit_id(unit)
+            state = _load_unit_state_locked(
+                execution_unit_id,
+                run_contract=contract,
+                lock=lock,
+                repair_mutable=False,
+                allow_owned_temps=True,
+            )
+            _validate_unit_journal_authority(state, unit, contract)
+            commit = _load_commit_for_unit_locked(
+                plan,
+                unit,
+                run_contract=contract,
+                lock=lock,
+                state=state,
+                repair_mutable=False,
+                allow_owned_temps=True,
+            )
+            if commit is None:
+                if (
+                    state.tip is not None
+                    and state.tip.value["private_commit_sha256"] is not None
+                ):
+                    raise StoreError("STORE_COMMIT_INVALID")
+                continue
+            _reconcile_commit_locked(
+                commit,
+                state,
+                run_contract=contract,
+                lock=lock,
+                repair=False,
+            )
+            observed.append(_canonical_private_result(commit))
+        return tuple(observed)
 
 
 def _durable_progress(

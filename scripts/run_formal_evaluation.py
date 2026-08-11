@@ -15,7 +15,9 @@ from typing import TYPE_CHECKING, Any, Callable
 if TYPE_CHECKING:
  from formal_evaluation_inflight import InflightJournal
  from formal_evaluation_orchestration import OrchestrationOutcome
- from formal_evaluation_store import DurableExecutionOutcome, DurableProgress
+ from formal_evaluation_store import (
+  CanonicalPrivateResultV1, DurableExecutionOutcome, DurableProgress,
+ )
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -749,6 +751,18 @@ def durable_progress(
  from formal_evaluation_store import _durable_progress
  contract=build_durable_run_contract(plan)
  return _durable_progress(plan,contract)
+
+
+def observe_validated_canonical_private_results(
+ plan: list[dict[str,Any]],
+) -> tuple[CanonicalPrivateResultV1,...]:
+ from formal_evaluation_store import _observe_validated_canonical_private_results
+ verify_frozen()
+ validate_plan(plan)
+ if plan_fingerprint(plan)!=PLAN_FINGERPRINT:
+  raise Blocked("BLOCKED FORMAL PLAN FINGERPRINT MISMATCH")
+ contract=build_durable_run_contract(plan)
+ return _observe_validated_canonical_private_results(plan,contract)
 
 
 def orchestrate_durable_offline_unit(
