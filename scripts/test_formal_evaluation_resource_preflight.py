@@ -25,6 +25,7 @@ import pytest
 import formal_evaluation_resource_preflight as preflight
 import formal_evaluation_resource_preflight_worker as worker
 import formal_evaluation_transport as transport
+from outputs import rag_answer_demo as rag_demo
 
 
 def _under(path: Path, root: Path) -> bool:
@@ -727,6 +728,123 @@ class _NumpyProbeProxy:
         if self.hook is not None:
             self.hook()
         return next(self.arrays)
+
+
+class TestV2DocumentIdDeduplication:
+    def test_deterministic_allocation_preserves_first_occurrence_and_values(self):
+        original = _snippet_frame(4)
+        original["doc_id"] = [
+            "snippet_returns",
+            "snippet_size",
+            "snippet_returns",
+            "snippet_returns",
+        ]
+        repaired = original.copy(deep=True)
+
+        repaired["doc_id"] = rag_demo._allocate_unique_document_ids(
+            repaired["doc_id"].tolist()
+        )
+
+        assert repaired["doc_id"].tolist() == [
+            "snippet_returns",
+            "snippet_size",
+            "snippet_returns__dup_2",
+            "snippet_returns__dup_3",
+        ]
+        pd.testing.assert_frame_equal(
+            repaired.drop(columns="doc_id"),
+            original.drop(columns="doc_id"),
+            check_exact=True,
+        )
+        assert repaired.index.equals(original.index)
+
+    def test_collision_avoidance_and_idempotence(self):
+        original_ids = [
+            "snippet_policy",
+            "snippet_policy",
+            "snippet_policy__dup_2",
+            "snippet_policy",
+        ]
+
+        repaired_ids = rag_demo._allocate_unique_document_ids(original_ids)
+
+        assert repaired_ids == [
+            "snippet_policy",
+            "snippet_policy__dup_3",
+            "snippet_policy__dup_2",
+            "snippet_policy__dup_4",
+        ]
+        assert len(repaired_ids) == len(set(repaired_ids))
+        assert rag_demo._allocate_unique_document_ids(repaired_ids) == repaired_ids
+
+    def test_mixed_builder_preserves_rows_qa_values_and_embedding_alignment(
+        self, monkeypatch
+    ):
+        qa = _qa_frame(3)
+        snippets = _snippet_frame(4)
+        snippets["doc_id"] = [
+            "snippet_delivery",
+            "snippet_returns",
+            "snippet_returns",
+            "snippet_returns",
+        ]
+        original = pd.concat([qa, snippets], ignore_index=True)
+        original_columns = original.columns.tolist()
+        original_attrs = copy.deepcopy(original.attrs)
+        embeddings = np.arange(len(original) * 3, dtype=np.float32).reshape(
+            len(original), 3
+        )
+        original_embeddings = embeddings.copy()
+        original_embedding_bytes = embeddings.tobytes()
+        qa_items = qa.to_dict(orient="records")
+        snippet_items = snippets.to_dict(orient="records")
+        monkeypatch.setattr(
+            rag_demo,
+            "build_qa_corpus_items",
+            lambda _path, _pd: copy.deepcopy(qa_items),
+        )
+        monkeypatch.setattr(
+            rag_demo,
+            "build_snippet_corpus_items",
+            lambda _path, _pd: copy.deepcopy(snippet_items),
+        )
+
+        repaired = rag_demo.build_mixed_corpus(
+            Path("synthetic-qa.csv"), Path("synthetic-snippets.csv"), pd
+        )
+
+        assert len(repaired) == len(original) == embeddings.shape[0]
+        assert repaired.columns.tolist() == original_columns
+        assert repaired.attrs == original_attrs
+        pd.testing.assert_frame_equal(
+            repaired.iloc[: len(qa)].reset_index(drop=True),
+            qa,
+            check_exact=True,
+        )
+        pd.testing.assert_frame_equal(
+            repaired.drop(columns="doc_id"),
+            original.drop(columns="doc_id"),
+            check_exact=True,
+        )
+        changed_positions = np.flatnonzero(
+            repaired["doc_id"].to_numpy() != original["doc_id"].to_numpy()
+        ).tolist()
+        assert changed_positions == [len(qa) + 2, len(qa) + 3]
+        assert repaired["doc_id"].tolist() == [
+            "qa_0",
+            "qa_1",
+            "qa_2",
+            "snippet_delivery",
+            "snippet_returns",
+            "snippet_returns__dup_2",
+            "snippet_returns__dup_3",
+        ]
+        assert repaired["doc_id"].map(
+            lambda doc_id: isinstance(doc_id, str) and bool(doc_id)
+        ).all()
+        assert repaired["doc_id"].is_unique
+        np.testing.assert_array_equal(embeddings, original_embeddings)
+        assert embeddings.tobytes() == original_embedding_bytes
 
 
 class TestB4ContractAndDiscovery:

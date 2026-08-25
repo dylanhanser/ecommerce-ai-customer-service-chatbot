@@ -1290,6 +1290,41 @@ def _resolve_qa_category(frame, pd):
     return pd.Series([CATEGORY_OTHER] * len(frame), index=frame.index)
 
 
+def _allocate_unique_document_ids(
+    document_ids: Iterable[object], *, immutable_prefix_count: int = 0
+) -> list[str]:
+    original_ids = list(document_ids)
+    if not 0 <= immutable_prefix_count <= len(original_ids):
+        raise ValueError("Immutable document-ID prefix is outside the corpus.")
+    if any(not isinstance(doc_id, str) or not doc_id for doc_id in original_ids):
+        raise ValueError("Document IDs must be nonempty strings.")
+
+    reserved_ids = set(original_ids)
+    allocated_ids: set[str] = set()
+    occurrence_by_id: dict[str, int] = {}
+    result: list[str] = []
+
+    for index, original_id in enumerate(original_ids):
+        occurrence = occurrence_by_id.get(original_id, 0) + 1
+        occurrence_by_id[original_id] = occurrence
+        if original_id not in allocated_ids:
+            allocated_ids.add(original_id)
+            result.append(original_id)
+            continue
+        if index < immutable_prefix_count:
+            raise ValueError("Duplicate document ID appears in the immutable prefix.")
+
+        candidate = f"{original_id}__dup_{occurrence}"
+        while not candidate or candidate in reserved_ids or candidate in allocated_ids:
+            occurrence += 1
+            candidate = f"{original_id}__dup_{occurrence}"
+        occurrence_by_id[original_id] = occurrence
+        allocated_ids.add(candidate)
+        result.append(candidate)
+
+    return result
+
+
 def build_qa_corpus_items(csv_path: Path, pd) -> list[dict]:
     frame = pd.read_csv(csv_path, encoding="utf-8-sig", dtype=str, keep_default_na=False)
     missing = {"final_question", "final_answer"}.difference(frame.columns)
@@ -1386,13 +1421,29 @@ def build_corpus(csv_path: Path, pd):
 def build_mixed_corpus(qa_csv_path: Path, snippets_csv_path: Path | None, pd):
     items = build_qa_corpus_items(qa_csv_path, pd)
     if snippets_csv_path is not None:
+        qa_item_count = len(items)
         snippet_items = build_snippet_corpus_items(snippets_csv_path, pd)
         items.extend(snippet_items)
+        allocated_ids = _allocate_unique_document_ids(
+            (item.get("doc_id") for item in items),
+            immutable_prefix_count=qa_item_count,
+        )
+        for index in range(qa_item_count, len(items)):
+            items[index]["doc_id"] = allocated_ids[index]
         print(
             f"Mixed corpus: {len(items) - len(snippet_items):,} QA + "
             f"{len(snippet_items):,} knowledge snippets"
         )
     corpus = pd.DataFrame(items).reset_index(drop=True)
+    if snippets_csv_path is not None:
+        document_ids = corpus["doc_id"].tolist()
+        if (
+            any(not isinstance(doc_id, str) or not doc_id for doc_id in document_ids)
+            or len(set(document_ids)) != len(document_ids)
+        ):
+            raise ValueError(
+                "Mixed corpus document IDs must be nonempty and globally unique."
+            )
     return corpus
 
 
