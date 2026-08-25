@@ -422,7 +422,7 @@ def _validate_authoritative_contract(contract: object) -> dict[str, Any]:
         if (
             type(contract["schema_version"]) is not int
             or contract["schema_version"] != 1
-            or contract["stage_id"] != "B2"
+            or contract["stage_id"] not in {"B2", "B5"}
         ):
             raise ProjectionError("B3_PRIVATE_STATE_INVALID")
         run_sha = _require_sha(
@@ -479,10 +479,14 @@ def _validate_authoritative_contract(contract: object) -> dict[str, Any]:
             ):
                 raise ProjectionError("B3_PRIVATE_STATE_INVALID")
             formal_ids.add(formal_id)
+        stage_id = contract["stage_id"]
         provider = contract["provider_generation_authority"]
-        if type(provider) is not dict or set(provider) != {
-            "generation", "transport", "offline_execution"
-        }:
+        expected_provider_fields = (
+            {"generation", "transport", "offline_execution"}
+            if stage_id == "B2"
+            else {"generation", "transport", "real_execution"}
+        )
+        if type(provider) is not dict or set(provider) != expected_provider_fields:
             raise ProjectionError("B3_PRIVATE_STATE_INVALID")
         generation = provider["generation"]
         if type(generation) is not dict or set(generation) != {
@@ -538,28 +542,150 @@ def _validate_authoritative_contract(contract: object) -> dict[str, Any]:
             raise ProjectionError("B3_PRIVATE_STATE_INVALID")
         for name in ("contract_id", "provider", "base_url", "provider_api"):
             _contract_string(transport_snapshot[name])
-        offline = provider["offline_execution"]
-        if type(offline) is not dict or set(offline) != {
-            "authority_bundle_id",
-            "clock_id",
-            "executor_registry_id",
-            "fake_raw_client_id",
-            "mode",
-            "snapshot_validator_id",
-            "test_fault_controller_id",
-        }:
-            raise ProjectionError("B3_PRIVATE_STATE_INVALID")
-        for value in offline.values():
-            _contract_string(value)
+        if stage_id == "B2":
+            execution = provider["offline_execution"]
+            if type(execution) is not dict or set(execution) != {
+                "authority_bundle_id",
+                "clock_id",
+                "executor_registry_id",
+                "fake_raw_client_id",
+                "mode",
+                "snapshot_validator_id",
+                "test_fault_controller_id",
+            }:
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+            for item in execution.values():
+                _contract_string(item)
+            if execution["mode"] not in {
+                "offline_fake_only",
+                "test_owned_eligible",
+            }:
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+        else:
+            execution = provider["real_execution"]
+            if type(execution) is not dict or set(execution) != {
+                "authority_bundle_id",
+                "client_adapter_id",
+                "client_transport",
+                "clock_id",
+                "executor_registry_id",
+                "mode",
+                "snapshot_validator_id",
+            }:
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+            for name in (
+                "authority_bundle_id",
+                "client_adapter_id",
+                "clock_id",
+                "executor_registry_id",
+                "mode",
+                "snapshot_validator_id",
+            ):
+                _contract_string(execution[name])
+            client_transport = execution["client_transport"]
+            if (
+                execution["mode"] != "production_real"
+                or type(client_transport) is not dict
+                or set(client_transport)
+                != {
+                    "base_url",
+                    "max_retries",
+                    "model",
+                    "sdk_distribution",
+                    "sdk_version",
+                    "timeout_seconds",
+                }
+                or client_transport["base_url"] != "https://api.deepseek.com"
+                or client_transport["model"] != "deepseek-chat"
+                or client_transport["max_retries"] != 0
+                or client_transport["timeout_seconds"] != 60.0
+            ):
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+            for name in ("base_url", "model", "sdk_distribution", "sdk_version"):
+                _contract_string(client_transport[name])
         runtime = contract["runtime_resource_authority"]
-        if type(runtime) is not dict or set(runtime) != {
-            "transport_implementation_sha256",
-            "runtime_identity_sha256",
-            "resources",
-        }:
+        expected_runtime_fields = (
+            {
+                "transport_implementation_sha256",
+                "runtime_identity_sha256",
+                "resources",
+            }
+            if stage_id == "B2"
+            else {
+                "b4_preflight",
+                "implementation_files",
+                "repository",
+                "resources",
+                "runtime_identity_sha256",
+                "transport_implementation_sha256",
+            }
+        )
+        if type(runtime) is not dict or set(runtime) != expected_runtime_fields:
             raise ProjectionError("B3_PRIVATE_STATE_INVALID")
         _require_sha(runtime["transport_implementation_sha256"], "B3_PRIVATE_STATE_INVALID")
         _require_sha(runtime["runtime_identity_sha256"], "B3_PRIVATE_STATE_INVALID")
+        if stage_id == "B5":
+            b4 = runtime["b4_preflight"]
+            if type(b4) is not dict or set(b4) != {
+                "artifact_path",
+                "artifact_sha256",
+                "authority_files",
+                "contract_id",
+                "embedding_model",
+                "preflight_sha256",
+                "resource_families",
+                "stage_id",
+                "status",
+            }:
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+            if (
+                b4["artifact_path"]
+                != "data/formal_eval/resource_preflight/production_resource_preflight_v1.json"
+                or b4["contract_id"] != "formal_production_resource_preflight_v1"
+                or b4["stage_id"] != "B4"
+                or b4["status"] != "passed"
+                or type(b4["authority_files"]) is not list
+                or not b4["authority_files"]
+                or type(b4["resource_families"]) is not list
+                or len(b4["resource_families"]) != 2
+                or type(b4["embedding_model"]) is not dict
+            ):
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+            _require_sha(b4["artifact_sha256"], "B3_PRIVATE_STATE_INVALID")
+            _require_sha(b4["preflight_sha256"], "B3_PRIVATE_STATE_INVALID")
+            implementation_files = runtime["implementation_files"]
+            expected_paths = (
+                "scripts/formal_evaluation_real_execution.py",
+                "scripts/run_formal_evaluation.py",
+                "scripts/formal_evaluation_orchestration.py",
+                "scripts/formal_evaluation_store.py",
+                "scripts/formal_evaluation_runtime.py",
+                "scripts/formal_evaluation_transport.py",
+                "scripts/formal_qa_only_baseline/adapter.py",
+                "scripts/formal_evaluation_review_projection.py",
+            )
+            if type(implementation_files) is not list or len(implementation_files) != 8:
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+            for item, expected_path in zip(implementation_files, expected_paths):
+                if (
+                    type(item) is not dict
+                    or set(item) != {"byte_count", "path", "sha256"}
+                    or item["path"] != expected_path
+                    or type(item["byte_count"]) is not int
+                    or item["byte_count"] < 1
+                ):
+                    raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+                _require_sha(item["sha256"], "B3_PRIVATE_STATE_INVALID")
+            repository = runtime["repository"]
+            if (
+                type(repository) is not dict
+                or set(repository) != {"branch", "commit"}
+                or repository["branch"] != "main"
+                or type(repository["commit"]) is not str
+                or re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", repository["commit"])
+                is None
+            ):
+                raise ProjectionError("B3_PRIVATE_STATE_INVALID")
         resources = runtime["resources"]
         if type(resources) is not dict or set(resources) != set(_SYSTEM_COUNTS):
             raise ProjectionError("B3_PRIVATE_STATE_INVALID")
@@ -634,9 +760,19 @@ def _validate_authoritative_contract(contract: object) -> dict[str, Any]:
 
 
 def _apply_source_eligibility_gate(contract: Mapping[str, Any]) -> None:
-    offline = contract["provider_generation_authority"]["offline_execution"]
+    provider = contract["provider_generation_authority"]
+    execution = provider.get("real_execution", provider.get("offline_execution"))
     resources = contract["runtime_resource_authority"]["resources"]
-    if offline["mode"] == "offline_fake_only" or any(
+    eligible_mode = (
+        contract.get("stage_id") == "B5"
+        and type(execution) is dict
+        and execution.get("mode") == "production_real"
+    ) or (
+        contract.get("stage_id") == "B2"
+        and type(execution) is dict
+        and execution.get("mode") == "test_owned_eligible"
+    )
+    if not eligible_mode or any(
         resources[system]["resource_identity"]["synthetic"] is True
         for system in sorted(_SYSTEM_COUNTS)
     ):
@@ -2543,6 +2679,41 @@ def _publish_material(material: _ProjectionMaterial) -> ReviewerProjectionOutcom
         )
 
 
+def _selected_run_contract(plan: list[dict[str, Any]]) -> Mapping[str, Any]:
+    """Rebuild an existing B5 contract; retain the exact B2 fake default."""
+
+    path = _stage_b2_store._PRIVATE_STATE_ROOT / "run_contract.json"
+    if not path.exists():
+        return build_durable_run_contract(plan)
+    try:
+        info = path.lstat()
+        if (
+            stat.S_ISLNK(info.st_mode)
+            or not stat.S_ISREG(info.st_mode)
+            or info.st_size <= 0
+            or info.st_size > 131_072
+        ):
+            raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+        raw = path.read_bytes()
+        if len(raw) != info.st_size:
+            raise ProjectionError("B3_PRIVATE_STATE_INVALID")
+        value = _load_canonical_json_bytes(raw, maximum=131_072)
+    except ProjectionError as exc:
+        raise ProjectionError("B3_PRIVATE_STATE_INVALID") from exc
+    except OSError as exc:
+        raise ProjectionError("B3_PRIVATE_STATE_INVALID") from exc
+    if value.get("stage_id") != "B5":
+        return build_durable_run_contract(plan)
+    try:
+        from formal_evaluation_real_execution import (
+            rebuild_real_run_contract_from_stored,
+        )
+
+        return rebuild_real_run_contract_from_stored(plan, value)
+    except Exception as exc:
+        raise ProjectionError("B3_PRIVATE_STATE_INVALID") from exc
+
+
 def project_blinded_reviewer_outputs() -> ReviewerProjectionOutcome:
     """Project the complete eligible canonical run to the fixed B3 tree."""
 
@@ -2557,7 +2728,7 @@ def project_blinded_reviewer_outputs() -> ReviewerProjectionOutcome:
     ):
         raise ProjectionError("B3_PRIVATE_STATE_INVALID")
     contract = _validate_authoritative_contract(
-        dict(build_durable_run_contract(plan))
+        dict(_selected_run_contract(plan))
     )
     _apply_source_eligibility_gate(contract)
     results = observe_validated_canonical_private_results(plan)

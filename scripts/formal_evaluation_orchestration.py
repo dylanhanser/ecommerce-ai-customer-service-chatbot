@@ -265,6 +265,77 @@ class SyntheticResourceBundle:
 
 
 @dataclass(frozen=True)
+class ProductionResourceBundle:
+    """Closed, validated production identities for all four formal systems."""
+
+    resources: Mapping[str, ProductionResourceIdentity]
+
+    def __post_init__(self) -> None:
+        validate_registry()
+        if not isinstance(self.resources, Mapping) or set(self.resources) != set(
+            SYSTEM_CONFIG_IDS
+        ):
+            raise OrchestrationError("PRODUCTION_RESOURCE_BUNDLE_INVALID")
+        checked: dict[str, ProductionResourceIdentity] = {}
+        for config_id in SYSTEM_CONFIG_IDS:
+            resource = self.resources.get(config_id)
+            try:
+                validate_resource_identity(resource)
+            except TransportError as exc:
+                raise OrchestrationError(exc.category) from exc
+            if (
+                type(resource) is not ProductionResourceIdentity
+                or resource.synthetic
+                or resource.resource_type != "production_frozen"
+                or resource.system_config_id != config_id
+                or resource.formal_system_id
+                != formal_identity(config_id).formal_system_id
+            ):
+                raise OrchestrationError("PRODUCTION_RESOURCE_BUNDLE_INVALID")
+            checked[config_id] = resource
+        object.__setattr__(self, "resources", MappingProxyType(checked))
+
+    @classmethod
+    def from_mappings(
+        cls, value: Mapping[str, Mapping[str, Any]]
+    ) -> "ProductionResourceBundle":
+        validate_registry()
+        if type(value) is not dict or set(value) != set(SYSTEM_CONFIG_IDS):
+            raise OrchestrationError("PRODUCTION_RESOURCE_BUNDLE_INVALID")
+        checked: dict[str, ProductionResourceIdentity] = {}
+        for config_id in SYSTEM_CONFIG_IDS:
+            try:
+                resource = ProductionResourceIdentity.from_mapping(value[config_id])
+                validate_resource_identity(resource)
+            except (TransportError, TypeError) as exc:
+                category = getattr(
+                    exc, "category", "PRODUCTION_RESOURCE_BUNDLE_INVALID"
+                )
+                raise OrchestrationError(category) from exc
+            if (
+                resource.synthetic
+                or resource.resource_type != "production_frozen"
+                or resource.system_config_id != config_id
+                or resource.formal_system_id
+                != formal_identity(config_id).formal_system_id
+            ):
+                raise OrchestrationError("PRODUCTION_RESOURCE_BUNDLE_INVALID")
+            checked[config_id] = resource
+        return cls(MappingProxyType(checked))
+
+    def resource_for(self, system_config_id: str) -> ProductionResourceIdentity:
+        if system_config_id not in SYSTEM_CONFIG_IDS:
+            raise OrchestrationError("UNKNOWN_FORMAL_SYSTEM")
+        resource = self.resources.get(system_config_id)
+        if type(resource) is not ProductionResourceIdentity:
+            raise OrchestrationError("PRODUCTION_RESOURCE_BUNDLE_INVALID")
+        validate_resource_identity(resource)
+        if resource.synthetic or resource.system_config_id != system_config_id:
+            raise OrchestrationError("PRODUCTION_RESOURCE_BUNDLE_INVALID")
+        return resource
+
+
+@dataclass(frozen=True)
 class ExecutorContext:
     """Closed input supplied to one injected offline executor."""
 
@@ -398,6 +469,9 @@ class _RawClientBoundary:
             raise OrchestrationError("JOURNAL_CALL_START_NOT_PERSISTED")
         self.call_count = 1
         try:
+            binder = getattr(self.fake_raw_client, "bind_provider_request_id", None)
+            if callable(binder):
+                binder(self.provider_request_id)
             create = getattr(self.fake_raw_client, "create", None)
             return (
                 create(**request)
@@ -875,7 +949,7 @@ def orchestrate_validated_unit(
 def _orchestrate_plan_member(
     unit: Mapping[str, Any],
     *,
-    resources: SyntheticResourceBundle,
+    resources: SyntheticResourceBundle | ProductionResourceBundle,
     executors: ExecutorRegistry,
     fake_raw_client: Any,
     clock: Callable[[], str],
@@ -906,7 +980,9 @@ def _orchestrate_plan_member(
         validate_sha256(runtime_identity_sha256, "RUNTIME_IDENTITY_INVALID")
     except TransportError as exc:
         raise OrchestrationError(exc.category) from exc
-    if type(resources) is not SyntheticResourceBundle or type(executors) is not ExecutorRegistry:
+    if type(resources) not in {SyntheticResourceBundle, ProductionResourceBundle} or type(
+        executors
+    ) is not ExecutorRegistry:
         raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
     if journal_persistence_callback is not None and not callable(
         journal_persistence_callback

@@ -60,6 +60,7 @@ _PRODUCTION_PRIVATE_STATE_ROOT = (
     _REPOSITORY_ROOT / "data" / "formal_eval" / "private_state"
 )
 _PRIVATE_STATE_ROOT = _PRODUCTION_PRIVATE_STATE_ROOT
+_PREFIX_LOCK_CONTEXT = threading.local()
 _PLAN_FINGERPRINT = (
     "4d8b22f755d3906762a9d680700fa87fc91155aeceb33e7bce9bb293067f78a5"
 )
@@ -548,6 +549,45 @@ class DurableExecutionOutcome:
                 raise ValueError
         except (TypeError, ValueError) as exc:
             raise ValueError("invalid DurableExecutionOutcome") from exc
+
+
+@dataclass(frozen=True)
+class DurablePrefixOutcome:
+    """Aggregate result of one contiguous-prefix invocation."""
+
+    schema_version: int
+    action: str
+    new_successes: int
+    block_category: str | None
+    progress: DurableProgress
+
+    def __post_init__(self) -> None:
+        valid_actions = {"ready", "prefix_paused", "blocked", "run_complete"}
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version != 1
+            or self.action not in valid_actions
+            or type(self.new_successes) is not int
+            or not 0 <= self.new_successes <= 190
+            or type(self.progress) is not DurableProgress
+            or (
+                self.block_category is not None
+                and (
+                    type(self.block_category) is not str
+                    or not self.block_category
+                    or len(self.block_category) > 64
+                )
+            )
+            or (self.action == "blocked") != (self.block_category is not None)
+            or (self.action == "run_complete")
+            != (self.progress.run_state == "complete")
+            or (
+                self.action in {"ready", "prefix_paused"}
+                and self.progress.run_state != "in_progress"
+            )
+            or (self.action == "ready" and self.new_successes != 0)
+        ):
+            raise ValueError("invalid DurablePrefixOutcome")
 
 
 def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -1290,8 +1330,53 @@ def _validate_run_contract_shape(value: Mapping[str, Any]) -> None:
         raise StoreError("STORE_SCHEMA_INVALID")
     if type(value["schema_version"]) is not int or value["schema_version"] != 1:
         raise StoreError("STORE_SCHEMA_INVALID")
-    if value["stage_id"] != "B2":
+    if value["stage_id"] not in {"B2", "B5"}:
         raise StoreError("STORE_SCHEMA_INVALID")
+    if value["stage_id"] == "B5":
+        provider = value.get("provider_generation_authority")
+        runtime = value.get("runtime_resource_authority")
+        if (
+            type(provider) is not dict
+            or set(provider) != {"generation", "transport", "real_execution"}
+            or type(provider.get("real_execution")) is not dict
+            or provider["real_execution"].get("mode") != "production_real"
+            or type(runtime) is not dict
+            or set(runtime)
+            != {
+                "b4_preflight",
+                "implementation_files",
+                "repository",
+                "resources",
+                "runtime_identity_sha256",
+                "transport_implementation_sha256",
+            }
+            or type(runtime.get("resources")) is not dict
+            or set(runtime["resources"])
+            != {
+                "qa_only_reconstructed_baseline",
+                "v2",
+                "single_turn",
+                "context_aware",
+            }
+        ):
+            raise StoreError("STORE_SCHEMA_INVALID")
+        try:
+            for wrapper in runtime["resources"].values():
+                resource = ProductionResourceIdentity.from_mapping(
+                    wrapper["resource_identity"]
+                )
+                validate_resource_identity(resource)
+                if (
+                    resource.synthetic
+                    or resource.resource_type != "production_frozen"
+                    or wrapper["resource_identity_sha256"]
+                    != resource_identity_sha256(resource)
+                ):
+                    raise StoreError("STORE_SCHEMA_INVALID")
+        except StoreError:
+            raise
+        except (KeyError, TypeError, TransportError) as exc:
+            raise StoreError("STORE_SCHEMA_INVALID") from exc
     try:
         _require_sha(value["run_contract_sha256"])
     except ValueError as exc:
@@ -3199,7 +3284,22 @@ def _validate_rq3_relationship(
     if type(value["checkpoint_evidence"]) is not dict:
         raise StoreError("STORE_COMMIT_INVALID")
     try:
-        from run_formal_evaluation import _validate_fixed_synthetic_snapshot_v1
+        if run_contract["stage_id"] == "B2":
+            from run_formal_evaluation import _validate_fixed_synthetic_snapshot_v1
+
+            snapshot_validator = _validate_fixed_synthetic_snapshot_v1
+        elif (
+            run_contract["stage_id"] == "B5"
+            and run_contract["provider_generation_authority"]["real_execution"][
+                "mode"
+            ]
+            == "production_real"
+        ):
+            from formal_evaluation_runtime import restore_runtime_snapshot
+
+            snapshot_validator = restore_runtime_snapshot
+        else:
+            raise KeyError("unknown execution authority")
 
         checkpoint = validate_checkpoint_evidence(
             value["checkpoint_evidence"],
@@ -3209,7 +3309,7 @@ def _validate_rq3_relationship(
             runtime_identity_sha256=run_contract["runtime_resource_authority"][
                 "runtime_identity_sha256"
             ],
-            snapshot_validator=_validate_fixed_synthetic_snapshot_v1,
+            snapshot_validator=snapshot_validator,
         )
     except (OrchestrationError, KeyError, TypeError) as exc:
         category = (
@@ -3861,6 +3961,19 @@ def _open_store(
     _validate_run_contract_shape(
         json.loads(_canonical_bytes(expected_contract))
     )
+    active = getattr(_PREFIX_LOCK_CONTEXT, "active", None)
+    if active is not None:
+        if (
+            type(active) is not tuple
+            or len(active) != 2
+            or type(active[0]) is not dict
+            or type(active[1]) is not _RunWideLock
+            or active[0] != dict(expected_contract)
+        ):
+            raise StoreError("STORE_LOCK_BUSY")
+        active[1].require_active()
+        yield active
+        return
     with _RunWideLock(_PRIVATE_STATE_ROOT) as lock:
         contract = _open_contract_locked(expected_contract, lock)
         _ensure_fixed_directories(lock.root)
@@ -4044,6 +4157,81 @@ def _block_category(journal: InflightJournal) -> str:
     if journal.state == "retryable_failed" and journal.identity.attempt_number == 3:
         return "attempts_exhausted"
     raise StoreError("STORE_SCHEMA_INVALID")
+
+
+def _contiguous_prefix_outcome_locked(
+    plan: list[dict[str, Any]],
+    *,
+    run_contract: Mapping[str, Any],
+    lock: _RunWideLock,
+    new_successes: int = 0,
+) -> DurablePrefixOutcome:
+    """Validate the exact successful prefix without making later units eligible."""
+
+    progress = _derive_durable_progress_locked(
+        plan, run_contract=run_contract, lock=lock
+    )
+    prefix = 0
+    first_non_success: tuple[
+        str, _UnitState, dict[str, Any] | None, Mapping[str, Any]
+    ] | None = None
+    gap_seen = False
+    for unit in plan:
+        category, state, commit = _unit_category_locked(
+            plan, unit, run_contract=run_contract, lock=lock
+        )
+        if category == "successful":
+            if gap_seen:
+                raise StoreError("STORE_COMMIT_INVALID")
+            prefix += 1
+            continue
+        gap_seen = True
+        if first_non_success is None:
+            first_non_success = (category, state, commit, unit)
+    if prefix != progress.total_successful_units:
+        raise StoreError("STORE_COMMIT_INVALID")
+    if prefix == 190:
+        if first_non_success is not None or progress.run_state != "complete":
+            raise StoreError("STORE_SCHEMA_INVALID")
+        return DurablePrefixOutcome(1, "run_complete", new_successes, None, progress)
+    if first_non_success is None:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    category, state, _commit, unit = first_non_success
+    if unit["execution_order"] != prefix + 1:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    if category in {
+        "initial-executable",
+        "same-attempt-continuable",
+        "retry-constructible",
+    }:
+        return DurablePrefixOutcome(
+            1,
+            "ready" if new_successes == 0 else "prefix_paused",
+            new_successes,
+            None,
+            progress,
+        )
+    if category == "dependency-blocked":
+        block = "dependency_missing"
+    elif category == "permanently-non-executable":
+        dependency_permanent = (
+            unit["rq"] == "RQ3"
+            and unit["system_config_id"] == "context_aware"
+            and unit["turn_index"] == 2
+            and state.tip is None
+        )
+        block = (
+            "dependency_permanent"
+            if dependency_permanent
+            else _block_category(state.tip.journal)
+            if state.tip is not None
+            else None
+        )
+        if block is None:
+            raise StoreError("STORE_SCHEMA_INVALID")
+    else:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    return DurablePrefixOutcome(1, "blocked", new_successes, block, progress)
 
 
 def _retry_predecessor(state: _UnitState) -> InflightJournal | None:
@@ -4377,4 +4565,161 @@ def _orchestrate_durable_offline_unit(
             orchestration.provider_call_count,
             orchestration,
             progress,
+        )
+
+
+def _real_prefix_progress(
+    plan: list[dict[str, Any]],
+    expected_contract: Mapping[str, Any],
+) -> DurablePrefixOutcome:
+    """Create/reopen the store and validate the real contiguous-prefix boundary."""
+
+    if (
+        type(expected_contract) is not dict
+        or expected_contract.get("stage_id") != "B5"
+        or expected_contract.get("provider_generation_authority", {})
+        .get("real_execution", {})
+        .get("mode")
+        != "production_real"
+    ):
+        raise StoreError("STORE_RUN_CONTRACT_MISMATCH")
+    with _open_store(expected_contract) as (contract, lock):
+        return _contiguous_prefix_outcome_locked(
+            plan, run_contract=contract, lock=lock
+        )
+
+
+@contextmanager
+def _real_prefix_invocation(
+    plan: list[dict[str, Any]],
+    expected_contract: Mapping[str, Any],
+) -> Iterator[DurablePrefixOutcome]:
+    """Hold the run-wide lock from progress authorization through execution."""
+
+    if (
+        type(expected_contract) is not dict
+        or expected_contract.get("stage_id") != "B5"
+        or expected_contract.get("provider_generation_authority", {})
+        .get("real_execution", {})
+        .get("mode")
+        != "production_real"
+    ):
+        raise StoreError("STORE_RUN_CONTRACT_MISMATCH")
+    if getattr(_PREFIX_LOCK_CONTEXT, "active", None) is not None:
+        raise StoreError("STORE_LOCK_BUSY")
+    with _open_store(expected_contract) as (contract, lock):
+        _PREFIX_LOCK_CONTEXT.active = (contract, lock)
+        try:
+            yield _contiguous_prefix_outcome_locked(
+                plan, run_contract=contract, lock=lock
+            )
+        finally:
+            del _PREFIX_LOCK_CONTEXT.active
+
+
+def _orchestrate_durable_prefix_locked(
+    plan: list[dict[str, Any]],
+    *,
+    contract: dict[str, Any],
+    lock: _RunWideLock,
+    authority: Any,
+    max_new_successes: int,
+) -> DurablePrefixOutcome:
+    state = _contiguous_prefix_outcome_locked(
+        plan, run_contract=contract, lock=lock
+    )
+    if state.action in {"blocked", "run_complete"}:
+        return state
+    new_successes = 0
+    while new_successes < max_new_successes:
+        selected_order = state.progress.total_successful_units + 1
+        selected = next(
+            (
+                unit
+                for unit in plan
+                if unit["execution_order"] == selected_order
+            ),
+            None,
+        )
+        if selected is None:
+            raise StoreError("STORE_SCHEMA_INVALID")
+        outcome = _orchestrate_durable_offline_unit(
+            plan,
+            selected,
+            expected_contract=contract,
+            authority=authority,
+        )
+        if outcome.action == "completed":
+            new_successes += 1
+        elif outcome.action not in {"advanced", "retry_constructed"}:
+            state = _contiguous_prefix_outcome_locked(
+                plan,
+                run_contract=contract,
+                lock=lock,
+                new_successes=new_successes,
+            )
+            if state.action != "blocked":
+                raise StoreError("STORE_SCHEMA_INVALID")
+            return state
+        state = _contiguous_prefix_outcome_locked(
+            plan,
+            run_contract=contract,
+            lock=lock,
+            new_successes=new_successes,
+        )
+        if state.action in {"blocked", "run_complete"}:
+            return state
+    if state.action != "prefix_paused":
+        raise StoreError("STORE_SCHEMA_INVALID")
+    return state
+
+
+def _orchestrate_durable_prefix(
+    plan: list[dict[str, Any]],
+    *,
+    expected_contract: Mapping[str, Any],
+    authority: Any,
+    max_new_successes: int,
+) -> DurablePrefixOutcome:
+    """Execute only the next contiguous units while holding one run-wide lock."""
+
+    if type(max_new_successes) is not int or not 1 <= max_new_successes <= 190:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    if (
+        type(expected_contract) is not dict
+        or expected_contract.get("stage_id") != "B5"
+        or expected_contract.get("provider_generation_authority", {})
+        .get("real_execution", {})
+        .get("mode")
+        != "production_real"
+    ):
+        raise StoreError("STORE_RUN_CONTRACT_MISMATCH")
+    active = getattr(_PREFIX_LOCK_CONTEXT, "active", None)
+    if active is not None:
+        if (
+            type(active) is not tuple
+            or len(active) != 2
+            or type(active[0]) is not dict
+            or type(active[1]) is not _RunWideLock
+            or active[0] != dict(expected_contract)
+        ):
+            raise StoreError("STORE_LOCK_BUSY")
+        active[1].require_active()
+        return _orchestrate_durable_prefix_locked(
+            plan,
+            contract=active[0],
+            lock=active[1],
+            authority=authority,
+            max_new_successes=max_new_successes,
+        )
+    with _real_prefix_invocation(plan, expected_contract):
+        active = getattr(_PREFIX_LOCK_CONTEXT, "active", None)
+        if active is None:
+            raise StoreError("STORE_LOCK_BUSY")
+        return _orchestrate_durable_prefix_locked(
+            plan,
+            contract=active[0],
+            lock=active[1],
+            authority=authority,
+            max_new_successes=max_new_successes,
         )

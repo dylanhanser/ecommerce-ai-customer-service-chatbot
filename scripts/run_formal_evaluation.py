@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Deterministic, offline-safe runner for the frozen formal evaluation.
+"""Deterministic runner for the frozen formal evaluation.
 
 Dry-run deliberately produces marker strings, never customer-service answers.
-The real transport is intentionally a guarded stub until separately authorised.
+Real execution is available only behind the separately authorised Stage B5
+non-secret gates and bounded contiguous-prefix authority.
 """
 from __future__ import annotations
 
@@ -745,6 +746,14 @@ def build_durable_run_contract(
  return contract
 
 
+def build_production_real_run_contract(
+ plan: list[dict[str,Any]], evidence: Any, repository: Any,
+ client_transport: Mapping[str,Any],
+) -> Mapping[str,Any]:
+ from formal_evaluation_real_execution import build_real_run_contract
+ return build_real_run_contract(plan,evidence,repository,client_transport)
+
+
 def durable_progress(
  plan: list[dict[str,Any]],
 ) -> DurableProgress:
@@ -1009,18 +1018,48 @@ def prepare(directory: Path, *, max_new_successes: int | None=None) -> dict[str,
  write_json(directory/"run_manifest.json",manifest); write_jsonl(directory/"execution_events.jsonl",[{"request_id":r["request_id"],"execution_status":r["execution_status"],"transport":"fake"} for r in responses]); return manifest
 def real_gate(args: argparse.Namespace) -> None:
  if args.mode!="real": return
- if args.confirm_real_api!=CONFIRM or not clean_worktree(): raise Blocked("BLOCKED REAL MODE GATE")
- verify_frozen()
- if (args.output/"responses.jsonl").exists(): raise Blocked("BLOCKED REAL RESULTS ALREADY EXIST")
- # load_dotenv may only be reached beyond all gates; real transport remains intentionally not implemented.
- raise Blocked("BLOCKED REAL TRANSPORT NOT ENABLED IN THIS DRY-RUN BUILD")
+ if (args.confirm_real_api!=CONFIRM or args.max_new_successes is None
+     or type(args.expected_b4_preflight_sha256) is not str
+     or re.fullmatch(r"[0-9a-f]{64}",args.expected_b4_preflight_sha256) is None
+     or args.output!=ROOT/"data/formal_eval/dry_run"):
+  raise Blocked("B5_AUTHORIZATION_BLOCKED")
 def positive_int(value: str) -> int:
  try: parsed=int(value)
  except ValueError as exc: raise argparse.ArgumentTypeError("must be a positive integer") from exc
  if parsed<=0: raise argparse.ArgumentTypeError("must be a positive integer")
  return parsed
 def main(argv=None) -> int:
- p=argparse.ArgumentParser(); p.add_argument("--mode",choices=("dry-run","real"),default="dry-run"); p.add_argument("--confirm-real-api"); p.add_argument("--output",type=Path,default=ROOT/"data/formal_eval/dry_run"); p.add_argument("--max-new-successes",type=positive_int); a=p.parse_args(argv)
+ p=argparse.ArgumentParser(); p.add_argument("--mode",choices=("dry-run","real"),default="dry-run"); p.add_argument("--confirm-real-api"); p.add_argument("--expected-b4-preflight-sha256"); p.add_argument("--output",type=Path,default=ROOT/"data/formal_eval/dry_run"); p.add_argument("--max-new-successes",type=positive_int); a=p.parse_args(argv)
+ if a.mode=="real":
+  try:
+   real_gate(a)
+  except Blocked as exc:
+   print(str(exc),file=sys.stderr); return 2
+  try:
+   from formal_evaluation_real_execution import (
+    RealExecutionError, aggregate_success_line, execute_guarded_real_prefix,
+    validate_repository_gate,
+   )
+   repository=validate_repository_gate()
+   plan=build_plan()
+   outcome=execute_guarded_real_prefix(
+    plan,
+    confirmation=a.confirm_real_api,
+    expected_b4_preflight_sha256=a.expected_b4_preflight_sha256,
+    max_new_successes=a.max_new_successes,
+    output_path=a.output,
+    repository_gate=lambda: repository,
+   )
+   print(aggregate_success_line(outcome))
+   return 0
+  except KeyboardInterrupt:
+   return 130
+  except RealExecutionError as exc:
+   print(exc.category,file=sys.stderr); return 2
+  except Blocked:
+   print("B5_FROZEN_PLAN_INVALID",file=sys.stderr); return 2
+  except Exception:
+   print("B5_INTERNAL_FAILURE",file=sys.stderr); return 2
  try:
   real_gate(a); manifest=prepare(a.output,max_new_successes=a.max_new_successes); print(f"DRY-RUN: frozen plan contains 190 units; this invocation added {manifest['invocation_new_successes']} new successes; total locked successes is {manifest['total_locked_successes']}; remaining units is {manifest['remaining_units']}; no API or model execution")
  except Blocked as e: print(str(e),file=sys.stderr); return 2
