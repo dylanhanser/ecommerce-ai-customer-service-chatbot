@@ -223,7 +223,8 @@ class _ControlState:
         safe_environment.update(configured)
         self.original_environment = dict(os.environ)
         self.original_cwd = os.getcwd()
-        self.original_socket = socket.socket
+        original_socket_type = socket.socket
+        self.original_socket = original_socket_type
         self.original_create_connection = socket.create_connection
         self.original_getaddrinfo = socket.getaddrinfo
 
@@ -231,10 +232,14 @@ class _ControlState:
             self.network_attempt_count += 1
             raise _OfflineAttempt()
 
+        class guarded_socket(original_socket_type):  # type: ignore[misc, valid-type]
+            def __new__(cls, *args: object, **kwargs: object) -> object:
+                return blocked(*args, **kwargs)
+
         os.environ.clear()
         os.environ.update(safe_environment)
         os.chdir(resolved_root)
-        socket.socket = blocked  # type: ignore[assignment]
+        socket.socket = guarded_socket
         socket.create_connection = blocked  # type: ignore[assignment]
         socket.getaddrinfo = blocked  # type: ignore[assignment]
         self.stdout_context = contextlib.redirect_stdout(self.stdout_sink)

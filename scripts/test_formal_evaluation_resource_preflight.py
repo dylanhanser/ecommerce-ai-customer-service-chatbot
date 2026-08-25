@@ -372,7 +372,13 @@ def isolated_offline_boundary(monkeypatch, request):
         network_calls["count"] += 1
         raise AssertionError("network access is forbidden")
 
-    monkeypatch.setattr(socket, "socket", forbidden_network)
+    original_socket_type = socket.socket
+
+    class ForbiddenSocket(original_socket_type):
+        def __new__(cls, *args, **kwargs):
+            return forbidden_network(*args, **kwargs)
+
+    monkeypatch.setattr(socket, "socket", ForbiddenSocket)
     monkeypatch.setattr(socket, "create_connection", forbidden_network)
     monkeypatch.setattr(socket, "getaddrinfo", forbidden_network)
     yield network_calls
@@ -1014,7 +1020,12 @@ class TestB4DependencyBoundary:
             assert Path.cwd() == root.resolve()
             assert os.environ["HF_HUB_OFFLINE"] == "1"
             assert _under(Path(os.environ["HF_HOME"]), root.resolve())
-            assert socket.socket.__name__ == "blocked"
+            assert isinstance(socket.socket, type)
+
+            class ImportCompatibleSocket(socket.socket):
+                pass
+
+            assert issubclass(ImportCompatibleSocket, socket.socket)
             observed.append(name)
             if name == "numpy":
                 return np
@@ -1032,6 +1043,71 @@ class TestB4DependencyBoundary:
         )
         assert value["status"] == "passed"
         assert observed[0] == "numpy"
+
+    def test_worker_socket_controls_are_type_compatible_block_and_restore(
+        self, tmp_path
+    ):
+        root = tmp_path / "worker"
+        root.mkdir()
+        originals = (
+            socket.socket,
+            socket.create_connection,
+            socket.getaddrinfo,
+        )
+        controls = worker._ControlState(
+            root,
+            source_environment={"PATH": os.environ.get("PATH", "")},
+        )
+
+        with pytest.raises(RuntimeError, match="^synthetic control exit$"):
+            with controls:
+                assert isinstance(socket.socket, type)
+
+                class ImportCompatibleSocket(socket.socket):
+                    pass
+
+                assert issubclass(ImportCompatibleSocket, socket.socket)
+                for operation in (
+                    socket.socket,
+                    ImportCompatibleSocket,
+                    lambda: socket.create_connection(("synthetic.invalid", 443)),
+                    lambda: socket.getaddrinfo("synthetic.invalid", 443),
+                ):
+                    with pytest.raises(worker._OfflineAttempt):
+                        operation()
+                assert controls.network_attempt_count == 4
+                raise RuntimeError("synthetic control exit")
+
+        assert controls.network_attempt_count == 4
+        assert socket.socket is originals[0]
+        assert socket.create_connection is originals[1]
+        assert socket.getaddrinfo is originals[2]
+
+    def test_worker_model_dependencies_import_with_type_compatible_guard(
+        self, tmp_path
+    ):
+        root = tmp_path / "worker"
+        root.mkdir()
+        source_environment = {
+            name: value
+            for name in preflight._WORKER_INHERITED_ENV_NAMES
+            if (value := os.environ.get(name))
+        }
+        controls = worker._ControlState(
+            root,
+            source_environment=source_environment,
+        )
+
+        with controls:
+            imported_numpy, cosine_similarity, sentence_transformer = (
+                worker._import_model_dependencies(None)
+            )
+            assert imported_numpy is np
+            assert callable(cosine_similarity)
+            assert callable(sentence_transformer)
+            assert controls.network_attempt_count == 0
+
+        assert controls.network_attempt_count == 0
 
     def test_worker_dependency_import_failure_maps_only_to_b4_dependency_unavailable(self, tmp_path):
         root = tmp_path / "worker"
