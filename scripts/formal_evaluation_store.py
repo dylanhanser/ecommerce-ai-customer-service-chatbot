@@ -75,6 +75,7 @@ _TEMP_NAME_RE = re.compile(r"^\.(?P<target>.{1,180})\.[0-9a-f]{32}\.tmp$")
 _FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 _MOVEFILE_REPLACE_EXISTING = 0x1
 _MOVEFILE_WRITE_THROUGH = 0x8
+_WINDOWS_MAX_PATH = 260
 _RUN_CONTRACT_LIMIT = 131_072
 _JOURNAL_LIMIT = 524_288
 _ARCHIVE_LIMIT = 524_288
@@ -676,9 +677,98 @@ def _load_json_bytes(raw: bytes, maximum: int) -> dict[str, Any]:
     return value
 
 
+def _os_io_path(path: Path) -> Path | str:
+    """Return an extended Windows path only for the immediate I/O call."""
+    if os.name != "nt":
+        return path
+    raw = os.fspath(path)
+    if raw.startswith("\\\\?\\"):
+        return raw
+    if not path.is_absolute():
+        return path
+    absolute = os.path.abspath(raw)
+    if len(absolute) < _WINDOWS_MAX_PATH:
+        return path
+    if absolute.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + absolute[2:]
+    return "\\\\?\\" + absolute
+
+
+def _path_exists(path: Path) -> bool:
+    io_path = _os_io_path(path)
+    return path.exists() if io_path is path else os.path.exists(io_path)
+
+
+def _path_is_dir(path: Path) -> bool:
+    io_path = _os_io_path(path)
+    return path.is_dir() if io_path is path else os.path.isdir(io_path)
+
+
+def _path_is_file(path: Path) -> bool:
+    io_path = _os_io_path(path)
+    return path.is_file() if io_path is path else os.path.isfile(io_path)
+
+
+def _path_lstat(path: Path) -> os.stat_result:
+    io_path = _os_io_path(path)
+    return path.lstat() if io_path is path else os.lstat(io_path)
+
+
+def _path_iterdir(path: Path) -> Iterator[Path]:
+    io_path = _os_io_path(path)
+    if io_path is path:
+        return path.iterdir()
+
+    def entries() -> Iterator[Path]:
+        with os.scandir(io_path) as directory:
+            for entry in directory:
+                yield path / entry.name
+
+    return entries()
+
+
+def _path_mkdir(
+    path: Path, *, parents: bool = False, exist_ok: bool = False
+) -> None:
+    io_path = _os_io_path(path)
+    if io_path is path:
+        path.mkdir(parents=parents, exist_ok=exist_ok)
+    elif parents:
+        os.makedirs(io_path, exist_ok=exist_ok)
+    else:
+        try:
+            os.mkdir(io_path)
+        except FileExistsError:
+            if not exist_ok:
+                raise
+
+
+def _path_open(path: Path, mode: str, *, buffering: int = -1) -> Any:
+    io_path = _os_io_path(path)
+    if io_path is path:
+        return path.open(mode, buffering=buffering)
+    return open(io_path, mode, buffering=buffering)
+
+
+def _path_read_bytes(path: Path) -> bytes:
+    io_path = _os_io_path(path)
+    if io_path is path:
+        return path.read_bytes()
+    with open(io_path, "rb") as handle:
+        return handle.read()
+
+
+def _path_unlink(path: Path) -> None:
+    io_path = _os_io_path(path)
+    if io_path is path:
+        path.unlink()
+    else:
+        os.unlink(io_path)
+
+
 def _read_json(path: Path, maximum: int) -> dict[str, Any]:
     try:
-        raw = path.read_bytes()
+        raw = _path_read_bytes(path)
     except OSError as exc:
         raise StoreError("STORE_IO_FAILURE") from exc
     return _load_json_bytes(raw, maximum)
@@ -686,7 +776,7 @@ def _read_json(path: Path, maximum: int) -> dict[str, Any]:
 
 def _is_reparse(path: Path) -> bool:
     try:
-        info = path.lstat()
+        info = _path_lstat(path)
     except OSError as exc:
         raise StoreError("STORE_PATH_INVALID") from exc
     attributes = getattr(info, "st_file_attributes", 0)
@@ -701,7 +791,7 @@ def _validate_root(root: Path) -> Path:
     current = Path(root.anchor)
     for part in root.parts[1:]:
         current = current / part
-        if current.exists() and _is_reparse(current):
+        if _path_exists(current) and _is_reparse(current):
             raise StoreError("STORE_PATH_INVALID")
     return root
 
@@ -709,18 +799,18 @@ def _validate_root(root: Path) -> Path:
 def _ensure_fixed_directories(root: Path) -> None:
     _validate_root(root)
     for path in (root, root / "journals", root / "attempts", root / "commits"):
-        if path.exists():
-            if _is_reparse(path) or not path.is_dir():
+        if _path_exists(path):
+            if _is_reparse(path) or not _path_is_dir(path):
                 raise StoreError("STORE_PATH_INVALID")
             continue
         try:
-            path.mkdir()
+            _path_mkdir(path)
         except FileExistsError:
-            if _is_reparse(path) or not path.is_dir():
+            if _is_reparse(path) or not _path_is_dir(path):
                 raise StoreError("STORE_PATH_INVALID")
         except OSError as exc:
             raise StoreError("STORE_IO_FAILURE") from exc
-        if _is_reparse(path) or not path.is_dir():
+        if _is_reparse(path) or not _path_is_dir(path):
             raise StoreError("STORE_PATH_INVALID")
 
 
@@ -749,21 +839,21 @@ class _RunWideLock:
         except ImportError as exc:
             raise StoreError("STORE_PLATFORM_UNSUPPORTED") from exc
         _validate_root(self.root)
-        if not self.root.exists():
+        if not _path_exists(self.root):
             if not self.create_missing:
                 raise StoreError("STORE_PATH_INVALID")
             try:
-                self.root.mkdir(parents=True)
+                _path_mkdir(self.root, parents=True)
             except OSError as exc:
                 raise StoreError("STORE_IO_FAILURE") from exc
-        if _is_reparse(self.root) or not self.root.is_dir():
+        if _is_reparse(self.root) or not _path_is_dir(self.root):
             raise StoreError("STORE_PATH_INVALID")
-        if not self.path.exists():
+        if not _path_exists(self.path):
             if not self.create_missing:
                 raise StoreError("STORE_LOCK_FILE_INVALID")
             try:
                 descriptor = os.open(
-                    self.path,
+                    _os_io_path(self.path),
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_BINARY,
                 )
                 try:
@@ -778,10 +868,10 @@ class _RunWideLock:
                 raise
             except OSError as exc:
                 raise StoreError("STORE_IO_FAILURE") from exc
-        if _is_reparse(self.path) or not self.path.is_file():
+        if _is_reparse(self.path) or not _path_is_file(self.path):
             raise StoreError("STORE_LOCK_FILE_INVALID")
         try:
-            self.handle = self.path.open("r+b", buffering=0)
+            self.handle = _path_open(self.path, "r+b", buffering=0)
         except OSError as exc:
             if self.handle is not None:
                 self.handle.close()
@@ -858,7 +948,11 @@ def _move_file_ex(source: Path, target: Path, replace: bool) -> None:
     flags = _MOVEFILE_WRITE_THROUGH | (
         _MOVEFILE_REPLACE_EXISTING if replace else 0
     )
-    if not function(str(source), str(target), flags):
+    if not function(
+        os.fspath(_os_io_path(source)),
+        os.fspath(_os_io_path(target)),
+        flags,
+    ):
         error = ctypes.get_last_error()
         if not replace and error in {80, 183}:
             raise FileExistsError(str(target))
@@ -916,7 +1010,7 @@ def _write_all_once(handle: Any, value: bytes) -> None:
 
 def _open_tracked(path: Path, mode: str, family: str) -> Any:
     try:
-        handle = path.open(mode, buffering=0)
+        handle = _path_open(path, mode, buffering=0)
     except (FileExistsError, OSError):
         raise
     _fault_handle_opened(family, handle)
@@ -1176,7 +1270,7 @@ def _atomic_publish_json(
     raw = _canonical_bytes(value) + b"\n"
     if len(raw) > maximum:
         raise StoreError("STORE_JSON_LIMIT_EXCEEDED")
-    if _is_reparse(path.parent) or not path.parent.is_dir():
+    if _is_reparse(path.parent) or not _path_is_dir(path.parent):
         raise StoreError("STORE_PATH_INVALID")
     kind = _atomic_target_kind(path)
     name = f".{path.name}.{os.urandom(16).hex()}.tmp"
@@ -1229,7 +1323,7 @@ def _atomic_publish_json(
             if existing != dict(value):
                 return False
             try:
-                temporary.unlink()
+                _path_unlink(temporary)
             except OSError as exc:
                 raise StoreError("STORE_IO_FAILURE") from exc
         return published
@@ -1264,14 +1358,14 @@ def _clean_owned_temps_locked(root: Path, lock: _RunWideLock) -> None:
         root / "commits",
         root / "attempts",
     ):
-        if not directory.exists():
+        if not _path_exists(directory):
             continue
-        for path in sorted(directory.iterdir(), key=lambda item: item.name):
-            if path.is_file() and path.name.startswith("."):
+        for path in sorted(_path_iterdir(directory), key=lambda item: item.name):
+            if _path_is_file(path) and path.name.startswith("."):
                 if (
                     _TEMP_NAME_RE.fullmatch(path.name) is None
                     or _is_reparse(path)
-                    or not path.is_file()
+                    or not _path_is_file(path)
                     or _atomic_target_kind(path.with_name(
                         _TEMP_NAME_RE.fullmatch(path.name).group("target")
                     ))
@@ -1280,24 +1374,28 @@ def _clean_owned_temps_locked(root: Path, lock: _RunWideLock) -> None:
                     raise StoreError("STORE_PATH_INVALID")
                 try:
                     _raise_if_fault("before_owned_temp_cleanup_error")
-                    path.unlink()
+                    _path_unlink(path)
                 except OSError as exc:
                     raise StoreError("STORE_IO_FAILURE") from exc
         if directory == root / "attempts":
-            for child in sorted(directory.iterdir(), key=lambda item: item.name):
+            for child in sorted(
+                _path_iterdir(directory), key=lambda item: item.name
+            ):
                 if (
                     _SHA256_RE.fullmatch(child.name) is None
                     or _is_reparse(child)
-                    or not child.is_dir()
+                    or not _path_is_dir(child)
                 ):
                     raise StoreError("STORE_PATH_INVALID")
-                for path in sorted(child.iterdir(), key=lambda item: item.name):
-                    if path.is_file() and path.name.startswith("."):
+                for path in sorted(
+                    _path_iterdir(child), key=lambda item: item.name
+                ):
+                    if _path_is_file(path) and path.name.startswith("."):
                         match = _TEMP_NAME_RE.fullmatch(path.name)
                         if (
                             match is None
                             or _is_reparse(path)
-                            or not path.is_file()
+                            or not _path_is_file(path)
                             or _atomic_target_kind(
                                 path.with_name(match.group("target"))
                             )
@@ -1306,7 +1404,7 @@ def _clean_owned_temps_locked(root: Path, lock: _RunWideLock) -> None:
                             raise StoreError("STORE_PATH_INVALID")
                         try:
                             _raise_if_fault("before_owned_temp_cleanup_error")
-                            path.unlink()
+                            _path_unlink(path)
                         except OSError as exc:
                             raise StoreError("STORE_IO_FAILURE") from exc
 
@@ -1394,11 +1492,11 @@ def _validate_run_contract_shape(value: Mapping[str, Any]) -> None:
 
 def _durable_state_exists_without_contract(root: Path) -> bool:
     allowed_empty_directories = {"journals", "attempts", "commits"}
-    for path in root.iterdir():
+    for path in _path_iterdir(root):
         if path.name == "run.lock":
             continue
-        if path.name in allowed_empty_directories and path.is_dir():
-            if any(path.iterdir()):
+        if path.name in allowed_empty_directories and _path_is_dir(path):
+            if any(_path_iterdir(path)):
                 return True
             continue
         return True
@@ -1411,7 +1509,7 @@ def _open_contract_locked(
     lock.require_active()
     root = lock.root
     contract_path = root / "run_contract.json"
-    if not contract_path.exists():
+    if not _path_exists(contract_path):
         _clean_owned_temps_locked(root, lock)
         if _durable_state_exists_without_contract(root):
             raise StoreError("STORE_STATE_WITHOUT_CONTRACT")
@@ -1424,7 +1522,7 @@ def _open_contract_locked(
         )
     loaded = _read_json(contract_path, _RUN_CONTRACT_LIMIT)
     _validate_run_contract_shape(loaded)
-    if loaded != dict(expected) or contract_path.read_bytes() != (
+    if loaded != dict(expected) or _path_read_bytes(contract_path) != (
         _canonical_bytes(expected) + b"\n"
     ):
         raise StoreError("STORE_RUN_CONTRACT_MISMATCH")
@@ -1946,7 +2044,7 @@ def _install_stage_b2_test_fault_controller_for_tests(
         raise StoreError("STORE_TEST_FAULT_INVALID")
     try:
         _validate_root(root)
-        if _is_reparse(root) or not root.is_dir():
+        if _is_reparse(root) or not _path_is_dir(root):
             raise StoreError("STORE_TEST_FAULT_INVALID")
         from run_formal_evaluation import (
             _FixedFakeRawClientV1,
@@ -2033,8 +2131,8 @@ def _write_fault_marker(
         raise StoreError("STORE_TEST_FAULT_INVALID") from exc
     marker_root = controller.root.parent / ".stage_b2_fault_markers"
     try:
-        marker_root.mkdir(exist_ok=True)
-        if _is_reparse(marker_root) or not marker_root.is_dir():
+        _path_mkdir(marker_root, exist_ok=True)
+        if _is_reparse(marker_root) or not _path_is_dir(marker_root):
             raise StoreError("STORE_TEST_FAULT_INVALID")
     except OSError as exc:
         raise StoreError("STORE_TEST_FAULT_INVALID") from exc
@@ -2051,7 +2149,7 @@ def _write_fault_marker(
     }
     raw = _canonical_bytes(value) + b"\n"
     try:
-        handle = marker.open("xb", buffering=0)
+        handle = _path_open(marker, "xb", buffering=0)
         try:
             written = handle.write(raw)
             if written != len(raw):
@@ -2060,7 +2158,7 @@ def _write_fault_marker(
             os.fsync(handle.fileno())
         finally:
             handle.close()
-        if marker.read_bytes() != raw:
+        if _path_read_bytes(marker) != raw:
             raise StoreError("STORE_TEST_FAULT_INVALID")
     except StoreError:
         raise
@@ -2440,15 +2538,15 @@ def _load_unit_state_locked(
     root = lock.root
     attempt_directory = root / "attempts" / execution_unit_id
     loaded: list[_LoadedArchive] = []
-    if attempt_directory.exists():
-        if _is_reparse(attempt_directory) or not attempt_directory.is_dir():
+    if _path_exists(attempt_directory):
+        if _is_reparse(attempt_directory) or not _path_is_dir(attempt_directory):
             raise StoreError("STORE_PATH_INVALID")
-        for path in attempt_directory.iterdir():
+        for path in _path_iterdir(attempt_directory):
             if allow_owned_temps and _owned_temp_kind(path) == "archive":
-                if _is_reparse(path) or not path.is_file():
+                if _is_reparse(path) or not _path_is_file(path):
                     raise StoreError("STORE_PATH_INVALID")
                 continue
-            if _is_reparse(path) or not path.is_file():
+            if _is_reparse(path) or not _path_is_file(path):
                 raise StoreError("STORE_PATH_INVALID")
             if _ARCHIVE_NAME_RE.fullmatch(path.name) is None:
                 raise StoreError("STORE_PATH_INVALID")
@@ -2524,8 +2622,8 @@ def _load_unit_state_locked(
     tip = loaded[-1] if loaded else None
     mutable_path = root / "journals" / f"{execution_unit_id}.json"
     mutable: dict[str, Any] | None = None
-    if mutable_path.exists():
-        if _is_reparse(mutable_path) or not mutable_path.is_file():
+    if _path_exists(mutable_path):
+        if _is_reparse(mutable_path) or not _path_is_file(mutable_path):
             raise StoreError("STORE_PATH_INVALID")
         mutable, _mutable_journal = _validate_mutable(
             _read_json(mutable_path, _JOURNAL_LIMIT),
@@ -2659,12 +2757,12 @@ def _publish_journal_locked(
     }
     value["archive_sha256"] = _archive_hash(value)
     attempt_directory = lock.root / "attempts" / execution_unit_id
-    if not attempt_directory.exists():
+    if not _path_exists(attempt_directory):
         try:
-            attempt_directory.mkdir()
+            _path_mkdir(attempt_directory)
         except OSError as exc:
             raise StoreError("STORE_IO_FAILURE") from exc
-    if _is_reparse(attempt_directory) or not attempt_directory.is_dir():
+    if _is_reparse(attempt_directory) or not _path_is_dir(attempt_directory):
         raise StoreError("STORE_PATH_INVALID")
     path = attempt_directory / (
         f"{attempt}-{sequence}-{value['journal_sha256']}.json"
@@ -2751,62 +2849,62 @@ def _validate_store_layout_locked(
         "attempts",
         "commits",
     }
-    for path in root.iterdir():
+    for path in _path_iterdir(root):
         if (
             allow_owned_temps
             and _owned_temp_kind(path) == "run_contract"
             and not _is_reparse(path)
-            and path.is_file()
+            and _path_is_file(path)
         ):
             continue
         if path.name not in allowed_root or _is_reparse(path):
             raise StoreError("STORE_PATH_INVALID")
-    for path in (root / "journals").iterdir():
+    for path in _path_iterdir(root / "journals"):
         if (
             allow_owned_temps
             and _owned_temp_kind(path) == "mutable"
             and not _is_reparse(path)
-            and path.is_file()
+            and _path_is_file(path)
         ):
             continue
         if (
             _is_reparse(path)
-            or not path.is_file()
+            or not _path_is_file(path)
             or _JOURNAL_NAME_RE.fullmatch(path.name) is None
         ):
             raise StoreError("STORE_PATH_INVALID")
-    for path in (root / "commits").iterdir():
+    for path in _path_iterdir(root / "commits"):
         if (
             allow_owned_temps
             and _owned_temp_kind(path) == "commit"
             and not _is_reparse(path)
-            and path.is_file()
+            and _path_is_file(path)
         ):
             continue
         if (
             _is_reparse(path)
-            or not path.is_file()
+            or not _path_is_file(path)
             or _COMMIT_NAME_RE.fullmatch(path.name) is None
         ):
             raise StoreError("STORE_PATH_INVALID")
-    for directory in (root / "attempts").iterdir():
+    for directory in _path_iterdir(root / "attempts"):
         if (
             _is_reparse(directory)
-            or not directory.is_dir()
+            or not _path_is_dir(directory)
             or _SHA256_RE.fullmatch(directory.name) is None
         ):
             raise StoreError("STORE_PATH_INVALID")
-        for path in directory.iterdir():
+        for path in _path_iterdir(directory):
             if (
                 allow_owned_temps
                 and _owned_temp_kind(path) == "archive"
                 and not _is_reparse(path)
-                and path.is_file()
+                and _path_is_file(path)
             ):
                 continue
             if (
                 _is_reparse(path)
-                or not path.is_file()
+                or not _path_is_file(path)
                 or _ARCHIVE_NAME_RE.fullmatch(path.name) is None
             ):
                 raise StoreError("STORE_PATH_INVALID")
@@ -3468,9 +3566,9 @@ def _load_commit_for_unit_locked(
     if type(repair_mutable) is not bool or type(allow_owned_temps) is not bool:
         raise StoreError("STORE_SCHEMA_INVALID")
     path = _commit_path(lock.root, unit)
-    if not path.exists():
+    if not _path_exists(path):
         return None
-    if _is_reparse(path) or not path.is_file():
+    if _is_reparse(path) or not _path_is_file(path):
         raise StoreError("STORE_PATH_INVALID")
     turn_one_commit: dict[str, Any] | None = None
     if (
@@ -3785,7 +3883,7 @@ def _unit_category_locked(
         lock=lock,
     )
     if turn_one_commit is None:
-        if turn_two_state.archives or _commit_path(lock.root, unit).exists():
+        if turn_two_state.archives or _path_exists(_commit_path(lock.root, unit)):
             raise StoreError("STORE_DEPENDENCY_INVALID")
         if turn_one_category == "permanently-non-executable":
             return "permanently-non-executable", turn_two_state, None
@@ -3810,18 +3908,18 @@ def _validate_known_store_members(
     if type(allow_owned_temps) is not bool:
         raise StoreError("STORE_SCHEMA_INVALID")
     known_ids = {_execution_unit_id(unit) for unit in plan}
-    for path in (lock.root / "journals").iterdir():
+    for path in _path_iterdir(lock.root / "journals"):
         if allow_owned_temps and _owned_temp_kind(path) == "mutable":
             continue
         if path.stem not in known_ids:
             raise StoreError("STORE_SCHEMA_INVALID")
-    for path in (lock.root / "attempts").iterdir():
+    for path in _path_iterdir(lock.root / "attempts"):
         if path.name not in known_ids:
             raise StoreError("STORE_SCHEMA_INVALID")
     expected_commits = {
         _commit_path(lock.root, unit).name for unit in plan
     }
-    for path in (lock.root / "commits").iterdir():
+    for path in _path_iterdir(lock.root / "commits"):
         if allow_owned_temps and _owned_temp_kind(path) == "commit":
             continue
         if path.name not in expected_commits:
@@ -3994,7 +4092,7 @@ def _open_store_read_only(
         raise StoreError("STORE_RUN_CONTRACT_MISMATCH")
     _validate_run_contract_shape(json.loads(_canonical_bytes(expected_contract)))
     root = _validate_root(_PRIVATE_STATE_ROOT)
-    if not root.exists() or _is_reparse(root) or not root.is_dir():
+    if not _path_exists(root) or _is_reparse(root) or not _path_is_dir(root):
         raise StoreError("STORE_PATH_INVALID")
     required_files = (root / "run.lock", root / "run_contract.json")
     required_directories = (
@@ -4003,14 +4101,14 @@ def _open_store_read_only(
         root / "commits",
     )
     for path in required_files:
-        if not path.exists() or _is_reparse(path) or not path.is_file():
+        if not _path_exists(path) or _is_reparse(path) or not _path_is_file(path):
             raise StoreError(
                 "STORE_LOCK_FILE_INVALID"
                 if path.name == "run.lock"
                 else "STORE_STATE_WITHOUT_CONTRACT"
             )
     for path in required_directories:
-        if not path.exists() or _is_reparse(path) or not path.is_dir():
+        if not _path_exists(path) or _is_reparse(path) or not _path_is_dir(path):
             raise StoreError("STORE_PATH_INVALID")
     with _RunWideLock(root, create_missing=False) as lock:
         contract_path = root / "run_contract.json"
@@ -4018,7 +4116,7 @@ def _open_store_read_only(
         _validate_run_contract_shape(contract)
         if (
             contract != dict(expected_contract)
-            or contract_path.read_bytes()
+            or _path_read_bytes(contract_path)
             != _canonical_bytes(expected_contract) + b"\n"
         ):
             raise StoreError("STORE_RUN_CONTRACT_MISMATCH")

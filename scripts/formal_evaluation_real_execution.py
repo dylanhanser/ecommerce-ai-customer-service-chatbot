@@ -654,11 +654,11 @@ class _MonotonicUTCClockV1:
 
     def __call__(self) -> str:
         with self._lock:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc).replace(microsecond=0)
             if self._last is not None and now <= self._last:
-                now = self._last + timedelta(microseconds=1)
+                now = self._last + timedelta(seconds=1)
             self._last = now
-            return now.isoformat(timespec="microseconds").replace("+00:00", "Z")
+            return now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class _SDKRawCompletionsAdapterV1:

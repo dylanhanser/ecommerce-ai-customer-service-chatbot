@@ -394,6 +394,135 @@ class _Clock:
         return self.value.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def test_real_clock_is_whole_second_monotonic_and_journal_compatible(monkeypatch):
+    fixed = datetime(2026, 8, 25, 12, 34, 56, 987654, tzinfo=timezone.utc)
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is timezone.utc
+            return fixed
+
+    monkeypatch.setattr(real, "datetime", FrozenDatetime)
+    clock = real._MonotonicUTCClockV1()
+    observed = [clock() for _ in range(3)]
+    assert observed == [
+        "2026-08-25T12:34:56Z",
+        "2026-08-25T12:34:57Z",
+        "2026-08-25T12:34:58Z",
+    ]
+    assert all(len(value) == 20 and "." not in value for value in observed)
+    assert observed == sorted(set(observed))
+
+    unit = _synthetic_plan()[0]
+    resource = transport.ProductionResourceIdentity.from_mapping(
+        _production_resource_mapping(unit["system_config_id"])
+    )
+    identity = orchestration._build_identity(
+        unit=unit,
+        resource=resource,
+        resolved_payload_sha256=unit["payload_sha256"],
+        attempt_number=1,
+        checkpoint=None,
+    )
+    journal = orchestration.create_initial_journal(identity, observed[0])
+    assert journal.prepared_at == observed[0]
+    assert journal.updated_at == observed[0]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows extended paths only")
+def test_windows_long_atomic_archive_round_trip_and_cleanup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    import winreg
+
+    with winreg.OpenKey(
+        winreg.HKEY_LOCAL_MACHINE,
+        r"SYSTEM\CurrentControlSet\Control\FileSystem",
+    ) as key:
+        long_paths_enabled, _kind = winreg.QueryValueEx(key, "LongPathsEnabled")
+    assert long_paths_enabled == 0
+
+    root = tmp_path.joinpath(
+        *(f"long-path-segment-{index:02d}-" + "x" * 28 for index in range(7)),
+        "state",
+    )
+    execution_unit_id = "a" * 64
+    archive_directory = root / "attempts" / execution_unit_id
+    target = archive_directory / f"1-1-{'b' * 64}.json"
+    failed_target = archive_directory / f"1-2-{'c' * 64}.json"
+    assert len(str(target)) > 300
+    extended_target = os.fspath(store._os_io_path(target))
+    assert extended_target.startswith("\\\\?\\")
+    assert store._os_io_path(Path(extended_target)) == extended_target
+    unc = Path(r"\\server\share") / ("u" * 125) / ("v" * 125)
+    assert store._os_io_path(unc) == "\\\\?\\UNC\\" + str(unc)[2:]
+
+    logical_member = target.relative_to(root).as_posix()
+    initial = {"durable_member": logical_member, "generation": 1}
+    replacement = {"durable_member": logical_member, "generation": 2}
+    failure = {
+        "durable_member": failed_target.relative_to(root).as_posix(),
+        "generation": 3,
+    }
+    try:
+        monkeypatch.setattr(store, "_PRIVATE_STATE_ROOT", root)
+        with store._RunWideLock(root) as lock:
+            store._ensure_fixed_directories(root)
+            store._path_mkdir(archive_directory)
+            assert store._atomic_publish_json(
+                target,
+                initial,
+                replace=False,
+                maximum=store._ARCHIVE_LIMIT,
+            )
+            assert store._read_json(target, store._ARCHIVE_LIMIT) == initial
+            assert store._atomic_publish_json(
+                target,
+                replacement,
+                replace=True,
+                maximum=store._ARCHIVE_LIMIT,
+            )
+            assert store._read_json(target, store._ARCHIVE_LIMIT) == replacement
+            raw = store._path_read_bytes(target)
+            assert b"\\\\?\\" not in raw
+            assert "\\\\?\\" not in logical_member
+            assert target.name == f"1-1-{'b' * 64}.json"
+
+            with monkeypatch.context() as publication_failure:
+                publication_failure.setattr(
+                    store,
+                    "_move_file_ex",
+                    lambda *_args: (_ for _ in ()).throw(
+                        store.StoreError("STORE_IO_FAILURE")
+                    ),
+                )
+                with pytest.raises(store.StoreError, match="STORE_IO_FAILURE"):
+                    store._atomic_publish_json(
+                        failed_target,
+                        failure,
+                        replace=False,
+                        maximum=store._ARCHIVE_LIMIT,
+                    )
+            owned_temps = [
+                path
+                for path in store._path_iterdir(archive_directory)
+                if path.name.startswith(".")
+            ]
+            assert len(owned_temps) == 1
+            store._clean_owned_temps_locked(root, lock)
+            assert not any(
+                path.name.startswith(".")
+                for path in store._path_iterdir(archive_directory)
+            )
+            store._path_unlink(target)
+            assert not store._path_exists(target)
+    finally:
+        io_root = store._os_io_path(root)
+        if os.path.exists(io_root):
+            shutil.rmtree(io_root)
+
+
 class _LocalAuthority:
     def __init__(
         self,
