@@ -8,12 +8,15 @@ import json
 import socket
 import subprocess
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
+import formal_evaluation_orchestration as orchestration
 import formal_evaluation_review_projection as projection
 import formal_evaluation_store as store
+import formal_evaluation_transport as transport
 import run_formal_evaluation as runner
 from formal_evaluation_store import CanonicalPrivateResultV1, StoreError
 
@@ -89,12 +92,22 @@ def _sha(text: str) -> str:
 def _synthetic_plan() -> list[dict]:
     units: list[dict] = []
 
-    def add(rq: str, case_id: str, turn: int, system: str, user_input: str):
+    def add(
+        rq: str,
+        case_id: str,
+        turn: int,
+        system: str,
+        user_input: str,
+        history: list[dict[str, str]] | None = None,
+    ):
         request_id = _sha(f"request|{rq}|{case_id}|{turn}|{system}")
         payload = {
+            "protocol_version": "1.0",
             "user_input": user_input,
             "rq": rq,
             "system_config": system,
+            "generation": copy.deepcopy(runner.GENERATION),
+            "history": history or [],
         }
         unit = {
             "request_id": request_id,
@@ -125,12 +138,23 @@ def _synthetic_plan() -> list[dict]:
         case_id = f"rq3_dialogue_{number:02d}"
         for system in ("single_turn", "context_aware"):
             for turn in (1, 2):
+                history = (
+                    [
+                        {
+                            "user_input": f"Synthetic RQ3 dialogue {number} turn 1",
+                            "assistant_answer": "__PRIOR_RESPONSE_BY_SAME_REQUEST_SEQUENCE__",
+                        }
+                    ]
+                    if system == "context_aware" and turn == 2
+                    else []
+                )
                 add(
                     "RQ3",
                     case_id,
                     turn,
                     system,
                     f"Synthetic RQ3 dialogue {number} turn {turn}",
+                    history,
                 )
     for order, unit in enumerate(units, 1):
         unit["execution_order"] = order
@@ -242,6 +266,171 @@ def _contract(*, mode: str = "test_owned_eligible", synthetic: bool = False) -> 
             "transport_implementation_sha256": _sha("test-transport"),
             "runtime_identity_sha256": _sha("test-runtime"),
             "resources": resources,
+        },
+        "schema_authority": {
+            "attempt_archive_schema_version": 1,
+            "b1_checkpoint_evidence_schema_version": 1,
+            "formal_result_schema_version": 1,
+            "journal_wrapper_schema_version": 1,
+            "private_commit_envelope_schema_version": 1,
+            "run_contract_schema_version": 1,
+            "stage_a_authoritative_success_schema_version": 1,
+            "stage_a_inflight_journal_schema_version": 3,
+            "stage_a_resource_identity_schema_version": 1,
+        },
+    }
+    contract = copy.deepcopy(without_hash)
+    contract["run_contract_sha256"] = projection.domain_hash(
+        "formal-evaluation-run-contract-v1", "contract", without_hash
+    )
+    return contract
+
+
+def _production_resource_identity(system: str) -> dict:
+    identity = transport.formal_identity(system)
+    family = identity.resource_family
+    is_v2 = family == "v2_mixed"
+    version = "production_v2_mixed" if is_v2 else "production_v1_qa_only"
+    corpus_name = "mixed_corpus_v2.pkl" if is_v2 else "qa_corpus.pkl"
+    embeddings_name = "mixed_embeddings_v2.npy" if is_v2 else "qa_embeddings.npy"
+    return {
+        "schema_version": 1,
+        "resource_type": "production_frozen",
+        "logical_resource_id": f"production_frozen_{family}_{version}",
+        "system_config_id": system,
+        "formal_system_id": identity.formal_system_id,
+        "corpus_path": f"outputs/cache/{family}/{corpus_name}",
+        "embeddings_path": f"outputs/cache/{family}/{embeddings_name}",
+        "corpus_sha256": ("1" if is_v2 else "2") * 64,
+        "embeddings_sha256": ("3" if is_v2 else "4") * 64,
+        "cache_family": family,
+        "corpus_version": version,
+        "row_count": 15688 if is_v2 else 15333,
+        "qa_count": 15333,
+        "snippet_count": 355 if is_v2 else 0,
+        "embedding_model": (
+            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        ),
+        "embedding_rows": 15688 if is_v2 else 15333,
+        "embedding_dimensions": 384,
+        "synthetic": False,
+    }
+
+
+def _production_real_contract() -> dict:
+    systems = {}
+    resources = {}
+    for system in projection._SYSTEM_COUNTS:
+        identity = transport.formal_identity(system)
+        systems[system] = {
+            "formal_system_id": identity.formal_system_id,
+            "resolved_runtime_system_id": identity.resolved_runtime_system_id,
+            "resource_family": identity.resource_family,
+            "top_k": identity.top_k,
+            "uses_context": identity.uses_context,
+            "uses_checkpoint": identity.uses_checkpoint,
+        }
+        resource_mapping = _production_resource_identity(system)
+        resource = transport.ProductionResourceIdentity.from_mapping(
+            resource_mapping
+        )
+        resources[system] = {
+            "resource_identity": resource_mapping,
+            "resource_identity_sha256": transport.resource_identity_sha256(
+                resource
+            ),
+        }
+    implementation_paths = (
+        "scripts/formal_evaluation_real_execution.py",
+        "scripts/run_formal_evaluation.py",
+        "scripts/formal_evaluation_orchestration.py",
+        "scripts/formal_evaluation_store.py",
+        "scripts/formal_evaluation_runtime.py",
+        "scripts/formal_evaluation_transport.py",
+        "scripts/formal_qa_only_baseline/adapter.py",
+        "scripts/formal_evaluation_review_projection.py",
+    )
+    without_hash = {
+        "schema_version": 1,
+        "stage_id": "B5",
+        "plan_authority": {
+            "plan_fingerprint": projection._PLAN_FINGERPRINT,
+            "base_seed": 20260721,
+            "execution_unit_count": 190,
+            "unique_request_id_count": 190,
+            "execution_order_first": 1,
+            "execution_order_last": 190,
+            "rq_counts": dict(projection._RQ_COUNTS),
+            "system_counts": {
+                "context_aware": 24,
+                "qa_only_reconstructed_baseline": 71,
+                "single_turn": 24,
+                "v2": 71,
+            },
+        },
+        "frozen_input_sha256": {"test-only": _sha("test-frozen-authority")},
+        "formal_system_authority": systems,
+        "provider_generation_authority": {
+            "generation": {
+                "contract_id": transport.generation_contract_id(),
+                "contract_sha256": transport.generation_contract_sha256(),
+                "runner_generation_sha256": runner.generation_sha(),
+                "snapshot": dict(transport.fixed_generation_snapshot()),
+            },
+            "transport": {
+                "contract_id": transport.transport_contract_id(),
+                "contract_sha256": transport.transport_contract_sha256(),
+                "snapshot": dict(transport.transport_contract_snapshot()),
+            },
+            "real_execution": {
+                "authority_bundle_id": "test.ProductionRealAuthorityV1",
+                "client_adapter_id": "test.NoNetworkAdapterV1",
+                "client_transport": {
+                    "base_url": "https://api.deepseek.com",
+                    "max_retries": 0,
+                    "model": "deepseek-chat",
+                    "sdk_distribution": "openai",
+                    "sdk_version": "test-only",
+                    "timeout_seconds": 60.0,
+                },
+                "clock_id": "test.SyntheticClockV1",
+                "executor_registry_id": "test.LocalExecutorRegistryV1",
+                "mode": "production_real",
+                "snapshot_validator_id": "test.SyntheticSnapshotValidatorV1",
+            },
+        },
+        "runtime_resource_authority": {
+            "b4_preflight": {
+                "artifact_path": (
+                    "data/formal_eval/resource_preflight/"
+                    "production_resource_preflight_v1.json"
+                ),
+                "artifact_sha256": _sha("test-b4-artifact"),
+                "authority_files": [
+                    {
+                        "byte_count": 1,
+                        "path": "synthetic/authority.py",
+                        "sha256": _sha("test-authority"),
+                    }
+                ],
+                "contract_id": "formal_production_resource_preflight_v1",
+                "embedding_model": {"test": "only"},
+                "preflight_sha256": _sha("test-preflight"),
+                "resource_families": [
+                    {"cache_family": "v1_qa"},
+                    {"cache_family": "v2_mixed"},
+                ],
+                "stage_id": "B4",
+                "status": "passed",
+            },
+            "implementation_files": [
+                {"byte_count": 1, "path": path, "sha256": _sha(path)}
+                for path in implementation_paths
+            ],
+            "repository": {"branch": "main", "commit": "1" * 40},
+            "resources": resources,
+            "runtime_identity_sha256": _sha("test-runtime"),
+            "transport_implementation_sha256": _sha("test-transport"),
         },
         "schema_authority": {
             "attempt_archive_schema_version": 1,
@@ -504,6 +693,136 @@ def _populate_complete_current_stage_b2_store(plan: list[dict]) -> None:
             )
 
 
+class _SyntheticProductionRealClock:
+    def __init__(self):
+        self._current = datetime(2026, 8, 26, tzinfo=timezone.utc)
+
+    def __call__(self) -> str:
+        self._current += timedelta(seconds=1)
+        return self._current.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+class _SyntheticProductionRealAuthority:
+    def __init__(self, contract: dict):
+        resource_mappings = {
+            system: dict(wrapper["resource_identity"])
+            for system, wrapper in contract["runtime_resource_authority"][
+                "resources"
+            ].items()
+        }
+        self._resources = orchestration.ProductionResourceBundle.from_mappings(
+            resource_mappings
+        )
+        self._clock = _SyntheticProductionRealClock()
+        runtime = contract["runtime_resource_authority"]
+        self._transport_sha256 = runtime["transport_implementation_sha256"]
+        self._runtime_sha256 = runtime["runtime_identity_sha256"]
+
+    def clock_for(self, _unit, _state):
+        return self._clock
+
+    def dependencies_for(self, _unit, _state):
+        def execute(context):
+            response = (
+                "STAGE_B2_SYNTHETIC_LOCAL "
+                + context.unit["request_id"][:24]
+            )
+            result = {
+                "response_text": response,
+                "route": "local_guard",
+                "guard_category": "test_owned_production_real",
+                "requires_backend_api": False,
+                "retrieval_used": False,
+                "retrieved_document_ids": [],
+                "retrieved_scores": [],
+            }
+            if (
+                context.unit["rq"] == "RQ3"
+                and context.unit["system_config_id"] == "context_aware"
+                and context.unit["turn_index"] == 1
+            ):
+                result["runtime_snapshot"] = runner._fixed_synthetic_snapshot(
+                    context.unit, response
+                )
+            return result
+
+        return {
+            "resources": self._resources,
+            "executors": orchestration.ExecutorRegistry(
+                {system: execute for system in projection._SYSTEM_COUNTS}
+            ),
+            "fake_raw_client": object(),
+            "clock": self._clock,
+            "transport_implementation_sha256": self._transport_sha256,
+            "runtime_identity_sha256": self._runtime_sha256,
+            "snapshot_validator": runner._validate_fixed_synthetic_snapshot_v1,
+        }
+
+
+def _patch_synthetic_plan_authority(monkeypatch) -> None:
+    monkeypatch.setattr(runner, "verify_frozen", lambda: {})
+    monkeypatch.setattr(runner, "validate_plan", lambda _plan: None)
+    monkeypatch.setattr(
+        runner,
+        "plan_fingerprint",
+        lambda _plan: projection._PLAN_FINGERPRINT,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_plan_fingerprint_bytes",
+        lambda _plan: projection._PLAN_FINGERPRINT,
+    )
+
+
+def _populate_complete_production_real_store(plan: list[dict], contract: dict):
+    authority = _SyntheticProductionRealAuthority(contract)
+    with store._open_store(contract) as (opened, lock):
+        for unit in plan:
+            unit_id = store._execution_unit_id(unit)
+            state = store._load_unit_state_locked(
+                unit_id, run_contract=opened, lock=lock
+            )
+            checkpoint, turn_one_commit_sha = store._selected_dependency_commit(
+                plan, unit, run_contract=opened, lock=lock
+            )
+            dependencies = authority.dependencies_for(unit, state)
+
+            def persist(journal):
+                store._publish_journal_locked(
+                    journal, run_contract=opened, lock=lock
+                )
+                return None
+
+            orchestration_result = runner.orchestrate_offline_unit(
+                plan,
+                unit,
+                journal_persistence_callback=persist,
+                checkpoint_evidence=checkpoint,
+                **dependencies,
+            )
+            assert orchestration_result.action == "local_success"
+            state = store._load_unit_state_locked(
+                unit_id, run_contract=opened, lock=lock
+            )
+            candidate = store._construct_private_commit(
+                plan,
+                unit,
+                orchestration_result,
+                run_contract=opened,
+                state=state,
+                turn_one_commit_sha256=turn_one_commit_sha,
+            )
+            commit, _published = store._publish_private_commit_locked(
+                candidate, unit=unit, lock=lock
+            )
+            store._reconcile_commit_locked(
+                commit, state, run_contract=opened, lock=lock
+            )
+        return store._derive_durable_progress_locked(
+            plan, run_contract=opened, lock=lock
+        )
+
+
 def test_canonical_private_result_exact_fields_immutable_and_validated(synthetic_material):
     result = synthetic_material[2][0]
     assert [field.name for field in dataclasses.fields(result)] == [
@@ -608,6 +927,155 @@ def test_source_gate_malformed_authority_fails_closed(mutation):
         projection._validate_authoritative_contract(contract)
 
 
+def test_production_real_source_gate_rejects_synthetic_resource():
+    contract = _production_real_contract()
+    system = next(iter(projection._SYSTEM_COUNTS))
+    wrapper = contract["runtime_resource_authority"]["resources"][system]
+    wrapper["resource_identity"]["synthetic"] = True
+    wrapper["resource_identity_sha256"] = hashlib.sha256(
+        projection._canonical_json_bytes(wrapper["resource_identity"])
+    ).hexdigest()
+    _rehash_contract(contract)
+    checked = projection._validate_authoritative_contract(contract)
+    with pytest.raises(projection.ProjectionError, match="^B3_SOURCE_INELIGIBLE$"):
+        projection._apply_source_eligibility_gate(checked)
+
+
+def test_complete_synthetic_production_real_store_projects_with_selected_contract(
+    isolated_roots_and_offline_guard,
+    monkeypatch,
+):
+    plan = _synthetic_plan()
+    contract = _production_real_contract()
+    references = projection._build_reference_bundle(plan, *_reference_values(plan))
+    _patch_synthetic_plan_authority(monkeypatch)
+    progress = _populate_complete_production_real_store(
+        plan, contract
+    )
+    assert progress.run_state == "complete"
+    assert progress.total_successful_units == 190
+    assert dict(progress.successful_by_rq) == projection._RQ_COUNTS
+    assert progress.remaining_units == 0
+    assert progress.next_eligible_execution_order is None
+    assert (
+        progress.initial_executable_units,
+        progress.same_attempt_continuable_units,
+        progress.retry_constructible_units,
+        progress.dependency_blocked_units,
+        progress.permanently_non_executable_units,
+    ) == (0, 0, 0, 0, 0)
+
+    monkeypatch.setattr(projection, "verify_frozen", lambda: {})
+    monkeypatch.setattr(projection, "build_plan", lambda: plan)
+    monkeypatch.setattr(projection, "validate_plan", lambda _plan: None)
+    monkeypatch.setattr(
+        projection,
+        "plan_fingerprint",
+        lambda _plan: projection._PLAN_FINGERPRINT,
+    )
+    monkeypatch.setattr(
+        projection,
+        "_selected_run_contract",
+        lambda selected_plan: contract if selected_plan == plan else None,
+    )
+    monkeypatch.setattr(
+        projection,
+        "_load_reference_sources",
+        lambda selected_plan: references if selected_plan == plan else None,
+    )
+    outcome = projection.project_blinded_reviewer_outputs()
+    assert outcome.action == "created"
+    assert outcome.source_unit_count == 190
+
+    raw, objects = projection._read_existing_finals(
+        isolated_roots_and_offline_guard["b3"]
+    )
+    assert set(raw) == set(projection._PUBLICATION_ORDER)
+    projection._validate_hash_relationships(objects, raw)
+    projection._validate_cross_artifact_consistency(objects)
+    projection._validate_privacy_boundary(objects)
+    private = objects[projection._PRIVATE_FILE]
+    assert private["counts"]["by_rq"] == projection._RQ_COUNTS
+    assert {
+        filename: (
+            objects[filename]["record_count"],
+            objects[filename]["source_unit_count"],
+        )
+        for filename in projection._DATA_FILES
+    } == {
+        "rq1_primary_v1.json": (102, 102),
+        "rq1_secondary_v1.json": (22, 22),
+        "rq2_v1.json": (40, 40),
+        "rq3_v1.json": (24, 48),
+    }
+    response_ids = {
+        record["response_id"]
+        for filename in ("rq1_primary_v1.json", "rq2_v1.json")
+        for record in objects[filename]["records"]
+    }
+    response_ids.update(
+        turn["response_id"]
+        for record in objects["rq3_v1.json"]["records"]
+        for turn in record["turns"]
+    )
+    assert len(response_ids) == 190
+    assert all(projection._RESPONSE_ID_RE.fullmatch(value) for value in response_ids)
+    reviewer_bytes = b"".join(raw[name] for name in projection._REVIEWER_FILES)
+    for key in projection._PROHIBITED_REVIEWER_KEYS:
+        assert f'"{key}":'.encode() not in reviewer_bytes
+    for system, authority in contract["formal_system_authority"].items():
+        assert system.encode() not in reviewer_bytes
+        assert authority["formal_system_id"].encode() not in reviewer_bytes
+
+
+def test_observer_rejects_genuinely_mismatched_selected_contract(
+    monkeypatch,
+):
+    plan = _synthetic_plan()
+    contract = _production_real_contract()
+    _patch_synthetic_plan_authority(monkeypatch)
+    with store._open_store(contract):
+        pass
+    mismatched = copy.deepcopy(contract)
+    mismatched["runtime_resource_authority"]["repository"]["commit"] = "2" * 40
+    _rehash_contract(mismatched)
+    before = _tree_bytes(store._PRIVATE_STATE_ROOT)
+    with pytest.raises(StoreError, match="^STORE_RUN_CONTRACT_MISMATCH$"):
+        runner.observe_validated_canonical_private_results(plan, mismatched)
+    assert _tree_bytes(store._PRIVATE_STATE_ROOT) == before
+
+
+def test_observer_default_preserves_b2_offline_contract_selection(monkeypatch):
+    plan = _synthetic_plan()
+    offline_contract = _contract(mode="offline_fake_only", synthetic=True)
+    captured = []
+    _patch_synthetic_plan_authority(monkeypatch)
+    monkeypatch.setattr(
+        runner,
+        "build_durable_run_contract",
+        lambda selected_plan: offline_contract if selected_plan == plan else None,
+    )
+
+    def observe(selected_plan, selected_contract):
+        captured.append((selected_plan, selected_contract))
+        return tuple()
+
+    monkeypatch.setattr(
+        store,
+        "_observe_validated_canonical_private_results",
+        observe,
+    )
+    assert runner.observe_validated_canonical_private_results(plan) == tuple()
+    assert captured == [(plan, offline_contract)]
+    assert offline_contract["stage_id"] == "B2"
+    assert (
+        offline_contract["provider_generation_authority"]["offline_execution"][
+            "mode"
+        ]
+        == "offline_fake_only"
+    )
+
+
 def test_complete_current_stage_b2_store_observation_is_read_only_and_b3_ineligible(
     isolated_roots_and_offline_guard,
     monkeypatch,
@@ -665,7 +1133,9 @@ def test_complete_current_stage_b2_store_observation_is_read_only_and_b3_ineligi
     monkeypatch.setattr(
         projection,
         "observe_validated_canonical_private_results",
-        lambda _plan: (_ for _ in ()).throw(AssertionError("observation invoked")),
+        lambda _plan, _contract: (_ for _ in ()).throw(
+            AssertionError("observation invoked")
+        ),
     )
     monkeypatch.setattr(
         projection,
@@ -720,7 +1190,7 @@ def test_ineligible_source_precedes_observation_references_and_b3_root_access(
     monkeypatch.setattr(projection, "plan_fingerprint", lambda value: projection._PLAN_FINGERPRINT)
     monkeypatch.setattr(projection, "build_durable_run_contract", lambda value: contract)
 
-    def observe(_plan):
+    def observe(_plan, _contract):
         calls["observe"] += 1
         return results
 
@@ -747,9 +1217,10 @@ def test_test_owned_eligible_fixture_exercises_production_entrypoint(
     plan, contract, results, references, _raw, material = synthetic_material
     observations = 0
 
-    def observe(value):
+    def observe(value, selected_contract):
         nonlocal observations
         assert value == plan
+        assert selected_contract == contract
         observations += 1
         return results
 
@@ -1501,7 +1972,8 @@ def test_present_wrong_version_or_hash_invalid_mapping_is_never_reconstructed(
 def test_public_projection_and_observation_apis_have_no_root_or_repair_arguments():
     assert list(inspect.signature(projection.project_blinded_reviewer_outputs).parameters) == []
     assert list(inspect.signature(runner.observe_validated_canonical_private_results).parameters) == [
-        "plan"
+        "plan",
+        "selected_run_contract",
     ]
 
 

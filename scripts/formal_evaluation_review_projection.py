@@ -2731,7 +2731,7 @@ def project_blinded_reviewer_outputs() -> ReviewerProjectionOutcome:
         dict(_selected_run_contract(plan))
     )
     _apply_source_eligibility_gate(contract)
-    results = observe_validated_canonical_private_results(plan)
+    results = observe_validated_canonical_private_results(plan, contract)
     snapshot = _validate_snapshot(plan, contract, results)
     references = _load_reference_sources(plan)
     material = _build_projection_material(plan, contract, snapshot, references)

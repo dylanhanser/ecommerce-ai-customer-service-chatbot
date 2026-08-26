@@ -764,13 +764,18 @@ def durable_progress(
 
 def observe_validated_canonical_private_results(
  plan: list[dict[str,Any]],
+ selected_run_contract: Mapping[str,Any] | None=None,
 ) -> tuple[CanonicalPrivateResultV1,...]:
  from formal_evaluation_store import _observe_validated_canonical_private_results
  verify_frozen()
  validate_plan(plan)
  if plan_fingerprint(plan)!=PLAN_FINGERPRINT:
   raise Blocked("BLOCKED FORMAL PLAN FINGERPRINT MISMATCH")
- contract=build_durable_run_contract(plan)
+ contract=(
+  build_durable_run_contract(plan)
+  if selected_run_contract is None
+  else selected_run_contract
+ )
  return _observe_validated_canonical_private_results(plan,contract)
 
 
