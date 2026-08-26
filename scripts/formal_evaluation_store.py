@@ -2424,8 +2424,6 @@ def _validate_pending_record(
             != returned_archives[0].journal.provider_response_id
             or response["response_sha256"]
             != returned_archives[0].journal.provider_response_sha256
-            or response["response_sha256"]
-            != returned_archives[0].journal.response_sha256
         ):
             raise StoreError("STORE_HASH_MISMATCH")
     elif journal.state != "call_started":
@@ -2505,7 +2503,7 @@ def _publish_pending_response_locked(
         or response["provider_request_id"] != journal.provider_request_id
         or response["provider_response_id"] != journal.provider_response_id
         or response["response_sha256"] != journal.provider_response_sha256
-        or sha256_text(content) != journal.response_sha256
+        or sha256_text(content) != response["response_sha256"]
     ):
         raise StoreError("STORE_SCHEMA_INVALID")
     value = {
@@ -4127,8 +4125,9 @@ def _reconcile_commit_locked(
         if pending is not None:
             normalized = pending["normalized_response"]
             if (
-                normalized["content"] != commit["formal_result"]["response_text"]
-                or normalized["response_sha256"] != commit["response_sha256"]
+                normalized["response_sha256"]
+                != success.provider_response_sha256
+                or commit["response_sha256"] != success.response_sha256
                 or normalized["provider_request_id"]
                 != success.provider_request_id
                 or normalized["provider_response_id"]
@@ -4140,15 +4139,34 @@ def _reconcile_commit_locked(
             ):
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
         if state.tip.journal.state == "provider_returned":
+            legacy_baseline_finalization = (
+                pending is not None
+                and pending["status"] == "pending"
+                and identity.system_config_id
+                == "qa_only_reconstructed_baseline"
+                and state.tip.journal.response_sha256
+                == state.tip.journal.provider_response_sha256
+                and state.tip.journal.provider_response_sha256
+                == pending["normalized_response"]["response_sha256"]
+                and success.provider_response_sha256
+                == state.tip.journal.provider_response_sha256
+                and success.response_sha256 != success.provider_response_sha256
+            )
             try:
                 decision = recovery_decision(
                     state.tip.journal,
                     authoritative_success=success,
                     expected=identity,
+                    allow_legacy_baseline_finalization=legacy_baseline_finalization,
                 )
                 if decision != "reconcile_committed":
                     raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
-                committed = reconcile(state.tip.journal, success, identity)
+                committed = reconcile(
+                    state.tip.journal,
+                    success,
+                    identity,
+                    allow_legacy_baseline_finalization=legacy_baseline_finalization,
+                )
             except JournalError as exc:
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT") from exc
             if repair:

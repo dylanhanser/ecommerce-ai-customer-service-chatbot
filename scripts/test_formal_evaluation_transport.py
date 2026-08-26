@@ -523,6 +523,26 @@ class ProviderBoundaryTests(unittest.TestCase):
             invoke(client, tracker)
         self.assertEqual(1, len(client.calls))
 
+    def test_finalized_core_text_remains_bound_to_raw_provider_receipt(self):
+        tracker, response = invoke(Fake(good_raw()), t.ProviderCallTracker())
+        finalized = response.content + " finalized"
+        self.assertNotEqual(
+            t.sha256_text(response.content), t.sha256_text(finalized)
+        )
+        t.validate_core_result(
+            tracker,
+            finalized,
+            success_receipt=response.success_receipt,
+            provider_response_text=response.content,
+        )
+        with self.assertRaises(t.TransportError):
+            t.validate_core_result(
+                tracker,
+                finalized,
+                success_receipt=response.success_receipt,
+                provider_response_text=response.content + " tampered",
+            )
+
     def test_forged_tracker_like_and_receipt_like_objects_fail(self):
         class ForgedTracker:
             state = "validated_success"

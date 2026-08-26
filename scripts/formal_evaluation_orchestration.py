@@ -971,7 +971,7 @@ def _checked_pending_provider_response(
         or checked["provider_request_id"] != journal.provider_request_id
         or checked["provider_response_id"] != journal.provider_response_id
         or checked["response_sha256"] != journal.provider_response_sha256
-        or sha256_text(checked["content"]) != journal.response_sha256
+        or sha256_text(checked["content"]) != checked["response_sha256"]
     ):
         raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
     return checked
@@ -1008,6 +1008,7 @@ def _orchestrate_plan_member(
     transport_implementation_sha256: str,
     runtime_identity_sha256: str,
     snapshot_validator: Callable[[Mapping[str, Any]], Any],
+    baseline_provider_response_finalizer: Callable[[str], str] | None = None,
     journal_persistence_callback: Callable[[InflightJournal], None] | None = None,
     pending_response_persistence_callback: Callable[
         [InflightJournal, Mapping[str, Any]], None
@@ -1033,6 +1034,11 @@ def _orchestrate_plan_member(
         checked, turn_one_unit, turn_two_unit
     )
     if not callable(clock) or not callable(snapshot_validator):
+        raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
+    if baseline_provider_response_finalizer is not None and (
+        checked["system_config_id"] != "qa_only_reconstructed_baseline"
+        or not callable(baseline_provider_response_finalizer)
+    ):
         raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
     try:
         validate_sha256(
@@ -1142,6 +1148,21 @@ def _orchestrate_plan_member(
     )
     provider_request_id = derive_provider_request_id(identity)
     _validate_claimed_ids(claimed_ids, identity, provider_request_id)
+
+    def finalize_provider_content(content: str) -> str:
+        finalized = content
+        if (
+            identity.system_config_id == "qa_only_reconstructed_baseline"
+            and baseline_provider_response_finalizer is not None
+        ):
+            try:
+                finalized = baseline_provider_response_finalizer(content)
+            except Exception as exc:
+                raise OrchestrationError("PROVIDER_CORE_RESPONSE_MISMATCH") from exc
+        if type(finalized) is not str or not finalized or not finalized.strip():
+            raise OrchestrationError("PROVIDER_CORE_RESPONSE_MISMATCH")
+        return finalized
+
     try:
         decision = recovery_decision(
             journal,
@@ -1161,6 +1182,21 @@ def _orchestrate_plan_member(
             identity=identity,
             journal=journal,
         )
+        expected_pending_content = finalize_provider_content(
+            checked_pending_response["content"]
+        )
+        expected_pending_sha256 = sha256_text(expected_pending_content)
+        legacy_pending_raw_hash = (
+            identity.system_config_id == "qa_only_reconstructed_baseline"
+            and journal.response_sha256 == journal.provider_response_sha256
+            and journal.response_sha256
+            == checked_pending_response["response_sha256"]
+        )
+        if (
+            journal.response_sha256 != expected_pending_sha256
+            and not legacy_pending_raw_hash
+        ):
+            raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
         decision = "continue_after_provider"
     predecessor: InflightJournal | None = None
     resumed_retry_predecessor: InflightJournal | None = None
@@ -1267,6 +1303,9 @@ def _orchestrate_plan_member(
     provider_invocation_attempted = False
     provider_persistence_failed = False
     pending_replay_count = 0
+    expected_provider_core_content: str | None = (
+        expected_pending_content if checked_pending_response is not None else None
+    )
 
     def persist_pending_response(
         returned: InflightJournal, response: NormalizedProviderResponse
@@ -1315,13 +1354,16 @@ def _orchestrate_plan_member(
                 elif tracker.state == "validated_success":
                     provider_result = getattr(boundary, "normalized_response", None)
                     if type(provider_result) is NormalizedProviderResponse:
+                        final_core_content = finalize_provider_content(
+                            provider_result.content
+                        )
                         failed = transition(
                             failed,
                             "provider_returned",
                             clock(),
                             provider_response_id=provider_result.provider_response_id,
                             provider_response_sha256=provider_result.response_sha256,
-                            response_sha256=sha256_text(provider_result.content),
+                            response_sha256=sha256_text(final_core_content),
                         )
                         persist_pending_response(failed, provider_result)
                     else:
@@ -1372,6 +1414,7 @@ def _orchestrate_plan_member(
         nonlocal provider_invocation_attempted
         nonlocal provider_persistence_failed
         nonlocal pending_replay_count
+        nonlocal expected_provider_core_content
         if decision == "continue_after_provider":
             if checked_pending_response is None or pending_replay_count != 0:
                 raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
@@ -1405,6 +1448,7 @@ def _orchestrate_plan_member(
                 raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
             pending_replay_count = 1
             boundary.normalized_response = response
+            expected_provider_core_content = finalize_provider_content(response.content)
             return response
         provider_invocation_attempted = True
         call_started = transition(
@@ -1423,13 +1467,14 @@ def _orchestrate_plan_member(
             **overrides,
         )
         boundary.normalized_response = response
+        expected_provider_core_content = finalize_provider_content(response.content)
         returned = transition(
             boundary.journal,
             "provider_returned",
             clock(),
             provider_response_id=response.provider_response_id,
             provider_response_sha256=response.response_sha256,
-            response_sha256=sha256_text(response.content),
+            response_sha256=sha256_text(expected_provider_core_content),
         )
         try:
             persist_pending_response(returned, response)
@@ -1570,7 +1615,10 @@ def _orchestrate_plan_member(
             return post_call_failure(
                 "provider_validation", "PROVIDER_RESPONSE_EVIDENCE_MISSING"
             )
-        if provider_result.content != response_text:
+        if (
+            expected_provider_core_content is None
+            or expected_provider_core_content != response_text
+        ):
             return post_call_failure(
                 "provider_validation", "PROVIDER_CORE_RESPONSE_MISMATCH"
             )
@@ -1580,6 +1628,7 @@ def _orchestrate_plan_member(
                 response_text,
                 success_receipt=provider_result.success_receipt,
                 local_result=False,
+                provider_response_text=provider_result.content,
             )
         except TransportError as exc:
             return post_call_failure("provider_validation", exc.category)

@@ -3020,7 +3020,7 @@ def test_transport_semantic_source_hash_and_eol_rejections():
     raw = (Path(__file__).parent / "formal_evaluation_transport.py").read_bytes()
     canonical = runner._lf_canonical_source_bytes_for_tests(raw)
     assert hashlib.sha256(canonical).hexdigest() == (
-        "13637de3bf008b69d95976c5068da39619bb8dd7cffdf6fe40a47b7677a9c890"
+        "aea54cc6b74cf334d9e069354a5c515465fa92e6a50fb7b871dc4c97e9401da9"
     )
     crlf = canonical.replace(b"\n", b"\r\n")
     assert runner._lf_canonical_source_bytes_for_tests(crlf) == canonical

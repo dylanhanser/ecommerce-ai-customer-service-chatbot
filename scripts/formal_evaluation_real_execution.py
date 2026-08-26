@@ -874,6 +874,12 @@ class ProductionRealAuthorityV1:
     def clock_for(self, _unit: Mapping[str, Any], _state: Any) -> _MonotonicUTCClockV1:
         return self._clock
 
+    @staticmethod
+    def _finalize_baseline_provider_response(content: str) -> str:
+        from formal_qa_only_baseline.adapter import _load_vendor
+
+        return _load_vendor().finalize_answer(content)
+
     def _baseline_executor(self, context: Any) -> Mapping[str, Any]:
         from formal_qa_only_baseline.adapter import (
             BaselineResources,
@@ -982,6 +988,11 @@ class ProductionRealAuthorityV1:
             "transport_implementation_sha256": self.transport_implementation_sha256,
             "runtime_identity_sha256": self.runtime_identity_sha256,
             "snapshot_validator": self.snapshot_validator,
+            "baseline_provider_response_finalizer": (
+                self._finalize_baseline_provider_response
+                if unit["system_config_id"] == "qa_only_reconstructed_baseline"
+                else None
+            ),
         }
 
 

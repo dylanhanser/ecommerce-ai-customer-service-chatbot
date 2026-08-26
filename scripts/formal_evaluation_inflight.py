@@ -918,9 +918,24 @@ def validate_authoritative_success(
 
 
 def _reject_conflicting_journal_evidence(
-    journal: InflightJournal, success: AuthoritativeSuccess
+    journal: InflightJournal,
+    success: AuthoritativeSuccess,
+    *,
+    allow_legacy_baseline_finalization: bool = False,
 ) -> None:
     """Fail closed if a journal has already recorded different call evidence."""
+
+    if type(allow_legacy_baseline_finalization) is not bool:
+        raise JournalError("JOURNAL_EVIDENCE_CONFLICT")
+    allow_response_sha256_change = (
+        allow_legacy_baseline_finalization
+        and journal.state == "provider_returned"
+        and journal.identity.system_config_id == "qa_only_reconstructed_baseline"
+        and journal.provider_response_sha256 is not None
+        and journal.response_sha256 == journal.provider_response_sha256
+        and success.provider_response_sha256 == journal.provider_response_sha256
+        and success.response_sha256 != journal.response_sha256
+    )
     for field_name in (
         "provider_request_id",
         "provider_response_id",
@@ -931,6 +946,8 @@ def _reject_conflicting_journal_evidence(
         "committed_at",
     ):
         existing = getattr(journal, field_name)
+        if field_name == "response_sha256" and allow_response_sha256_change:
+            continue
         if existing is not None and existing != getattr(success, field_name):
             raise JournalError("JOURNAL_EVIDENCE_CONFLICT")
 
@@ -939,6 +956,8 @@ def reconcile(
     journal: InflightJournal,
     success: AuthoritativeSuccess | Mapping[str, Any],
     expected: ExecutionIdentity | Mapping[str, Any] | None = None,
+    *,
+    allow_legacy_baseline_finalization: bool = False,
 ) -> InflightJournal:
     _validate_journal(journal)
     expected_identity = journal.identity if expected is None else validate_expected_identity(expected)
@@ -947,7 +966,11 @@ def reconcile(
     checked = _checked_authoritative_success(success)
     if checked.identity != expected_identity:
         raise JournalError("JOURNAL_EVIDENCE_CONFLICT")
-    _reject_conflicting_journal_evidence(journal, checked)
+    _reject_conflicting_journal_evidence(
+        journal,
+        checked,
+        allow_legacy_baseline_finalization=allow_legacy_baseline_finalization,
+    )
     if journal.state == "committed":
         return journal
     if _parse_timestamp(checked.call_started_at) <= _parse_timestamp(journal.prepared_at):
@@ -975,7 +998,10 @@ def recovery_decision(
     *,
     authoritative_success: AuthoritativeSuccess | Mapping[str, Any] | None = None,
     expected: ExecutionIdentity | Mapping[str, Any] | None = None,
+    allow_legacy_baseline_finalization: bool = False,
 ) -> str:
+    if type(allow_legacy_baseline_finalization) is not bool:
+        raise JournalError("JOURNAL_EVIDENCE_CONFLICT")
     expected_identity = validate_expected_identity(expected)
     if journal is not None:
         _validate_journal(journal, expected_identity)
@@ -983,7 +1009,12 @@ def recovery_decision(
         if journal is None:
             validate_authoritative_success(authoritative_success, expected_identity)
             return "authoritative_success"
-        reconcile(journal, authoritative_success, expected_identity)
+        reconcile(
+            journal,
+            authoritative_success,
+            expected_identity,
+            allow_legacy_baseline_finalization=allow_legacy_baseline_finalization,
+        )
         return "confirmed" if journal.state == "committed" else "reconcile_committed"
     if journal is None:
         return "begin"

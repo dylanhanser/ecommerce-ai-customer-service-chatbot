@@ -838,6 +838,7 @@ def validate_core_result(
     *,
     success_receipt: ProviderSuccessReceipt | None = None,
     local_result: bool = False,
+    provider_response_text: object | None = None,
 ) -> None:
     if type(tracker) is not ProviderCallTracker:
         raise TransportError("UNSAFE_CORE_FALLBACK")
@@ -850,16 +851,24 @@ def validate_core_result(
         and tracker.state == "not_called"
         and not tracker.provider_called
         and success_receipt is None
+        and provider_response_text is None
     ):
         return
+    try:
+        raw_provider_text = _bounded_string(
+            response_text if provider_response_text is None else provider_response_text,
+            maximum=_MAX_RESPONSE_TEXT_LENGTH,
+        )
+    except TransportError as exc:
+        raise TransportError("UNSAFE_CORE_FALLBACK") from exc
     if (
         not local_result
         and tracker.state == "validated_success"
         and tracker.provider_called
         and _valid_receipt_capability(success_receipt)
         and success_receipt is tracker._receipt
-            and success_receipt.provider_request_id == tracker.provider_request_id
-        and success_receipt.response_sha256 == _sha256_text(text)
+        and success_receipt.provider_request_id == tracker.provider_request_id
+        and success_receipt.response_sha256 == _sha256_text(raw_provider_text)
         and success_receipt.provider == _CANONICAL_TRANSPORT_CONTRACT["provider"]
         and success_receipt.model == _CANONICAL_GENERATION["model"]
     ):

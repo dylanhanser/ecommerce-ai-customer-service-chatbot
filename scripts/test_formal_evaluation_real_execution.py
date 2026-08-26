@@ -817,6 +817,287 @@ class _CoreGatewayAuthority(_LocalAuthority):
         }
 
 
+def _baseline_provider_case(
+    monkeypatch: pytest.MonkeyPatch, content: str
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, Any],
+    _SuccessCompletions,
+    real.ProductionRealAuthorityV1,
+]:
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    eligible_question = "这个商品是什么颜色"
+    plan[0]["payload"]["user_input"] = eligible_question
+    plan[0]["input_sha256"] = hashlib.sha256(eligible_question.encode()).hexdigest()
+    plan[0]["payload_sha256"] = _sha(plan[0]["payload"])
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    completions = _SuccessCompletions(content)
+    authority = real.ProductionRealAuthorityV1(
+        evidence,
+        _synthetic_loaded_resources(),
+        real._SDKRawCompletionsAdapterV1(completions),
+        contract,
+    )
+    return plan, contract, completions, authority
+
+
+def test_baseline_finalized_provider_response_validates_and_commits(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw_content = "您好。最终合成回答"
+    plan, contract, completions, authority = _baseline_provider_case(
+        monkeypatch, raw_content
+    )
+    finalized = authority._finalize_baseline_provider_response(raw_content)
+    assert finalized != raw_content
+
+    outcome = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert (
+        outcome.action,
+        outcome.orchestration_outcome.failure_category
+        if outcome.orchestration_outcome is not None
+        else None,
+        outcome.orchestration_outcome.tracker_state
+        if outcome.orchestration_outcome is not None
+        else None,
+    ) == ("completed", None, "validated_success")
+    assert outcome.provider_call_count == 1
+    assert completions.calls == 1
+    assert outcome.orchestration_outcome is not None
+    assert outcome.orchestration_outcome.formal_result is not None
+    formal_result = outcome.orchestration_outcome.formal_result
+    assert formal_result["response_text"] == finalized
+    raw_sha256 = transport.sha256_text(raw_content)
+    final_sha256 = transport.sha256_text(finalized)
+    assert raw_sha256 != final_sha256
+    success = outcome.orchestration_outcome.authoritative_success
+    assert success is not None
+    assert success.provider_response_sha256 == raw_sha256
+    assert success.response_sha256 == final_sha256
+    returned_journal = outcome.orchestration_outcome.journal
+    assert returned_journal.provider_response_sha256 == raw_sha256
+    assert returned_journal.response_sha256 == final_sha256
+    unit_id = store._execution_unit_id(plan[0])
+    pending = store._read_json(
+        store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json",
+        store._PENDING_LIMIT,
+    )
+    assert pending["status"] == "consumed"
+    assert pending["normalized_response"]["content"] == raw_content
+    assert (
+        pending["normalized_response"]["response_sha256"]
+        == raw_sha256
+    )
+    assert raw_content not in json.dumps(
+        dict(formal_result), ensure_ascii=False, sort_keys=True
+    )
+    observed = store._observe_validated_canonical_private_results(plan, contract)
+    assert len(observed) == 1
+    assert observed[0].response_text == finalized
+    reviewer_record = {
+        "display_payload": {
+            "model_answer": projection._model_answer(observed[0].response_text)
+        }
+    }
+    assert reviewer_record["display_payload"]["model_answer"] == finalized
+    assert raw_content not in json.dumps(
+        reviewer_record, ensure_ascii=False, sort_keys=True
+    )
+    assert not hasattr(observed[0], "provider_response_sha256")
+    assert not hasattr(observed[0], "raw_provider_content")
+    assert raw_content not in repr(observed[0])
+    assert not projection._REVIEWER_PROJECTION_ROOT.exists()
+
+
+def test_baseline_unrelated_core_response_remains_a_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw_content = "这是合成的提供方回答"
+    plan, contract, completions, authority = _baseline_provider_case(
+        monkeypatch, raw_content
+    )
+
+    def unrelated_executor(context):
+        context.invoke_provider(
+            [{"role": "user", "content": "Synthetic baseline provider request"}]
+        )
+        return {
+            "response_text": "Genuinely unrelated synthetic core response.",
+            "route": "provider",
+            "guard_category": "qa_only_baseline",
+            "requires_backend_api": False,
+            "retrieval_used": True,
+            "retrieved_document_ids": [],
+            "retrieved_scores": [],
+        }
+
+    authority._baseline_executor = unrelated_executor
+    outcome = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert outcome.action == "advanced"
+    assert outcome.journal_state == "provider_returned"
+    assert outcome.private_commit_sha256 is None
+    assert completions.calls == 1
+    assert outcome.orchestration_outcome is not None
+    assert outcome.orchestration_outcome.failure_category == (
+        "PROVIDER_CORE_RESPONSE_MISMATCH"
+    )
+    assert list(store._PRIVATE_STATE_ROOT.glob("commits/*.json")) == []
+
+
+def test_baseline_pending_finalized_response_resumes_without_provider_recall(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw_content = "这是合成的提供方回答"
+    plan, contract, completions, authority = _baseline_provider_case(
+        monkeypatch, raw_content
+    )
+    finalized = authority._finalize_baseline_provider_response(raw_content)
+    original_publish = store._publish_private_commit_locked
+    original_transition = orchestration.transition
+
+    def legacy_provider_returned_transition(journal, state, updated_at, **updates):
+        if state == "provider_returned":
+            updates["response_sha256"] = updates["provider_response_sha256"]
+        return original_transition(journal, state, updated_at, **updates)
+
+    def fail_commit(*_args, **_kwargs):
+        raise store.StoreError("STORE_IO_FAILURE")
+
+    monkeypatch.setattr(
+        orchestration, "transition", legacy_provider_returned_transition
+    )
+    monkeypatch.setattr(store, "_publish_private_commit_locked", fail_commit)
+    with pytest.raises(store.StoreError, match="STORE_IO_FAILURE"):
+        store._orchestrate_durable_offline_unit(
+            plan,
+            plan[0],
+            expected_contract=contract,
+            authority=authority,
+        )
+    assert completions.calls == 1
+    unit_id = store._execution_unit_id(plan[0])
+    pending_path = store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json"
+    pending = store._read_json(pending_path, store._PENDING_LIMIT)
+    assert pending["status"] == "pending"
+    assert pending["normalized_response"]["content"] == raw_content
+    raw_sha256 = transport.sha256_text(raw_content)
+    final_sha256 = transport.sha256_text(finalized)
+    legacy_mutable = store._read_json(
+        store._PRIVATE_STATE_ROOT / "journals" / f"{unit_id}.json",
+        store._JOURNAL_LIMIT,
+    )
+    assert legacy_mutable["journal"]["provider_response_sha256"] == raw_sha256
+    assert legacy_mutable["journal"]["response_sha256"] == raw_sha256
+
+    monkeypatch.setattr(orchestration, "transition", original_transition)
+    monkeypatch.setattr(store, "_publish_private_commit_locked", original_publish)
+    resumed = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert resumed.action == "completed"
+    assert resumed.provider_call_count == 0
+    assert completions.calls == 1
+    consumed = store._read_json(pending_path, store._PENDING_LIMIT)
+    assert consumed["status"] == "consumed"
+    assert consumed["normalized_response"]["content"] == raw_content
+    committed_mutable = store._read_json(
+        store._PRIVATE_STATE_ROOT / "journals" / f"{unit_id}.json",
+        store._JOURNAL_LIMIT,
+    )
+    assert committed_mutable["journal"]["provider_response_sha256"] == raw_sha256
+    assert committed_mutable["journal"]["response_sha256"] == final_sha256
+    observed = store._observe_validated_canonical_private_results(plan, contract)
+    assert len(observed) == 1
+    assert observed[0].response_text == finalized
+
+
+@pytest.mark.parametrize(
+    "tamper_target",
+    ["raw_content", "raw_hash", "finalized_content", "final_hash"],
+)
+def test_baseline_pending_dual_hash_tampering_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    tamper_target: str,
+):
+    raw_content = "您好。最终合成回答"
+    plan, contract, completions, authority = _baseline_provider_case(
+        monkeypatch, raw_content
+    )
+    original_publish = store._publish_private_commit_locked
+
+    def fail_commit(*_args, **_kwargs):
+        raise store.StoreError("STORE_IO_FAILURE")
+
+    monkeypatch.setattr(store, "_publish_private_commit_locked", fail_commit)
+    with pytest.raises(store.StoreError, match="STORE_IO_FAILURE"):
+        store._orchestrate_durable_offline_unit(
+            plan,
+            plan[0],
+            expected_contract=contract,
+            authority=authority,
+        )
+    monkeypatch.setattr(store, "_publish_private_commit_locked", original_publish)
+    assert completions.calls == 1
+
+    unit_id = store._execution_unit_id(plan[0])
+    pending_path = store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json"
+    journal_path = store._PRIVATE_STATE_ROOT / "journals" / f"{unit_id}.json"
+    if tamper_target in {"raw_content", "raw_hash"}:
+        value = store._read_json(pending_path, store._PENDING_LIMIT)
+        if tamper_target == "raw_content":
+            value["normalized_response"]["content"] += " tampered"
+        else:
+            value["normalized_response"]["response_sha256"] = "0" * 64
+        pending_path.write_text(
+            json.dumps(value, ensure_ascii=False, sort_keys=True), encoding="utf-8"
+        )
+    elif tamper_target == "finalized_content":
+        monkeypatch.setattr(
+            authority,
+            "_finalize_baseline_provider_response",
+            lambda _content: "Tampered finalized content.",
+        )
+    else:
+        value = store._read_json(journal_path, store._JOURNAL_LIMIT)
+        value["journal"]["response_sha256"] = "0" * 64
+        journal_path.write_text(
+            json.dumps(value, ensure_ascii=False, sort_keys=True), encoding="utf-8"
+        )
+
+    expected_error = (
+        orchestration.OrchestrationError
+        if tamper_target == "finalized_content"
+        else store.StoreError
+    )
+    with pytest.raises(expected_error):
+        store._orchestrate_durable_offline_unit(
+            plan,
+            plan[0],
+            expected_contract=contract,
+            authority=authority,
+        )
+    assert completions.calls == 1
+    assert list(store._PRIVATE_STATE_ROOT.glob("commits/*.json")) == []
+
+
 def test_multiline_rag_provider_unit_commits_as_provider_backed(
     monkeypatch: pytest.MonkeyPatch,
 ):
