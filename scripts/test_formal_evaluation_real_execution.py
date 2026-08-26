@@ -628,16 +628,21 @@ class _ProviderAuthority(_LocalAuthority):
 
 
 class _SuccessCompletions:
-    def __init__(self):
+    def __init__(self, content: str | None = None):
+        self.content = content
         self.calls = 0
+        self.requests: list[dict[str, Any]] = []
 
-    def create(self, **_request):
+    def create(self, **request):
         self.calls += 1
+        self.requests.append(copy.deepcopy(request))
         return SimpleNamespace(
             id=f"synthetic_response_{self.calls}",
             choices=[
                 SimpleNamespace(
-                    message=SimpleNamespace(content=f"provider answer {self.calls}")
+                    message=SimpleNamespace(
+                        content=self.content or f"provider answer {self.calls}"
+                    )
                 )
             ],
         )
@@ -660,6 +665,344 @@ class _RetryCompletions:
     def create(self, **_request):
         self.calls += 1
         raise self.failure
+
+
+class _InvalidResponseCompletions:
+    def __init__(self):
+        self.calls = 0
+
+    def create(self, **_request):
+        self.calls += 1
+        return SimpleNamespace(id="synthetic_invalid_response", choices=[])
+
+
+def _tracked_multiline_rag_messages() -> list[dict[str, str]]:
+    import formal_evaluation_runtime as runtime
+
+    row = {
+        "source_type": "chat_qa",
+        "category": "synthetic",
+        "title": "Synthetic source title",
+        "question": "Synthetic source question",
+        "answer_or_content": "Synthetic context answer",
+        "needs_backend_api": False,
+        "allowed_for_answer": True,
+    }
+    prompt = runtime.rag.build_rag_prompt(
+        "Synthetic provider-eligible question",
+        [
+            (
+                row,
+                0.9,
+                {
+                    "rerank_score": 0.95,
+                    "rerank_reason": "synthetic_test",
+                },
+            )
+        ],
+    )
+    assert "\n\n" in prompt
+    return [
+        {"role": "system", "content": "Synthetic formal RAG system"},
+        {"role": "user", "content": prompt},
+    ]
+
+
+def _synthetic_loaded_resources() -> real.LoadedProductionResources:
+    import numpy as np
+    import pandas as pd
+
+    corpus = pd.DataFrame(
+        [
+            {
+                "doc_id": "synthetic_doc",
+                "source_type": "chat_qa",
+                "category": "synthetic",
+                "title": "Synthetic product information",
+                "text_for_embedding": "Synthetic product color information",
+                "answer_or_content": "Synthetic context answer",
+                "question": "Synthetic source question",
+                "answer": "Synthetic context answer",
+                "priority": 100,
+                "allowed_for_answer": True,
+                "needs_backend_api": False,
+                "source_file": "synthetic",
+                "session_id": "",
+            }
+        ]
+    )
+    embeddings = np.asarray([[1.0]], dtype=np.float32)
+
+    class EmbeddingModel:
+        @staticmethod
+        def encode(*_args, **_kwargs):
+            return np.asarray([[1.0]], dtype=np.float32)
+
+    def cosine_similarity(_query, _embeddings):
+        return np.asarray([[0.99]], dtype=np.float32)
+
+    return real.LoadedProductionResources(
+        {"v1_qa": (corpus, embeddings), "v2_mixed": (corpus, embeddings)},
+        EmbeddingModel(),
+        cosine_similarity,
+    )
+
+
+class _CoreGatewayAuthority(_LocalAuthority):
+    def __init__(
+        self,
+        evidence: real.ValidatedB4Evidence,
+        contract: Mapping[str, Any],
+        completions: Any,
+        messages: list[dict[str, str]],
+        *,
+        behavior: str = "provider",
+        fallback_query_type: str = "normal",
+    ):
+        super().__init__(evidence, contract)
+        self.raw = real._SDKRawCompletionsAdapterV1(completions)
+        self.messages = copy.deepcopy(messages)
+        self.behavior = behavior
+        self.fallback_query_type = fallback_query_type
+
+    def dependencies_for(self, unit: Mapping[str, Any], _state: Any) -> dict[str, Any]:
+        def execute(context):
+            self.orders.append(context.unit["execution_order"])
+            gateway = real._CoreCompletionsGatewayV1(context)
+            if self.behavior == "local_guard":
+                answer = "synthetic deterministic local guard"
+                requires_backend = False
+                skip_llm = True
+            elif self.behavior == "backend_boundary":
+                answer = "synthetic deterministic backend boundary"
+                requires_backend = True
+                skip_llm = False
+            else:
+                answer = "synthetic mock fallback"
+                requires_backend = False
+                skip_llm = False
+                try:
+                    response = gateway.create(
+                        messages=copy.deepcopy(self.messages),
+                        **dict(transport.fixed_generation_snapshot()),
+                    )
+                    answer = response.choices[0].message.content
+                except Exception:
+                    # Mirrors the tracked RAG cores' catch-and-fallback behavior.
+                    if self.fallback_query_type == "product_attribute":
+                        answer = "synthetic product-attribute fallback"
+            return real._project_v2_core_result(
+                {
+                    "final_answer": answer,
+                    "reranked_results": [],
+                    "requires_backend_api": requires_backend,
+                    "skip_llm": skip_llm,
+                    "skip_retrieval": self.behavior == "local_guard",
+                    "query_type": self.fallback_query_type,
+                },
+                gateway,
+                runtime_snapshot=None,
+            )
+
+        return {
+            "resources": self.resources,
+            "executors": orchestration.ExecutorRegistry(
+                {name: execute for name in real._SYSTEM_CONFIG_IDS}
+            ),
+            "fake_raw_client": self.raw,
+            "clock": self.clock,
+            "transport_implementation_sha256": self.transport_sha256,
+            "runtime_identity_sha256": self.runtime_sha256,
+            "snapshot_validator": runner._validate_fixed_synthetic_snapshot_v1,
+        }
+
+
+def test_multiline_rag_provider_unit_commits_as_provider_backed(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    eligible_question = "这个商品是什么颜色"
+    plan[0]["payload"]["user_input"] = eligible_question
+    plan[0]["input_sha256"] = hashlib.sha256(eligible_question.encode()).hexdigest()
+    plan[0]["payload_sha256"] = _sha(plan[0]["payload"])
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    completions = _SuccessCompletions("这是合成的提供方回答。")
+    authority = real.ProductionRealAuthorityV1(
+        evidence,
+        _synthetic_loaded_resources(),
+        real._SDKRawCompletionsAdapterV1(completions),
+        contract,
+    )
+    outcome = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert outcome.action == "completed"
+    assert outcome.private_commit_sha256 is not None
+    assert outcome.provider_call_count == 1
+    assert outcome.progress.total_successful_units == 1
+    assert completions.calls == 1
+    messages = completions.requests[0]["messages"]
+    assert "\n\n" in messages[1]["content"]
+    assert [dict(message) for message in transport.validate_messages(messages)] == messages
+    executed = outcome.orchestration_outcome
+    assert executed is not None
+    assert executed.action == "success"
+    assert executed.tracker_state == "validated_success"
+    assert executed.authoritative_success is not None
+    assert executed.formal_result is not None
+    assert executed.formal_result["status"] == "success"
+    assert executed.formal_result["provider_called"] is True
+    assert executed.formal_result["route"] == "provider"
+    assert executed.formal_result["response_text"] == "这是合成的提供方回答。"
+    observed = store._observe_validated_canonical_private_results(plan, contract)
+    assert len(observed) == 1
+    assert observed[0].response_text == "这是合成的提供方回答。"
+
+
+@pytest.mark.parametrize("fallback_query_type", ["normal", "product_attribute"])
+def test_pre_provider_request_failure_cannot_commit_caught_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    fallback_query_type: str,
+):
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    messages = _tracked_multiline_rag_messages()
+    messages[1]["content"] += "\x00"
+    completions = _SuccessCompletions()
+    authority = _CoreGatewayAuthority(
+        evidence,
+        contract,
+        completions,
+        messages,
+        fallback_query_type=fallback_query_type,
+    )
+
+    with pytest.raises(orchestration.OrchestrationError) as raised:
+        store._orchestrate_durable_offline_unit(
+            plan,
+            plan[0],
+            expected_contract=contract,
+            authority=authority,
+        )
+    assert raised.value.category == "FIXED_REQUEST_INVALID"
+    assert completions.calls == 0
+    assert store._real_prefix_progress(plan, contract).progress.total_successful_units == 0
+    assert store._observe_validated_canonical_private_results(plan, contract) == ()
+
+
+def test_guarded_real_execution_exposes_stable_pre_provider_failure_category():
+    plan = _synthetic_plan()
+    evidence = _evidence()
+    state = _prefix_state(plan, 0)
+
+    def reject_fixed_request(*_args, **_kwargs):
+        raise orchestration.OrchestrationError("FIXED_REQUEST_INVALID")
+
+    with pytest.raises(real.RealExecutionError) as raised:
+        real.execute_guarded_real_prefix(
+            plan,
+            confirmation=real.CONFIRMATION_TOKEN,
+            expected_b4_preflight_sha256=evidence.preflight_sha256,
+            max_new_successes=1,
+            output_path=real.DRY_RUN_OUTPUT_PATH,
+            repository_gate=lambda: real.RepositoryIdentity("main", "1" * 40),
+            plan_validator=lambda _plan: None,
+            evidence_consumer=lambda _sha: evidence,
+            metadata_loader=_metadata,
+            contract_builder=lambda *_args: {},
+            progress_reader=lambda *_args: state,
+            resource_loader=lambda _evidence: object(),
+            config_parser=lambda _path: object(),
+            client_factory=lambda _config: object(),
+            authority_factory=lambda *_args: object(),
+            prefix_executor=reject_fixed_request,
+        )
+    assert raised.value.category == "B5_PRE_PROVIDER_REQUEST_INVALID"
+
+
+@pytest.mark.parametrize("provider_outcome", ["exception", "invalid_response"])
+def test_provider_failure_cannot_commit_caught_mock_as_local_success(
+    monkeypatch: pytest.MonkeyPatch,
+    provider_outcome: str,
+):
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    completions = (
+        _RetryCompletions(_TerminalFailure())
+        if provider_outcome == "exception"
+        else _InvalidResponseCompletions()
+    )
+    authority = _CoreGatewayAuthority(
+        evidence,
+        contract,
+        completions,
+        _tracked_multiline_rag_messages(),
+    )
+
+    outcome = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+    assert outcome.action == "permanently_non_executable"
+    assert outcome.block_category == "terminal_failed"
+    assert outcome.private_commit_sha256 is None
+    assert outcome.progress.total_successful_units == 0
+    assert completions.calls == 1
+    assert store._observe_validated_canonical_private_results(plan, contract) == ()
+
+
+@pytest.mark.parametrize(
+    ("behavior", "expected_route"),
+    [("local_guard", "local_guard"), ("backend_boundary", "backend_boundary")],
+)
+def test_genuine_local_guard_and_backend_boundary_commit_without_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    behavior: str,
+    expected_route: str,
+):
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    completions = _SuccessCompletions()
+    authority = _CoreGatewayAuthority(
+        evidence,
+        contract,
+        completions,
+        _tracked_multiline_rag_messages(),
+        behavior=behavior,
+    )
+
+    outcome = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+    assert outcome.action == "completed"
+    assert outcome.private_commit_sha256 is not None
+    assert outcome.provider_call_count == 0
+    assert completions.calls == 0
+    executed = outcome.orchestration_outcome
+    assert executed is not None
+    assert executed.action == "local_success"
+    assert executed.formal_result is not None
+    assert executed.formal_result["status"] == "local_success"
+    assert executed.formal_result["provider_called"] is False
+    assert executed.formal_result["route"] == expected_route
+    assert len(store._observe_validated_canonical_private_results(plan, contract)) == 1
 
 
 def test_import_help_and_dry_run_compatibility_are_offline(monkeypatch, capsys, tmp_path):

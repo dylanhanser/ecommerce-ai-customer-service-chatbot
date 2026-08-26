@@ -438,6 +438,60 @@ class ResourceIdentityTests(unittest.TestCase):
 
 
 class ProviderBoundaryTests(unittest.TestCase):
+    def test_multiline_message_content_is_preserved_and_hashed_canonically(self):
+        prompt = (
+            "Synthetic RAG instructions\n\n"
+            "Rules:\n1. Use context only.\n2. Be concise.\n\n"
+            "Retrieved context:\n[1] synthetic evidence"
+        )
+        messages = [
+            {"role": "system", "content": "Synthetic formal RAG system"},
+            {"role": "user", "content": prompt},
+        ]
+        normalized = t.validate_messages(messages)
+        self.assertEqual(messages, [dict(message) for message in normalized])
+
+        client = Fake(good_raw(content="provider-backed synthetic answer"))
+        tracker = t.ProviderCallTracker()
+        response = t.FixedGenerationProxy().invoke(
+            client,
+            tracker,
+            messages,
+            provider_request_id="call_test",
+        )
+        self.assertEqual("validated_success", tracker.state)
+        self.assertEqual("provider-backed synthetic answer", response.content)
+        self.assertEqual(1, len(client.calls))
+        self.assertEqual(messages, client.calls[0]["messages"])
+
+        copy_messages = [dict(message) for message in messages]
+        reordered = {
+            "messages": copy_messages,
+            "stream": False,
+            "max_tokens": 512,
+            "top_p": 1.0,
+            "temperature": 0.0,
+            "model": "deepseek-chat",
+        }
+        self.assertEqual(t._canonical_sha(client.calls[0]), t._canonical_sha(reordered))
+        flattened = dict(reordered)
+        flattened["messages"] = [dict(copy_messages[0]), dict(copy_messages[1])]
+        flattened["messages"][1]["content"] = prompt.replace("\n", " ")
+        self.assertNotEqual(t._canonical_sha(reordered), t._canonical_sha(flattened))
+
+    def test_message_content_still_rejects_nul_and_non_lf_controls(self):
+        for control in ("\x00", "\x01", "\x08", "\t", "\x0b", "\x0c", "\r", "\x1f", "\x7f"):
+            client = Fake(good_raw())
+            with self.assertRaises(t.TransportError, msg=repr(control)) as raised:
+                t.FixedGenerationProxy().invoke(
+                    client,
+                    t.ProviderCallTracker(),
+                    [{"role": "user", "content": "before" + control + "after"}],
+                    provider_request_id="call_test",
+                )
+            self.assertEqual("FIXED_REQUEST_INVALID", raised.exception.category)
+            self.assertEqual(0, len(client.calls))
+
     def test_success_is_proxy_capability_bound(self):
         tracker = t.ProviderCallTracker()
         self.assertFalse(hasattr(tracker, "transition"))

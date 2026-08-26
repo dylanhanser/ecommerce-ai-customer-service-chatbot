@@ -32,6 +32,7 @@ _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _PROVIDER_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _PATH_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_MESSAGE_CONTROL = re.compile(r"[\x00-\x09\x0b-\x1f\x7f]")
 _FORMAL_PLAN_FINGERPRINT = "4d8b22f755d3906762a9d680700fa87fc91155aeceb33e7bce9bb293067f78a5"
 
 
@@ -327,9 +328,15 @@ def _validate_messages(messages: object) -> tuple[Mapping[str, str], ...]:
         if message["role"] not in {"system", "user", "assistant"}:
             raise TransportError("FIXED_REQUEST_INVALID")
         try:
-            content = _bounded_string(message["content"], maximum=_MAX_MESSAGE_TEXT_LENGTH)
+            content = _bounded_string(
+                message["content"],
+                maximum=_MAX_MESSAGE_TEXT_LENGTH,
+                control_free=False,
+            )
         except TransportError as exc:
             raise TransportError("FIXED_REQUEST_INVALID") from exc
+        if _MESSAGE_CONTROL.search(content):
+            raise TransportError("FIXED_REQUEST_INVALID")
         result.append(MappingProxyType({"role": message["role"], "content": content}))
     return tuple(result)
 

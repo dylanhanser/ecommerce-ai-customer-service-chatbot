@@ -68,6 +68,7 @@ _ERROR_CATEGORIES = frozenset(
         "B5_CONFIGURATION_INVALID",
         "B5_RESOURCE_INVALID",
         "B5_CLIENT_INVALID",
+        "B5_PRE_PROVIDER_REQUEST_INVALID",
         "B5_PROVIDER_RETRY_EXHAUSTED",
         "B5_PROVIDER_UNCERTAIN",
         "B5_PROVIDER_TERMINAL",
@@ -706,11 +707,17 @@ class _CoreCompletionsGatewayV1:
 
     def __init__(self, context: Any):
         self._context = context
+        self.generation_attempted = False
         self.provider_called = False
+        self.pre_provider_failure_category: str | None = None
 
     def create(self, *args: Any, **request: Any) -> Any:
+        from formal_evaluation_transport import TransportError, validate_messages
+
+        self.generation_attempted = True
         if args:
-            raise RealExecutionError("B5_INTERNAL_FAILURE")
+            self.pre_provider_failure_category = "FIXED_REQUEST_INVALID"
+            raise TransportError(self.pre_provider_failure_category)
         expected = {
             "model": "deepseek-chat",
             "temperature": 0.0,
@@ -720,10 +727,14 @@ class _CoreCompletionsGatewayV1:
         }
         messages = request.pop("messages", None)
         if request != expected:
-            raise RealExecutionError("B5_INTERNAL_FAILURE")
-        from formal_evaluation_transport import validate_messages
+            self.pre_provider_failure_category = "FIXED_REQUEST_INVALID"
+            raise TransportError(self.pre_provider_failure_category)
 
-        normalized = validate_messages(messages)
+        try:
+            normalized = validate_messages(messages)
+        except TransportError as exc:
+            self.pre_provider_failure_category = exc.category
+            raise
         self.provider_called = True
         response = self._context.invoke_provider(
             [dict(message) for message in normalized]
@@ -736,6 +747,15 @@ class _CoreCompletionsGatewayV1:
 class _CoreClientFacadeV1:
     def __init__(self, gateway: _CoreCompletionsGatewayV1):
         self.chat = SimpleNamespace(completions=gateway)
+
+
+def _reject_pre_provider_core_fallback(gateway: _CoreCompletionsGatewayV1) -> None:
+    if gateway.generation_attempted and not gateway.provider_called:
+        from formal_evaluation_transport import TransportError
+
+        raise TransportError(
+            gateway.pre_provider_failure_category or "FIXED_REQUEST_INVALID"
+        )
 
 
 def _safe_retrieval_projection(result: Mapping[str, Any]) -> tuple[list[str], list[float]]:
@@ -768,6 +788,7 @@ def _project_v2_core_result(
     *,
     runtime_snapshot: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    _reject_pre_provider_core_fallback(gateway)
     answer = result.get("final_answer")
     if type(answer) is not str or not answer:
         raise RealExecutionError("B5_INTERNAL_FAILURE")
@@ -883,6 +904,7 @@ class ProductionRealAuthorityV1:
             result = run_qa_only_baseline_query(
                 context.unit["payload"]["user_input"], resources
             )
+        _reject_pre_provider_core_fallback(gateway)
         answer = result.get("answer")
         if type(answer) is not str or not answer:
             raise RealExecutionError("B5_INTERNAL_FAILURE")
@@ -1126,6 +1148,10 @@ def execute_guarded_real_prefix(
         except RealExecutionError:
             raise
         except Exception as exc:
+            if getattr(exc, "category", None) == "FIXED_REQUEST_INVALID":
+                raise RealExecutionError(
+                    "B5_PRE_PROVIDER_REQUEST_INVALID"
+                ) from exc
             raise RealExecutionError("B5_PERSISTENCE_INVALID") from exc
         if outcome.action == "blocked":
             _raise_for_block(outcome.block_category)
