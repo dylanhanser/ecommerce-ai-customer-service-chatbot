@@ -1,0 +1,82 @@
+{
+  "canonical_projection": {
+    "plan_fingerprint": "4d8b22f755d3906762a9d680700fa87fc91155aeceb33e7bce9bb293067f78a5",
+    "projection_contract_id": "formal_reviewer_projection_v1",
+    "projection_manifest_sha256": "d845b4a9a767ae5c7cb466548e32bb36953eef50a3c0b51961de123ee91febde",
+    "reviewer_manifest_sha256": "066879d53009fa9b52cb4f234e338c10479df9997879e54209f920401d4330e3",
+    "secondary_selection_sha256": "6bce170ec082f021ff52a2c8299dcc69aaca296056ff9ffc125e523ef2b54e0c"
+  },
+  "checks": {
+    "bundle_ids_match": true,
+    "canonical_id_membership": true,
+    "canonical_projection_integrity": true,
+    "exact_export_file_set": true,
+    "expected_section_counts_match": true,
+    "pairing_structure_exact": true,
+    "reviewer_identities_match": true,
+    "rq3_linkage_exact": true,
+    "scores_complete_and_in_domain": true,
+    "secondary_subset_exact": true,
+    "text_matching_used_for_join": false
+  },
+  "input_files": [
+    {
+      "filename": "reviewer_1_scores_b3b_df58ae0ecc6666a7feff0aa2.json",
+      "reviewer_id": "reviewer_1",
+      "reviewer_label": "Reviewer 1",
+      "section_counts": {
+        "rq1_primary": 102,
+        "rq2": 40,
+        "rq3": 24
+      },
+      "sha256": "27919322cfe098028be4d1ce721a2f37ad48471aad831e75708f68f7bea619af"
+    },
+    {
+      "filename": "reviewer_2_scores_b3b_df58ae0ecc6666a7feff0aa2.json",
+      "reviewer_id": "reviewer_2",
+      "reviewer_label": "Reviewer 2",
+      "section_counts": {
+        "rq1_secondary": 22
+      },
+      "sha256": "3bc0ac8e149b456d7ed057fed6d62fe30013e059f471f39a6e4768d5fe0edffc"
+    }
+  ],
+  "input_json_file_count": 2,
+  "issues": [],
+  "privacy": {
+    "aggregate_only_report": true,
+    "canonical_joins_use_ids_only": true,
+    "row_level_questions_or_answers_included": false
+  },
+  "reviewer_bundle_id": "b3b_df58ae0ecc6666a7feff0aa2",
+  "schema_version": "formal-score-validation-v1",
+  "score_domains": {
+    "rq1_acceptable": "quality_total >= 6 and every dimension > 0",
+    "rq1_dimensions": "integer 0..2",
+    "rq1_quality_total": "derived integer 0..8",
+    "rq2_case_pass": "route_pass AND required_content_pass AND forbidden_content_pass",
+    "rq2_components": "boolean",
+    "rq3_dialogue_pass": "turn_1_pass AND turn_2_pass AND no_safety_violation",
+    "rq3_no_safety_violation": "boolean",
+    "rq3_turn_components": "boolean",
+    "rq3_turn_pass": "route_pass AND required_content_pass AND forbidden_content_pass"
+  },
+  "status": "PASS",
+  "validated_counts": {
+    "paired_units": {
+      "rq1": 51,
+      "rq2": 20,
+      "rq3_dialogues": 12
+    },
+    "reviewer_1": {
+      "rq1_primary": 102,
+      "rq2": 40,
+      "rq3": 24
+    },
+    "reviewer_2": {
+      "rq1_secondary": 22
+    },
+    "rq3_source_turns": 48
+  },
+  "warnings": []
+}

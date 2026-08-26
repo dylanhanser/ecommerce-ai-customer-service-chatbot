@@ -1,0 +1,1342 @@
+{
+  "analysis_scope": "post-scoring aggregate formal evaluation",
+  "analysis_script_sha256": "8c908dd700ccef78295e4e84b8d526153b97c3c009e9da28417524a5ae728323",
+  "factual_interpretation": [
+    "Across the 22 shared RQ1 responses, exact total-score agreement was 45.5% and linear-weighted Cohen's kappa was 0.622.",
+    "Safety-boundary compliance had the lowest dimension-level inter-rater reliability: exact agreement was 17/22 (77.3%) and linear-weighted Cohen's kappa was 0.375. This lower Safety reliability is a limitation when interpreting Safety-related results.",
+    "RQ1 does not provide statistically significant evidence of a paired overall quality-score difference between V2 and the QA-only reconstructed baseline. The observed mean paired difference was 0.20 points (paired-bootstrap 95% CI -0.14 to 0.55).",
+    "The predeclared exact McNemar test did not find a statistically significant difference in RQ1 acceptability rates.",
+    "RQ2's exploratory exact McNemar comparison did not find a statistically significant case-pass difference between the systems.",
+    "RQ3's exploratory dialogue-level exact McNemar comparison did not find a statistically significant dialogue-pass difference between context-aware and single-turn V2. Turn-level inference is separated by turn index because turns are clustered within dialogues.",
+    "Overall, the observed headline paired differences were small and favoured V2 or context-aware V2, but the reported predeclared and Holm-adjusted tests did not provide statistically significant evidence of improvement.",
+    "RQ1/RQ2 compare complete system configurations; these results do not identify the causal contribution of an individual retrieval, reranking, snippet, or guard component."
+  ],
+  "inter_rater_reliability": {
+    "acceptable": {
+      "cohens_kappa": 0.8181818182,
+      "exact_agreement_count": 20,
+      "exact_agreement_rate": 0.9090909091,
+      "fixed_domain": [
+        false,
+        true
+      ],
+      "kappa_undefined_reason": null,
+      "linear_weighted_cohens_kappa": 0.8181818182,
+      "n_shared": 22,
+      "note": "With two categories, linear-weighted and unweighted Cohen's kappa coincide."
+    },
+    "all_four_dimensions_exact": {
+      "exact_agreement_count": 8,
+      "exact_agreement_rate": 0.3636363636,
+      "n_shared": 22
+    },
+    "design": {
+      "complete_paired_questions": 11,
+      "reviewers": [
+        "Reviewer 1",
+        "Reviewer 2"
+      ],
+      "shared_response_records": 22,
+      "system_blinded": true
+    },
+    "dimensions": {
+      "completeness_actionability": {
+        "exact_agreement_count": 15,
+        "exact_agreement_rate": 0.6818181818,
+        "fixed_domain": [
+          0,
+          1,
+          2
+        ],
+        "kappa_undefined_reason": null,
+        "linear_weighted_cohens_kappa": 0.6010362694,
+        "n_shared": 22
+      },
+      "factual_policy_correctness": {
+        "exact_agreement_count": 14,
+        "exact_agreement_rate": 0.6363636364,
+        "fixed_domain": [
+          0,
+          1,
+          2
+        ],
+        "kappa_undefined_reason": null,
+        "linear_weighted_cohens_kappa": 0.56,
+        "n_shared": 22
+      },
+      "relevance": {
+        "exact_agreement_count": 19,
+        "exact_agreement_rate": 0.8636363636,
+        "fixed_domain": [
+          0,
+          1,
+          2
+        ],
+        "kappa_undefined_reason": null,
+        "linear_weighted_cohens_kappa": 0.7179487179,
+        "n_shared": 22
+      },
+      "safety_boundary_compliance": {
+        "exact_agreement_count": 17,
+        "exact_agreement_rate": 0.7727272727,
+        "fixed_domain": [
+          0,
+          1,
+          2
+        ],
+        "kappa_undefined_reason": null,
+        "linear_weighted_cohens_kappa": 0.375,
+        "n_shared": 22
+      }
+    },
+    "quality_total": {
+      "exact_agreement_count": 10,
+      "exact_agreement_rate": 0.4545454545,
+      "fixed_domain": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "kappa_undefined_reason": null,
+      "linear_weighted_cohens_kappa": 0.6220614828,
+      "n_shared": 22
+    }
+  },
+  "reviewer_bundle_id": "b3b_df58ae0ecc6666a7feff0aa2",
+  "rq1": {
+    "comparisons": {
+      "acceptable": {
+        "alternative": "two-sided",
+        "concordant_both_fail": 15,
+        "concordant_both_pass": 31,
+        "discordant_pair_odds_ratio_second_vs_first": {
+          "status": "finite",
+          "value": 4.0
+        },
+        "discordant_pairs": 5,
+        "first_fail_second_pass": 4,
+        "first_pass_second_fail": 1,
+        "n_pairs": 51,
+        "p_value": 0.375,
+        "paired_pass_rate_difference_second_minus_first": 0.0588235294,
+        "status": "predeclared_primary",
+        "test": "exact McNemar"
+      },
+      "dimensions": {
+        "completeness_actionability": {
+          "direction": "V2 minus QA-only reconstructed baseline",
+          "paired_difference": {
+            "distribution": {
+              "-1": 2,
+              "-2": 0,
+              "0": 41,
+              "1": 8,
+              "2": 0
+            },
+            "maximum": 1,
+            "mean": 0.1176470588,
+            "median": 0.0,
+            "minimum": -1,
+            "n": 51,
+            "standard_deviation": 0.4311407577
+          },
+          "status": "exploratory",
+          "wilcoxon": {
+            "all_pairs_tied": false,
+            "alternative": "two-sided",
+            "matched_pairs_rank_biserial": 0.6,
+            "multiplicity_family": "RQ1 exploratory four-dimension paired comparisons",
+            "n_negative": 2,
+            "n_nonzero": 10,
+            "n_pairs": 51,
+            "n_positive": 8,
+            "n_zero": 41,
+            "p_value": 0.109375,
+            "p_value_holm": 0.4375,
+            "p_value_method": "exact conditional sign permutation with midranks for tied absolute differences",
+            "statistic_min_rank_sum": 11.0,
+            "test": "Wilcoxon signed-rank",
+            "w_minus": 11.0,
+            "w_plus": 44.0,
+            "zero_method": "wilcox_discard"
+          }
+        },
+        "factual_policy_correctness": {
+          "direction": "V2 minus QA-only reconstructed baseline",
+          "paired_difference": {
+            "distribution": {
+              "-1": 2,
+              "-2": 0,
+              "0": 46,
+              "1": 1,
+              "2": 2
+            },
+            "maximum": 2,
+            "mean": 0.0588235294,
+            "median": 0.0,
+            "minimum": -1,
+            "n": 51,
+            "standard_deviation": 0.4652639984
+          },
+          "status": "exploratory",
+          "wilcoxon": {
+            "all_pairs_tied": false,
+            "alternative": "two-sided",
+            "matched_pairs_rank_biserial": 0.4666666667,
+            "multiplicity_family": "RQ1 exploratory four-dimension paired comparisons",
+            "n_negative": 2,
+            "n_nonzero": 5,
+            "n_pairs": 51,
+            "n_positive": 3,
+            "n_zero": 46,
+            "p_value": 0.4375,
+            "p_value_holm": 1.0,
+            "p_value_method": "exact conditional sign permutation with midranks for tied absolute differences",
+            "statistic_min_rank_sum": 4.0,
+            "test": "Wilcoxon signed-rank",
+            "w_minus": 4.0,
+            "w_plus": 11.0,
+            "zero_method": "wilcox_discard"
+          }
+        },
+        "relevance": {
+          "direction": "V2 minus QA-only reconstructed baseline",
+          "paired_difference": {
+            "distribution": {
+              "-1": 0,
+              "-2": 1,
+              "0": 49,
+              "1": 1,
+              "2": 0
+            },
+            "maximum": 1,
+            "mean": -0.0196078431,
+            "median": 0.0,
+            "minimum": -2,
+            "n": 51,
+            "standard_deviation": 0.3156071025
+          },
+          "status": "exploratory",
+          "wilcoxon": {
+            "all_pairs_tied": false,
+            "alternative": "two-sided",
+            "matched_pairs_rank_biserial": -0.3333333333,
+            "multiplicity_family": "RQ1 exploratory four-dimension paired comparisons",
+            "n_negative": 1,
+            "n_nonzero": 2,
+            "n_pairs": 51,
+            "n_positive": 1,
+            "n_zero": 49,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "p_value_method": "exact conditional sign permutation with midranks for tied absolute differences",
+            "statistic_min_rank_sum": 1.0,
+            "test": "Wilcoxon signed-rank",
+            "w_minus": 2.0,
+            "w_plus": 1.0,
+            "zero_method": "wilcox_discard"
+          }
+        },
+        "safety_boundary_compliance": {
+          "direction": "V2 minus QA-only reconstructed baseline",
+          "paired_difference": {
+            "distribution": {
+              "-1": 3,
+              "-2": 0,
+              "0": 44,
+              "1": 3,
+              "2": 1
+            },
+            "maximum": 2,
+            "mean": 0.0392156863,
+            "median": 0.0,
+            "minimum": -1,
+            "n": 51,
+            "standard_deviation": 0.4454563644
+          },
+          "status": "exploratory",
+          "wilcoxon": {
+            "all_pairs_tied": false,
+            "alternative": "two-sided",
+            "matched_pairs_rank_biserial": 0.25,
+            "multiplicity_family": "RQ1 exploratory four-dimension paired comparisons",
+            "n_negative": 3,
+            "n_nonzero": 7,
+            "n_pairs": 51,
+            "n_positive": 4,
+            "n_zero": 44,
+            "p_value": 0.765625,
+            "p_value_holm": 1.0,
+            "p_value_method": "exact conditional sign permutation with midranks for tied absolute differences",
+            "statistic_min_rank_sum": 10.5,
+            "test": "Wilcoxon signed-rank",
+            "w_minus": 10.5,
+            "w_plus": 17.5,
+            "zero_method": "wilcox_discard"
+          }
+        }
+      },
+      "quality_total": {
+        "direction": "V2 minus QA-only reconstructed baseline",
+        "paired_bootstrap_95_ci": {
+          "confidence_level": 0.95,
+          "estimand": "paired mean difference",
+          "lower": -0.137254902,
+          "method": "percentile bootstrap",
+          "resamples": 100000,
+          "seed": 20260721,
+          "upper": 0.5490196078
+        },
+        "paired_difference": {
+          "distribution": {
+            "-1": 4,
+            "-2": 0,
+            "-3": 0,
+            "-4": 1,
+            "-5": 0,
+            "-6": 0,
+            "-7": 0,
+            "-8": 0,
+            "0": 38,
+            "1": 4,
+            "2": 1,
+            "3": 1,
+            "4": 1,
+            "5": 1,
+            "6": 0,
+            "7": 0,
+            "8": 0
+          },
+          "maximum": 5,
+          "mean": 0.1960784314,
+          "median": 0.0,
+          "minimum": -4,
+          "n": 51,
+          "standard_deviation": 1.2332008408
+        },
+        "status": "predeclared_primary",
+        "wilcoxon": {
+          "all_pairs_tied": false,
+          "alternative": "two-sided",
+          "matched_pairs_rank_biserial": 0.3516483516,
+          "n_negative": 5,
+          "n_nonzero": 13,
+          "n_pairs": 51,
+          "n_positive": 8,
+          "n_zero": 38,
+          "p_value": 0.28466796875,
+          "p_value_method": "exact conditional sign permutation with midranks for tied absolute differences",
+          "statistic_min_rank_sum": 29.5,
+          "test": "Wilcoxon signed-rank",
+          "w_minus": 29.5,
+          "w_plus": 61.5,
+          "zero_method": "wilcox_discard"
+        }
+      }
+    },
+    "design": {
+      "paired_questions": 51,
+      "primary_reviewer": "Reviewer 1",
+      "responses_per_system": 51
+    },
+    "systems": {
+      "qa_only_reconstructed_baseline": {
+        "acceptable": {
+          "distribution": {
+            "false": 19,
+            "true": 32
+          },
+          "fail_count": 19,
+          "n": 51,
+          "pass_count": 32,
+          "pass_rate": 0.6274509804
+        },
+        "dimensions": {
+          "completeness_actionability": {
+            "distribution": {
+              "0": 13,
+              "1": 23,
+              "2": 15
+            },
+            "maximum": 2,
+            "mean": 1.0392156863,
+            "median": 1.0,
+            "minimum": 0,
+            "n": 51,
+            "standard_deviation": 0.7472826591
+          },
+          "factual_policy_correctness": {
+            "distribution": {
+              "0": 4,
+              "1": 30,
+              "2": 17
+            },
+            "maximum": 2,
+            "mean": 1.2549019608,
+            "median": 1.0,
+            "minimum": 0,
+            "n": 51,
+            "standard_deviation": 0.5947482578
+          },
+          "relevance": {
+            "distribution": {
+              "0": 0,
+              "1": 13,
+              "2": 38
+            },
+            "maximum": 2,
+            "mean": 1.7450980392,
+            "median": 2.0,
+            "minimum": 1,
+            "n": 51,
+            "standard_deviation": 0.4401425794
+          },
+          "safety_boundary_compliance": {
+            "distribution": {
+              "0": 1,
+              "1": 9,
+              "2": 41
+            },
+            "maximum": 2,
+            "mean": 1.7843137255,
+            "median": 2.0,
+            "minimum": 0,
+            "n": 51,
+            "standard_deviation": 0.461030389
+          }
+        },
+        "display_label": "QA-only reconstructed baseline",
+        "formal_system_id": "qa_only_reconstructed_baseline",
+        "n": 51,
+        "primary_error_type_distribution": {
+          "incomplete": 11,
+          "incorrect_or_unsupported": 8
+        },
+        "quality_total": {
+          "distribution": {
+            "0": 0,
+            "1": 0,
+            "2": 2,
+            "3": 1,
+            "4": 12,
+            "5": 4,
+            "6": 12,
+            "7": 10,
+            "8": 10
+          },
+          "maximum": 8,
+          "mean": 5.8235294118,
+          "median": 6.0,
+          "minimum": 2,
+          "n": 51,
+          "standard_deviation": 1.681735798
+        },
+        "role": "baseline"
+      },
+      "v2": {
+        "acceptable": {
+          "distribution": {
+            "false": 16,
+            "true": 35
+          },
+          "fail_count": 16,
+          "n": 51,
+          "pass_count": 35,
+          "pass_rate": 0.6862745098
+        },
+        "dimensions": {
+          "completeness_actionability": {
+            "distribution": {
+              "0": 12,
+              "1": 19,
+              "2": 20
+            },
+            "maximum": 2,
+            "mean": 1.1568627451,
+            "median": 1.0,
+            "minimum": 0,
+            "n": 51,
+            "standard_deviation": 0.7841568471
+          },
+          "factual_policy_correctness": {
+            "distribution": {
+              "0": 3,
+              "1": 29,
+              "2": 19
+            },
+            "maximum": 2,
+            "mean": 1.3137254902,
+            "median": 1.0,
+            "minimum": 0,
+            "n": 51,
+            "standard_deviation": 0.5827588207
+          },
+          "relevance": {
+            "distribution": {
+              "0": 1,
+              "1": 12,
+              "2": 38
+            },
+            "maximum": 2,
+            "mean": 1.7254901961,
+            "median": 2.0,
+            "minimum": 0,
+            "n": 51,
+            "standard_deviation": 0.4930894999
+          },
+          "safety_boundary_compliance": {
+            "distribution": {
+              "0": 0,
+              "1": 9,
+              "2": 42
+            },
+            "maximum": 2,
+            "mean": 1.8235294118,
+            "median": 2.0,
+            "minimum": 1,
+            "n": 51,
+            "standard_deviation": 0.3850133688
+          }
+        },
+        "display_label": "V2",
+        "formal_system_id": "current_v2",
+        "n": 51,
+        "primary_error_type_distribution": {
+          "incomplete": 10,
+          "incorrect_or_unsupported": 5,
+          "irrelevant": 1
+        },
+        "quality_total": {
+          "distribution": {
+            "0": 0,
+            "1": 0,
+            "2": 2,
+            "3": 4,
+            "4": 7,
+            "5": 3,
+            "6": 13,
+            "7": 6,
+            "8": 16
+          },
+          "maximum": 8,
+          "mean": 6.0196078431,
+          "median": 6.0,
+          "minimum": 2,
+          "n": 51,
+          "standard_deviation": 1.8383709754
+        },
+        "role": "current_system"
+      }
+    }
+  },
+  "rq2": {
+    "comparisons": {
+      "case_pass": {
+        "alternative": "two-sided",
+        "concordant_both_fail": 8,
+        "concordant_both_pass": 9,
+        "discordant_pair_odds_ratio_second_vs_first": {
+          "status": "finite",
+          "value": 2.0
+        },
+        "discordant_pairs": 3,
+        "first_fail_second_pass": 2,
+        "first_pass_second_fail": 1,
+        "multiplicity_family": "RQ2 exploratory four binary outcomes",
+        "n_pairs": 20,
+        "p_value": 1.0,
+        "p_value_holm": 1.0,
+        "paired_pass_rate_difference_second_minus_first": 0.05,
+        "status": "exploratory",
+        "test": "exact McNemar"
+      },
+      "forbidden_content_pass": {
+        "alternative": "two-sided",
+        "concordant_both_fail": 1,
+        "concordant_both_pass": 19,
+        "discordant_pair_odds_ratio_second_vs_first": {
+          "status": "undefined_no_discordant_pairs",
+          "value": null
+        },
+        "discordant_pairs": 0,
+        "first_fail_second_pass": 0,
+        "first_pass_second_fail": 0,
+        "multiplicity_family": "RQ2 exploratory four binary outcomes",
+        "n_pairs": 20,
+        "p_value": 1.0,
+        "p_value_holm": 1.0,
+        "paired_pass_rate_difference_second_minus_first": 0.0,
+        "status": "exploratory",
+        "test": "exact McNemar"
+      },
+      "required_content_pass": {
+        "alternative": "two-sided",
+        "concordant_both_fail": 8,
+        "concordant_both_pass": 9,
+        "discordant_pair_odds_ratio_second_vs_first": {
+          "status": "finite",
+          "value": 2.0
+        },
+        "discordant_pairs": 3,
+        "first_fail_second_pass": 2,
+        "first_pass_second_fail": 1,
+        "multiplicity_family": "RQ2 exploratory four binary outcomes",
+        "n_pairs": 20,
+        "p_value": 1.0,
+        "p_value_holm": 1.0,
+        "paired_pass_rate_difference_second_minus_first": 0.05,
+        "status": "exploratory",
+        "test": "exact McNemar"
+      },
+      "route_pass": {
+        "alternative": "two-sided",
+        "concordant_both_fail": 3,
+        "concordant_both_pass": 13,
+        "discordant_pair_odds_ratio_second_vs_first": {
+          "status": "finite",
+          "value": 1.0
+        },
+        "discordant_pairs": 4,
+        "first_fail_second_pass": 2,
+        "first_pass_second_fail": 2,
+        "multiplicity_family": "RQ2 exploratory four binary outcomes",
+        "n_pairs": 20,
+        "p_value": 1.0,
+        "p_value_holm": 1.0,
+        "paired_pass_rate_difference_second_minus_first": 0.0,
+        "status": "exploratory",
+        "test": "exact McNemar"
+      }
+    },
+    "design": {
+      "paired_cases": 20,
+      "responses_per_system": 20
+    },
+    "systems": {
+      "qa_only_reconstructed_baseline": {
+        "display_label": "QA-only reconstructed baseline",
+        "formal_system_id": "qa_only_reconstructed_baseline",
+        "n": 20,
+        "outcomes": {
+          "case_pass": {
+            "distribution": {
+              "false": 10,
+              "true": 10
+            },
+            "fail_count": 10,
+            "n": 20,
+            "pass_count": 10,
+            "pass_rate": 0.5
+          },
+          "forbidden_content_pass": {
+            "distribution": {
+              "false": 1,
+              "true": 19
+            },
+            "fail_count": 1,
+            "n": 20,
+            "pass_count": 19,
+            "pass_rate": 0.95
+          },
+          "required_content_pass": {
+            "distribution": {
+              "false": 10,
+              "true": 10
+            },
+            "fail_count": 10,
+            "n": 20,
+            "pass_count": 10,
+            "pass_rate": 0.5
+          },
+          "route_pass": {
+            "distribution": {
+              "false": 5,
+              "true": 15
+            },
+            "fail_count": 5,
+            "n": 20,
+            "pass_count": 15,
+            "pass_rate": 0.75
+          }
+        },
+        "role": "baseline"
+      },
+      "v2": {
+        "display_label": "V2",
+        "formal_system_id": "current_v2",
+        "n": 20,
+        "outcomes": {
+          "case_pass": {
+            "distribution": {
+              "false": 9,
+              "true": 11
+            },
+            "fail_count": 9,
+            "n": 20,
+            "pass_count": 11,
+            "pass_rate": 0.55
+          },
+          "forbidden_content_pass": {
+            "distribution": {
+              "false": 1,
+              "true": 19
+            },
+            "fail_count": 1,
+            "n": 20,
+            "pass_count": 19,
+            "pass_rate": 0.95
+          },
+          "required_content_pass": {
+            "distribution": {
+              "false": 9,
+              "true": 11
+            },
+            "fail_count": 9,
+            "n": 20,
+            "pass_count": 11,
+            "pass_rate": 0.55
+          },
+          "route_pass": {
+            "distribution": {
+              "false": 5,
+              "true": 15
+            },
+            "fail_count": 5,
+            "n": 20,
+            "pass_count": 15,
+            "pass_rate": 0.75
+          }
+        },
+        "role": "current_system"
+      }
+    }
+  },
+  "rq3": {
+    "comparisons": {
+      "all_turns_clustered_descriptive": {
+        "forbidden_content_pass": {
+          "inferential_test": null,
+          "n_turn_pairs": 24,
+          "paired_pass_rate_difference_context_aware_minus_single_turn": 0.0,
+          "reason": "turns are clustered within dialogues; inference is reported separately by turn index and at dialogue level"
+        },
+        "required_content_pass": {
+          "inferential_test": null,
+          "n_turn_pairs": 24,
+          "paired_pass_rate_difference_context_aware_minus_single_turn": 0.0416666667,
+          "reason": "turns are clustered within dialogues; inference is reported separately by turn index and at dialogue level"
+        },
+        "route_pass": {
+          "inferential_test": null,
+          "n_turn_pairs": 24,
+          "paired_pass_rate_difference_context_aware_minus_single_turn": 0.0,
+          "reason": "turns are clustered within dialogues; inference is reported separately by turn index and at dialogue level"
+        },
+        "turn_pass": {
+          "inferential_test": null,
+          "n_turn_pairs": 24,
+          "paired_pass_rate_difference_context_aware_minus_single_turn": 0.0416666667,
+          "reason": "turns are clustered within dialogues; inference is reported separately by turn index and at dialogue level"
+        }
+      },
+      "dialogue_level": {
+        "dialogue_pass": {
+          "alternative": "two-sided",
+          "concordant_both_fail": 4,
+          "concordant_both_pass": 7,
+          "discordant_pair_odds_ratio_second_vs_first": {
+            "status": "infinite_in_favor_of_second",
+            "value": null
+          },
+          "discordant_pairs": 1,
+          "first_fail_second_pass": 1,
+          "first_pass_second_fail": 0,
+          "multiplicity_family": "RQ3 exploratory two dialogue outcomes",
+          "n_pairs": 12,
+          "p_value": 1.0,
+          "p_value_holm": 1.0,
+          "paired_pass_rate_difference_second_minus_first": 0.0833333333,
+          "status": "exploratory",
+          "test": "exact McNemar"
+        },
+        "no_safety_violation": {
+          "alternative": "two-sided",
+          "concordant_both_fail": 0,
+          "concordant_both_pass": 12,
+          "discordant_pair_odds_ratio_second_vs_first": {
+            "status": "undefined_no_discordant_pairs",
+            "value": null
+          },
+          "discordant_pairs": 0,
+          "first_fail_second_pass": 0,
+          "first_pass_second_fail": 0,
+          "multiplicity_family": "RQ3 exploratory two dialogue outcomes",
+          "n_pairs": 12,
+          "p_value": 1.0,
+          "p_value_holm": 1.0,
+          "paired_pass_rate_difference_second_minus_first": 0.0,
+          "status": "exploratory",
+          "test": "exact McNemar"
+        }
+      },
+      "turn_level_by_turn_index": {
+        "1": {
+          "forbidden_content_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 0,
+            "concordant_both_pass": 12,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "undefined_no_discordant_pairs",
+              "value": null
+            },
+            "discordant_pairs": 0,
+            "first_fail_second_pass": 0,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-1 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          },
+          "required_content_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 2,
+            "concordant_both_pass": 9,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "infinite_in_favor_of_second",
+              "value": null
+            },
+            "discordant_pairs": 1,
+            "first_fail_second_pass": 1,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-1 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0833333333,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          },
+          "route_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 1,
+            "concordant_both_pass": 11,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "undefined_no_discordant_pairs",
+              "value": null
+            },
+            "discordant_pairs": 0,
+            "first_fail_second_pass": 0,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-1 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          },
+          "turn_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 2,
+            "concordant_both_pass": 9,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "infinite_in_favor_of_second",
+              "value": null
+            },
+            "discordant_pairs": 1,
+            "first_fail_second_pass": 1,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-1 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0833333333,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          }
+        },
+        "2": {
+          "forbidden_content_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 0,
+            "concordant_both_pass": 12,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "undefined_no_discordant_pairs",
+              "value": null
+            },
+            "discordant_pairs": 0,
+            "first_fail_second_pass": 0,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-2 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          },
+          "required_content_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 4,
+            "concordant_both_pass": 8,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "undefined_no_discordant_pairs",
+              "value": null
+            },
+            "discordant_pairs": 0,
+            "first_fail_second_pass": 0,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-2 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          },
+          "route_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 1,
+            "concordant_both_pass": 11,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "undefined_no_discordant_pairs",
+              "value": null
+            },
+            "discordant_pairs": 0,
+            "first_fail_second_pass": 0,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-2 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          },
+          "turn_pass": {
+            "alternative": "two-sided",
+            "concordant_both_fail": 4,
+            "concordant_both_pass": 8,
+            "discordant_pair_odds_ratio_second_vs_first": {
+              "status": "undefined_no_discordant_pairs",
+              "value": null
+            },
+            "discordant_pairs": 0,
+            "first_fail_second_pass": 0,
+            "first_pass_second_fail": 0,
+            "multiplicity_family": "RQ3 exploratory turn-2 four binary outcomes",
+            "n_pairs": 12,
+            "p_value": 1.0,
+            "p_value_holm": 1.0,
+            "paired_pass_rate_difference_second_minus_first": 0.0,
+            "status": "exploratory",
+            "test": "exact McNemar"
+          }
+        }
+      }
+    },
+    "design": {
+      "dialogues_per_system": 12,
+      "paired_dialogue_cases": 12,
+      "turns_per_system": 24
+    },
+    "systems": {
+      "context_aware": {
+        "dialogues": {
+          "error_type_distribution": {
+            "incomplete": 4
+          },
+          "n": 12,
+          "outcomes": {
+            "dialogue_pass": {
+              "distribution": {
+                "false": 4,
+                "true": 8
+              },
+              "fail_count": 4,
+              "n": 12,
+              "pass_count": 8,
+              "pass_rate": 0.6666666667
+            },
+            "no_safety_violation": {
+              "distribution": {
+                "false": 0,
+                "true": 12
+              },
+              "fail_count": 0,
+              "n": 12,
+              "pass_count": 12,
+              "pass_rate": 1.0
+            }
+          }
+        },
+        "display_label": "V2.1b context-aware",
+        "formal_system_id": "v21b_context_aware",
+        "role": "rq3_current_system",
+        "turns": {
+          "all_turns": {
+            "n": 24,
+            "outcomes": {
+              "forbidden_content_pass": {
+                "distribution": {
+                  "false": 0,
+                  "true": 24
+                },
+                "fail_count": 0,
+                "n": 24,
+                "pass_count": 24,
+                "pass_rate": 1.0
+              },
+              "required_content_pass": {
+                "distribution": {
+                  "false": 6,
+                  "true": 18
+                },
+                "fail_count": 6,
+                "n": 24,
+                "pass_count": 18,
+                "pass_rate": 0.75
+              },
+              "route_pass": {
+                "distribution": {
+                  "false": 2,
+                  "true": 22
+                },
+                "fail_count": 2,
+                "n": 24,
+                "pass_count": 22,
+                "pass_rate": 0.9166666667
+              },
+              "turn_pass": {
+                "distribution": {
+                  "false": 6,
+                  "true": 18
+                },
+                "fail_count": 6,
+                "n": 24,
+                "pass_count": 18,
+                "pass_rate": 0.75
+              }
+            }
+          },
+          "by_turn_index": {
+            "1": {
+              "n": 12,
+              "outcomes": {
+                "forbidden_content_pass": {
+                  "distribution": {
+                    "false": 0,
+                    "true": 12
+                  },
+                  "fail_count": 0,
+                  "n": 12,
+                  "pass_count": 12,
+                  "pass_rate": 1.0
+                },
+                "required_content_pass": {
+                  "distribution": {
+                    "false": 2,
+                    "true": 10
+                  },
+                  "fail_count": 2,
+                  "n": 12,
+                  "pass_count": 10,
+                  "pass_rate": 0.8333333333
+                },
+                "route_pass": {
+                  "distribution": {
+                    "false": 1,
+                    "true": 11
+                  },
+                  "fail_count": 1,
+                  "n": 12,
+                  "pass_count": 11,
+                  "pass_rate": 0.9166666667
+                },
+                "turn_pass": {
+                  "distribution": {
+                    "false": 2,
+                    "true": 10
+                  },
+                  "fail_count": 2,
+                  "n": 12,
+                  "pass_count": 10,
+                  "pass_rate": 0.8333333333
+                }
+              }
+            },
+            "2": {
+              "n": 12,
+              "outcomes": {
+                "forbidden_content_pass": {
+                  "distribution": {
+                    "false": 0,
+                    "true": 12
+                  },
+                  "fail_count": 0,
+                  "n": 12,
+                  "pass_count": 12,
+                  "pass_rate": 1.0
+                },
+                "required_content_pass": {
+                  "distribution": {
+                    "false": 4,
+                    "true": 8
+                  },
+                  "fail_count": 4,
+                  "n": 12,
+                  "pass_count": 8,
+                  "pass_rate": 0.6666666667
+                },
+                "route_pass": {
+                  "distribution": {
+                    "false": 1,
+                    "true": 11
+                  },
+                  "fail_count": 1,
+                  "n": 12,
+                  "pass_count": 11,
+                  "pass_rate": 0.9166666667
+                },
+                "turn_pass": {
+                  "distribution": {
+                    "false": 4,
+                    "true": 8
+                  },
+                  "fail_count": 4,
+                  "n": 12,
+                  "pass_count": 8,
+                  "pass_rate": 0.6666666667
+                }
+              }
+            }
+          }
+        }
+      },
+      "single_turn": {
+        "dialogues": {
+          "error_type_distribution": {
+            "incomplete": 3,
+            "missing_required_content": 2
+          },
+          "n": 12,
+          "outcomes": {
+            "dialogue_pass": {
+              "distribution": {
+                "false": 5,
+                "true": 7
+              },
+              "fail_count": 5,
+              "n": 12,
+              "pass_count": 7,
+              "pass_rate": 0.5833333333
+            },
+            "no_safety_violation": {
+              "distribution": {
+                "false": 0,
+                "true": 12
+              },
+              "fail_count": 0,
+              "n": 12,
+              "pass_count": 12,
+              "pass_rate": 1.0
+            }
+          }
+        },
+        "display_label": "V2 single-turn",
+        "formal_system_id": "v2_without_context_management",
+        "role": "rq3_comparator",
+        "turns": {
+          "all_turns": {
+            "n": 24,
+            "outcomes": {
+              "forbidden_content_pass": {
+                "distribution": {
+                  "false": 0,
+                  "true": 24
+                },
+                "fail_count": 0,
+                "n": 24,
+                "pass_count": 24,
+                "pass_rate": 1.0
+              },
+              "required_content_pass": {
+                "distribution": {
+                  "false": 7,
+                  "true": 17
+                },
+                "fail_count": 7,
+                "n": 24,
+                "pass_count": 17,
+                "pass_rate": 0.7083333333
+              },
+              "route_pass": {
+                "distribution": {
+                  "false": 2,
+                  "true": 22
+                },
+                "fail_count": 2,
+                "n": 24,
+                "pass_count": 22,
+                "pass_rate": 0.9166666667
+              },
+              "turn_pass": {
+                "distribution": {
+                  "false": 7,
+                  "true": 17
+                },
+                "fail_count": 7,
+                "n": 24,
+                "pass_count": 17,
+                "pass_rate": 0.7083333333
+              }
+            }
+          },
+          "by_turn_index": {
+            "1": {
+              "n": 12,
+              "outcomes": {
+                "forbidden_content_pass": {
+                  "distribution": {
+                    "false": 0,
+                    "true": 12
+                  },
+                  "fail_count": 0,
+                  "n": 12,
+                  "pass_count": 12,
+                  "pass_rate": 1.0
+                },
+                "required_content_pass": {
+                  "distribution": {
+                    "false": 3,
+                    "true": 9
+                  },
+                  "fail_count": 3,
+                  "n": 12,
+                  "pass_count": 9,
+                  "pass_rate": 0.75
+                },
+                "route_pass": {
+                  "distribution": {
+                    "false": 1,
+                    "true": 11
+                  },
+                  "fail_count": 1,
+                  "n": 12,
+                  "pass_count": 11,
+                  "pass_rate": 0.9166666667
+                },
+                "turn_pass": {
+                  "distribution": {
+                    "false": 3,
+                    "true": 9
+                  },
+                  "fail_count": 3,
+                  "n": 12,
+                  "pass_count": 9,
+                  "pass_rate": 0.75
+                }
+              }
+            },
+            "2": {
+              "n": 12,
+              "outcomes": {
+                "forbidden_content_pass": {
+                  "distribution": {
+                    "false": 0,
+                    "true": 12
+                  },
+                  "fail_count": 0,
+                  "n": 12,
+                  "pass_count": 12,
+                  "pass_rate": 1.0
+                },
+                "required_content_pass": {
+                  "distribution": {
+                    "false": 4,
+                    "true": 8
+                  },
+                  "fail_count": 4,
+                  "n": 12,
+                  "pass_count": 8,
+                  "pass_rate": 0.6666666667
+                },
+                "route_pass": {
+                  "distribution": {
+                    "false": 1,
+                    "true": 11
+                  },
+                  "fail_count": 1,
+                  "n": 12,
+                  "pass_count": 11,
+                  "pass_rate": 0.9166666667
+                },
+                "turn_pass": {
+                  "distribution": {
+                    "false": 4,
+                    "true": 8
+                  },
+                  "fail_count": 4,
+                  "n": 12,
+                  "pass_count": 8,
+                  "pass_rate": 0.6666666667
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "schema_version": "formal-evaluation-results-v1",
+  "statistical_methods": {
+    "alpha": 0.05,
+    "exploratory": {
+      "rq1_dimensions": "paired Wilcoxon and matched-pairs rank-biserial",
+      "rq2_binary_outcomes": "exact McNemar",
+      "rq3_binary_outcomes": "exact McNemar at dialogue level and separately by turn index"
+    },
+    "operational_details": {
+      "exploratory_multiplicity": "Holm adjustment within each declared exploratory outcome family",
+      "mcnemar": "two-sided exact binomial test on discordant pairs",
+      "paired_bootstrap": "percentile CI for the paired mean difference; 100000 resamples; seed 20260721",
+      "wilcoxon": "two-sided exact conditional sign permutation; zero differences discarded; midranks used for tied absolute differences"
+    },
+    "predeclared": {
+      "inter_rater": "exact agreement and linear-weighted Cohen's kappa",
+      "rq1_acceptable": "exact McNemar",
+      "rq1_quality_total": "paired Wilcoxon signed-rank, matched-pairs rank-biserial, paired-bootstrap 95% confidence interval"
+    }
+  },
+  "system_unblinding": {
+    "context_aware": {
+      "display_label": "V2.1b context-aware",
+      "formal_system_id": "v21b_context_aware",
+      "role": "rq3_current_system"
+    },
+    "qa_only_reconstructed_baseline": {
+      "display_label": "QA-only reconstructed baseline",
+      "formal_system_id": "qa_only_reconstructed_baseline",
+      "role": "baseline"
+    },
+    "single_turn": {
+      "display_label": "V2 single-turn",
+      "formal_system_id": "v2_without_context_management",
+      "role": "rq3_comparator"
+    },
+    "v2": {
+      "display_label": "V2",
+      "formal_system_id": "current_v2",
+      "role": "current_system"
+    }
+  }
+}
