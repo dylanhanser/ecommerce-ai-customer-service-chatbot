@@ -843,6 +843,57 @@ def _baseline_provider_case(
     return plan, contract, completions, authority
 
 
+def _v2_provider_case(
+    monkeypatch: pytest.MonkeyPatch, content: str
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, Any],
+    dict[str, Any],
+    _SuccessCompletions,
+    real.ProductionRealAuthorityV1,
+]:
+    from formal_evaluation_runtime import rag
+
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    unit = plan[1]
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    completions = _SuccessCompletions(content)
+    authority = real.ProductionRealAuthorityV1(
+        evidence,
+        _synthetic_loaded_resources(),
+        real._SDKRawCompletionsAdapterV1(completions),
+        contract,
+    )
+
+    def v2_executor(context):
+        gateway = real._CoreCompletionsGatewayV1(context)
+        response = gateway.create(
+            messages=[
+                {"role": "user", "content": "Synthetic V2 provider request"}
+            ],
+            **dict(transport.fixed_generation_snapshot()),
+        )
+        return real._project_v2_core_result(
+            {
+                "final_answer": rag.finalize_answer(
+                    response.choices[0].message.content
+                ),
+                "reranked_results": [],
+                "requires_backend_api": False,
+                "skip_llm": False,
+                "skip_retrieval": False,
+                "query_type": "normal",
+            },
+            gateway,
+            runtime_snapshot=None,
+        )
+
+    authority._v2_executor = v2_executor
+    return plan, unit, contract, completions, authority
+
+
 def test_baseline_finalized_provider_response_validates_and_commits(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -915,6 +966,163 @@ def test_baseline_finalized_provider_response_validates_and_commits(
     assert not hasattr(observed[0], "raw_provider_content")
     assert raw_content not in repr(observed[0])
     assert not projection._REVIEWER_PROJECTION_ROOT.exists()
+
+
+def test_v2_finalized_provider_response_validates_and_commits(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw_content = "您好。V2最终合成回答"
+    plan, unit, contract, completions, authority = _v2_provider_case(
+        monkeypatch, raw_content
+    )
+    finalized = authority._finalize_v2_provider_response(raw_content)
+    assert finalized != raw_content
+
+    outcome = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert outcome.action == "completed"
+    assert outcome.provider_call_count == 1
+    assert completions.calls == 1
+    executed = outcome.orchestration_outcome
+    assert executed is not None
+    assert executed.failure_category is None
+    assert executed.formal_result is not None
+    assert executed.formal_result["response_text"] == finalized
+    raw_sha256 = transport.sha256_text(raw_content)
+    final_sha256 = transport.sha256_text(finalized)
+    assert raw_sha256 != final_sha256
+    success = executed.authoritative_success
+    assert success is not None
+    assert success.provider_response_sha256 == raw_sha256
+    assert success.response_sha256 == final_sha256
+    assert executed.journal.provider_response_sha256 == raw_sha256
+    assert executed.journal.response_sha256 == final_sha256
+    unit_id = store._execution_unit_id(unit)
+    pending = store._read_json(
+        store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json",
+        store._PENDING_LIMIT,
+    )
+    assert pending["status"] == "consumed"
+    assert pending["normalized_response"]["content"] == raw_content
+    assert pending["normalized_response"]["response_sha256"] == raw_sha256
+
+
+def test_v2_pending_raw_response_resumes_without_provider_recall(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw_content = "您好。V2待恢复合成回答"
+    plan, unit, contract, completions, authority = _v2_provider_case(
+        monkeypatch, raw_content
+    )
+    finalized = authority._finalize_v2_provider_response(raw_content)
+    original_dependencies = authority.dependencies_for
+
+    def legacy_dependencies(selected, state):
+        dependencies = original_dependencies(selected, state)
+        dependencies["v2_provider_response_finalizer"] = None
+        return dependencies
+
+    monkeypatch.setattr(authority, "dependencies_for", legacy_dependencies)
+    failed = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert failed.action == "advanced"
+    assert failed.journal_state == "provider_returned"
+    assert failed.private_commit_sha256 is None
+    assert failed.provider_call_count == 1
+    assert completions.calls == 1
+    assert failed.orchestration_outcome is not None
+    assert (
+        failed.orchestration_outcome.failure_category
+        == "PROVIDER_CORE_RESPONSE_MISMATCH"
+    )
+    unit_id = store._execution_unit_id(unit)
+    pending_path = store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json"
+    pending = store._read_json(pending_path, store._PENDING_LIMIT)
+    assert pending["status"] == "pending"
+    assert pending["normalized_response"]["content"] == raw_content
+    raw_sha256 = transport.sha256_text(raw_content)
+    final_sha256 = transport.sha256_text(finalized)
+    mutable = store._read_json(
+        store._PRIVATE_STATE_ROOT / "journals" / f"{unit_id}.json",
+        store._JOURNAL_LIMIT,
+    )
+    assert mutable["journal"]["provider_response_sha256"] == raw_sha256
+    assert mutable["journal"]["response_sha256"] == raw_sha256
+
+    monkeypatch.setattr(authority, "dependencies_for", original_dependencies)
+    resumed = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert resumed.action == "completed"
+    assert resumed.provider_call_count == 0
+    assert completions.calls == 1
+    assert resumed.orchestration_outcome is not None
+    assert resumed.orchestration_outcome.formal_result is not None
+    assert resumed.orchestration_outcome.formal_result["response_text"] == finalized
+    consumed = store._read_json(pending_path, store._PENDING_LIMIT)
+    assert consumed["status"] == "consumed"
+    committed = store._read_json(
+        store._PRIVATE_STATE_ROOT / "journals" / f"{unit_id}.json",
+        store._JOURNAL_LIMIT,
+    )
+    assert committed["journal"]["provider_response_sha256"] == raw_sha256
+    assert committed["journal"]["response_sha256"] == final_sha256
+
+
+def test_v2_unrelated_core_response_remains_a_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    raw_content = "这是V2合成的提供方回答"
+    plan, unit, contract, completions, authority = _v2_provider_case(
+        monkeypatch, raw_content
+    )
+
+    def unrelated_executor(context):
+        context.invoke_provider(
+            [{"role": "user", "content": "Synthetic V2 provider request"}]
+        )
+        return {
+            "response_text": "Genuinely unrelated synthetic V2 core response.",
+            "route": "provider",
+            "guard_category": "normal",
+            "requires_backend_api": False,
+            "retrieval_used": True,
+            "retrieved_document_ids": [],
+            "retrieved_scores": [],
+        }
+
+    authority._v2_executor = unrelated_executor
+    outcome = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert outcome.action == "advanced"
+    assert outcome.journal_state == "provider_returned"
+    assert outcome.private_commit_sha256 is None
+    assert completions.calls == 1
+    assert outcome.orchestration_outcome is not None
+    assert (
+        outcome.orchestration_outcome.failure_category
+        == "PROVIDER_CORE_RESPONSE_MISMATCH"
+    )
+    assert list(store._PRIVATE_STATE_ROOT.glob("commits/*.json")) == []
 
 
 def test_baseline_unrelated_core_response_remains_a_mismatch(

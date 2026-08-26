@@ -922,15 +922,25 @@ def _reject_conflicting_journal_evidence(
     success: AuthoritativeSuccess,
     *,
     allow_legacy_baseline_finalization: bool = False,
+    allow_legacy_v2_finalization: bool = False,
 ) -> None:
     """Fail closed if a journal has already recorded different call evidence."""
 
-    if type(allow_legacy_baseline_finalization) is not bool:
+    if (
+        type(allow_legacy_baseline_finalization) is not bool
+        or type(allow_legacy_v2_finalization) is not bool
+    ):
         raise JournalError("JOURNAL_EVIDENCE_CONFLICT")
-    allow_response_sha256_change = (
+    allowed_legacy_finalization = (
         allow_legacy_baseline_finalization
-        and journal.state == "provider_returned"
         and journal.identity.system_config_id == "qa_only_reconstructed_baseline"
+    ) or (
+        allow_legacy_v2_finalization
+        and journal.identity.system_config_id in {"v2", "single_turn", "context_aware"}
+    )
+    allow_response_sha256_change = (
+        allowed_legacy_finalization
+        and journal.state == "provider_returned"
         and journal.provider_response_sha256 is not None
         and journal.response_sha256 == journal.provider_response_sha256
         and success.provider_response_sha256 == journal.provider_response_sha256
@@ -958,6 +968,7 @@ def reconcile(
     expected: ExecutionIdentity | Mapping[str, Any] | None = None,
     *,
     allow_legacy_baseline_finalization: bool = False,
+    allow_legacy_v2_finalization: bool = False,
 ) -> InflightJournal:
     _validate_journal(journal)
     expected_identity = journal.identity if expected is None else validate_expected_identity(expected)
@@ -970,6 +981,7 @@ def reconcile(
         journal,
         checked,
         allow_legacy_baseline_finalization=allow_legacy_baseline_finalization,
+        allow_legacy_v2_finalization=allow_legacy_v2_finalization,
     )
     if journal.state == "committed":
         return journal
@@ -999,8 +1011,12 @@ def recovery_decision(
     authoritative_success: AuthoritativeSuccess | Mapping[str, Any] | None = None,
     expected: ExecutionIdentity | Mapping[str, Any] | None = None,
     allow_legacy_baseline_finalization: bool = False,
+    allow_legacy_v2_finalization: bool = False,
 ) -> str:
-    if type(allow_legacy_baseline_finalization) is not bool:
+    if (
+        type(allow_legacy_baseline_finalization) is not bool
+        or type(allow_legacy_v2_finalization) is not bool
+    ):
         raise JournalError("JOURNAL_EVIDENCE_CONFLICT")
     expected_identity = validate_expected_identity(expected)
     if journal is not None:
@@ -1014,6 +1030,7 @@ def recovery_decision(
             authoritative_success,
             expected_identity,
             allow_legacy_baseline_finalization=allow_legacy_baseline_finalization,
+            allow_legacy_v2_finalization=allow_legacy_v2_finalization,
         )
         return "confirmed" if journal.state == "committed" else "reconcile_committed"
     if journal is None:

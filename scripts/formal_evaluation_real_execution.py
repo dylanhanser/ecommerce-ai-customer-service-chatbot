@@ -880,6 +880,12 @@ class ProductionRealAuthorityV1:
 
         return _load_vendor().finalize_answer(content)
 
+    @staticmethod
+    def _finalize_v2_provider_response(content: str) -> str:
+        from formal_evaluation_runtime import rag
+
+        return rag.finalize_answer(content)
+
     def _baseline_executor(self, context: Any) -> Mapping[str, Any]:
         from formal_qa_only_baseline.adapter import (
             BaselineResources,
@@ -991,6 +997,11 @@ class ProductionRealAuthorityV1:
             "baseline_provider_response_finalizer": (
                 self._finalize_baseline_provider_response
                 if unit["system_config_id"] == "qa_only_reconstructed_baseline"
+                else None
+            ),
+            "v2_provider_response_finalizer": (
+                self._finalize_v2_provider_response
+                if unit["system_config_id"] in {"v2", "single_turn", "context_aware"}
                 else None
             ),
         }

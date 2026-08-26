@@ -1009,6 +1009,7 @@ def _orchestrate_plan_member(
     runtime_identity_sha256: str,
     snapshot_validator: Callable[[Mapping[str, Any]], Any],
     baseline_provider_response_finalizer: Callable[[str], str] | None = None,
+    v2_provider_response_finalizer: Callable[[str], str] | None = None,
     journal_persistence_callback: Callable[[InflightJournal], None] | None = None,
     pending_response_persistence_callback: Callable[
         [InflightJournal, Mapping[str, Any]], None
@@ -1038,6 +1039,11 @@ def _orchestrate_plan_member(
     if baseline_provider_response_finalizer is not None and (
         checked["system_config_id"] != "qa_only_reconstructed_baseline"
         or not callable(baseline_provider_response_finalizer)
+    ):
+        raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
+    if v2_provider_response_finalizer is not None and (
+        checked["system_config_id"] not in {"v2", "single_turn", "context_aware"}
+        or not callable(v2_provider_response_finalizer)
     ):
         raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
     try:
@@ -1159,6 +1165,14 @@ def _orchestrate_plan_member(
                 finalized = baseline_provider_response_finalizer(content)
             except Exception as exc:
                 raise OrchestrationError("PROVIDER_CORE_RESPONSE_MISMATCH") from exc
+        elif (
+            identity.system_config_id in {"v2", "single_turn", "context_aware"}
+            and v2_provider_response_finalizer is not None
+        ):
+            try:
+                finalized = v2_provider_response_finalizer(content)
+            except Exception as exc:
+                raise OrchestrationError("PROVIDER_CORE_RESPONSE_MISMATCH") from exc
         if type(finalized) is not str or not finalized or not finalized.strip():
             raise OrchestrationError("PROVIDER_CORE_RESPONSE_MISMATCH")
         return finalized
@@ -1187,7 +1201,13 @@ def _orchestrate_plan_member(
         )
         expected_pending_sha256 = sha256_text(expected_pending_content)
         legacy_pending_raw_hash = (
-            identity.system_config_id == "qa_only_reconstructed_baseline"
+            identity.system_config_id
+            in {
+                "qa_only_reconstructed_baseline",
+                "v2",
+                "single_turn",
+                "context_aware",
+            }
             and journal.response_sha256 == journal.provider_response_sha256
             and journal.response_sha256
             == checked_pending_response["response_sha256"]
