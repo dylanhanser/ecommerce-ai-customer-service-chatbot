@@ -27,7 +27,9 @@ from formal_evaluation_inflight import (
     next_retry_journal,
     reconcile,
     recovery_decision,
+    retry_predecessor_authorized,
     transition,
+    unknown_outcome_retry_authorized,
     validate_authoritative_success,
     validate_execution_identity,
     validate_journal,
@@ -808,7 +810,10 @@ def _may_retry_journal(journal: InflightJournal) -> bool:
         classification = retry_classification(category="temporary_unavailable")
     else:
         classification = retry_classification(category=category)
-    return may_retry(journal.identity.attempt_number, classification)
+    return (
+        may_retry(journal.identity.attempt_number, classification)
+        and retry_predecessor_authorized(journal)
+    ) or unknown_outcome_retry_authorized(journal)
 
 
 def _retry_supported(journal: InflightJournal) -> None:
@@ -1222,7 +1227,7 @@ def _orchestrate_plan_member(
         except JournalError as exc:
             raise OrchestrationError("RECOVERY_PREDECESSOR_INVALID") from exc
         if (
-            retry_predecessor.state != "retryable_failed"
+            not retry_predecessor_authorized(retry_predecessor)
             or retry_predecessor.identity.attempt_number
             != journal.identity.attempt_number - 1
             or expected_prepared != journal

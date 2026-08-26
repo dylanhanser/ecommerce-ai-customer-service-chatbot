@@ -34,6 +34,8 @@ from formal_evaluation_inflight import (
     next_retry_journal,
     reconcile,
     recovery_decision,
+    retry_predecessor_authorized,
+    unknown_outcome_retry_authorized,
     validate_authoritative_success,
     validate_execution_identity,
     validate_journal,
@@ -2949,7 +2951,9 @@ def _load_unit_state_locked(
         else:
             if (
                 previous_attempt_tip is None
-                or previous_attempt_tip.journal.state != "retryable_failed"
+                or not retry_predecessor_authorized(
+                    previous_attempt_tip.journal
+                )
                 or previous_attempt_tip.journal.identity.attempt_number
                 != attempt_number - 1
                 or first.value["predecessor_attempt_id"]
@@ -3056,7 +3060,9 @@ def _publish_journal_locked(
                 for item in state.archives
                 if item.value["attempt_number"] == attempt - 1
             ]
-            if not previous or previous[-1].journal.state != "retryable_failed":
+            if not previous or not retry_predecessor_authorized(
+                previous[-1].journal
+            ):
                 raise StoreError("STORE_PREDECESSOR_INVALID")
             predecessor_attempt_id = previous[-1].journal.identity.attempt_id
             predecessor_terminal_archive_sha256 = previous[-1].value[
@@ -4234,7 +4240,7 @@ def _direct_unit_category_locked(
     if journal.state == "retryable_failed":
         return (
             "retry-constructible"
-            if journal.identity.attempt_number < 3
+            if retry_predecessor_authorized(journal)
             else "permanently-non-executable",
             state,
             None,
@@ -4247,6 +4253,13 @@ def _direct_unit_category_locked(
         )
         if pending is not None and pending["status"] == "pending":
             return "same-attempt-continuable", state, None
+        return "permanently-non-executable", state, None
+    if journal.state == "uncertain" and unknown_outcome_retry_authorized(journal):
+        pending = _load_pending_response_locked(
+            state, run_contract=run_contract, lock=lock
+        )
+        if pending is None:
+            return "retry-constructible", state, None
         return "permanently-non-executable", state, None
     if journal.state in {
         "call_started",
@@ -4666,7 +4679,9 @@ def _block_category(journal: InflightJournal) -> str:
         return "uncertain"
     if journal.state == "terminal_failed":
         return "terminal_failed"
-    if journal.state == "retryable_failed" and journal.identity.attempt_number == 3:
+    if journal.state == "retryable_failed" and not retry_predecessor_authorized(
+        journal
+    ):
         return "attempts_exhausted"
     raise StoreError("STORE_SCHEMA_INVALID")
 
@@ -4755,7 +4770,7 @@ def _retry_predecessor(state: _UnitState) -> InflightJournal | None:
         for archive in state.archives
         if archive.value["attempt_number"] == attempt - 1
     ]
-    if not candidates or candidates[-1].journal.state != "retryable_failed":
+    if not candidates or not retry_predecessor_authorized(candidates[-1].journal):
         raise StoreError("STORE_PREDECESSOR_INVALID")
     return candidates[-1].journal
 

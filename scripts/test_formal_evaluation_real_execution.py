@@ -23,6 +23,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+import formal_evaluation_inflight as inflight
 import formal_evaluation_orchestration as orchestration
 import formal_evaluation_real_execution as real
 import formal_evaluation_review_projection as projection
@@ -665,6 +666,22 @@ class _RetryCompletions:
     def create(self, **_request):
         self.calls += 1
         raise self.failure
+
+
+class _SequencedCompletions:
+    def __init__(self, *outcomes: BaseException | str):
+        self.outcomes = outcomes
+        self.calls = 0
+
+    def create(self, **_request):
+        self.calls += 1
+        outcome = self.outcomes[self.calls - 1]
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return SimpleNamespace(
+            id=f"synthetic_response_{self.calls}",
+            choices=[SimpleNamespace(message=SimpleNamespace(content=outcome))],
+        )
 
 
 class _InvalidResponseCompletions:
@@ -1509,6 +1526,10 @@ def test_provider_failure_cannot_commit_caught_mock_as_local_success(
 ):
     _patch_synthetic_plan_authority(monkeypatch)
     plan = _synthetic_plan()
+    unit_id = store._execution_unit_id(plan[0])
+    monkeypatch.setattr(
+        inflight, "_UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID", unit_id
+    )
     evidence = _evidence()
     contract = _real_contract(plan, evidence)
     completions = (
@@ -1535,6 +1556,24 @@ def test_provider_failure_cannot_commit_caught_mock_as_local_success(
     assert outcome.progress.total_successful_units == 0
     assert completions.calls == 1
     assert store._observe_validated_canonical_private_results(plan, contract) == ()
+    terminal_wrapper = store._read_json(
+        store._PRIVATE_STATE_ROOT / "journals" / f"{unit_id}.json",
+        store._JOURNAL_LIMIT,
+    )
+    monkeypatch.setattr(
+        inflight,
+        "_UNKNOWN_OUTCOME_RETRY_JOURNAL_SHA256",
+        terminal_wrapper["journal_sha256"],
+    )
+    recalled = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+    assert recalled.action == "permanently_non_executable"
+    assert recalled.block_category == "terminal_failed"
+    assert completions.calls == 1
 
 
 @pytest.mark.parametrize(
@@ -2231,6 +2270,175 @@ def test_provider_retry_ceiling_and_uncertain_outcome_are_non_recallable(
     assert terminal_client.calls == 1
 
 
+def test_current_unknown_outcome_retries_once_and_commits_with_lineage(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    assert (
+        inflight._UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID
+        == "84b3177e90588fac78c68804af330113d27da33e3394d981dd1e551bf0e65b69"
+    )
+    assert (
+        inflight._UNKNOWN_OUTCOME_RETRY_JOURNAL_SHA256
+        == "223afe0e33d3b589e2f204b65720e9249f50e3b41b0413b32d0b06c973c53716"
+    )
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    unit = plan[0]
+    unit_id = store._execution_unit_id(unit)
+    monkeypatch.setattr(
+        inflight, "_UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID", unit_id
+    )
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    retry_content = "provider answer after accepted unknown outcome"
+    client = _SequencedCompletions(RuntimeError("synthetic unknown"), retry_content)
+    authority = _ProviderAuthority(evidence, contract, client)
+
+    first = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+    assert (first.action, first.journal_state) == (
+        "permanently_non_executable",
+        "uncertain",
+    )
+    assert client.calls == 1
+    assert not (store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json").exists()
+    attempt_directory = store._PRIVATE_STATE_ROOT / "attempts" / unit_id
+    original_paths = sorted(attempt_directory.glob("1-*.json"))
+    original_bytes = {path.name: path.read_bytes() for path in original_paths}
+    original_records = [
+        store._read_json(path, store._ARCHIVE_LIMIT) for path in original_paths
+    ]
+    original_uncertain = next(
+        record for record in original_records if record["event"] == "uncertain"
+    )
+    assert original_uncertain["journal"]["sanitized_outcome_category"] == "unknown"
+    monkeypatch.setattr(
+        inflight,
+        "_UNKNOWN_OUTCOME_RETRY_JOURNAL_SHA256",
+        original_uncertain["journal_sha256"],
+    )
+    ready = store._real_prefix_progress(plan, contract)
+    assert ready.action == "ready"
+    assert ready.progress.retry_constructible_units == 1
+
+    constructed = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+    assert (constructed.action, constructed.attempt_number, client.calls) == (
+        "retry_constructed",
+        2,
+        1,
+    )
+    assert all(path.read_bytes() == original_bytes[path.name] for path in original_paths)
+
+    completed = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+    assert (completed.action, completed.attempt_number, client.calls) == (
+        "completed",
+        2,
+        2,
+    )
+    assert all(path.read_bytes() == original_bytes[path.name] for path in original_paths)
+    commit_path = next((store._PRIVATE_STATE_ROOT / "commits").glob("*.json"))
+    commit = store._read_json(commit_path, store._COMMIT_LIMIT)
+    lineage = commit["attempt_lineage"]
+    assert lineage["attempt_number"] == 2
+    assert (
+        lineage["predecessor_attempt_id"]
+        == original_uncertain["journal"]["identity"]["attempt_id"]
+    )
+    assert (
+        lineage["predecessor_terminal_archive_sha256"]
+        == original_uncertain["archive_sha256"]
+    )
+    assert commit["formal_result"]["attempt_count"] == 2
+    assert commit["formal_result"]["provider_called"] is True
+    assert commit["provider_response_sha256"] == transport.sha256_text(retry_content)
+    assert commit["response_sha256"] == transport.sha256_text(retry_content)
+
+
+def test_current_unknown_outcome_second_uncertain_blocks_without_third_call(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    unit_id = store._execution_unit_id(plan[0])
+    monkeypatch.setattr(
+        inflight, "_UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID", unit_id
+    )
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    client = _RetryCompletions(RuntimeError("synthetic unknown"))
+    authority = _ProviderAuthority(evidence, contract, client)
+
+    first = store._orchestrate_durable_offline_unit(
+        plan,
+        plan[0],
+        expected_contract=contract,
+        authority=authority,
+    )
+    assert (first.action, first.block_category, client.calls) == (
+        "permanently_non_executable",
+        "uncertain",
+        1,
+    )
+    first_records = [
+        store._read_json(path, store._ARCHIVE_LIMIT)
+        for path in (store._PRIVATE_STATE_ROOT / "attempts" / unit_id).glob("1-*.json")
+    ]
+    first_uncertain = next(
+        record for record in first_records if record["event"] == "uncertain"
+    )
+    monkeypatch.setattr(
+        inflight,
+        "_UNKNOWN_OUTCOME_RETRY_JOURNAL_SHA256",
+        first_uncertain["journal_sha256"],
+    )
+    blocked = store._orchestrate_durable_prefix(
+        plan,
+        expected_contract=contract,
+        authority=authority,
+        max_new_successes=1,
+    )
+    assert (blocked.action, blocked.block_category, client.calls) == (
+        "blocked",
+        "uncertain",
+        2,
+    )
+    attempt_records = [
+        store._read_json(path, store._ARCHIVE_LIMIT)
+        for path in (store._PRIVATE_STATE_ROOT / "attempts" / unit_id).glob("*.json")
+    ]
+    uncertain_attempts = sorted(
+        record["attempt_number"]
+        for record in attempt_records
+        if record["event"] == "uncertain"
+    )
+    assert uncertain_attempts == [1, 2]
+    reopened = store._orchestrate_durable_prefix(
+        plan,
+        expected_contract=contract,
+        authority=authority,
+        max_new_successes=1,
+    )
+    assert (reopened.action, reopened.block_category, client.calls) == (
+        "blocked",
+        "uncertain",
+        2,
+    )
+
+
 def test_proven_pre_send_failure_is_the_only_no_call_retry_class():
     tracker = transport.ProviderCallTracker()
     tracker.record_pre_send_failure()
@@ -2246,6 +2454,10 @@ def test_pending_provider_response_survives_commit_failure_and_resumes_locally(
 ):
     _patch_synthetic_plan_authority(monkeypatch)
     plan = _synthetic_plan()
+    unit_id = store._execution_unit_id(plan[0])
+    monkeypatch.setattr(
+        inflight, "_UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID", unit_id
+    )
     evidence = _evidence()
     contract = _real_contract(plan, evidence)
     content = "PRIVATE_PENDING_RESPONSE_SENTINEL"
@@ -2265,7 +2477,6 @@ def test_pending_provider_response_survives_commit_failure_and_resumes_locally(
             max_new_successes=1,
         )
     assert client.calls == 1
-    unit_id = store._execution_unit_id(plan[0])
     pending_path = store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json"
     pending = store._read_json(pending_path, store._PENDING_LIMIT)
     assert pending["status"] == "pending"
@@ -2273,6 +2484,15 @@ def test_pending_provider_response_survives_commit_failure_and_resumes_locally(
     assert pending["local_failure_stage"] == "commit_publication"
     assert pending["local_failure_category"] == "STORE_IO_FAILURE"
     assert list(store._PRIVATE_STATE_ROOT.glob("commits/*.json")) == []
+    returned_wrapper = store._read_json(
+        store._PRIVATE_STATE_ROOT / "journals" / f"{unit_id}.json",
+        store._JOURNAL_LIMIT,
+    )
+    monkeypatch.setattr(
+        inflight,
+        "_UNKNOWN_OUTCOME_RETRY_JOURNAL_SHA256",
+        returned_wrapper["journal_sha256"],
+    )
 
     monkeypatch.setattr(store, "_publish_private_commit_locked", original)
     state = store._real_prefix_progress(plan, contract)

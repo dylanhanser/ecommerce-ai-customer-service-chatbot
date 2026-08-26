@@ -35,6 +35,13 @@ _FROZEN_PLAN_FINGERPRINT = (
 PLAN_FINGERPRINT = _FROZEN_PLAN_FINGERPRINT  # compatibility snapshot only
 _MAX_ATTEMPTS = 3
 MAX_ATTEMPTS = _MAX_ATTEMPTS
+_UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID = (
+    "84b3177e90588fac78c68804af330113d27da33e3394d981dd1e551bf0e65b69"
+)
+_UNKNOWN_OUTCOME_RETRY_JOURNAL_SHA256 = (
+    "223afe0e33d3b589e2f204b65720e9249f50e3b41b0413b32d0b06c973c53716"
+)
+_UNKNOWN_OUTCOME_RETRY_ATTEMPT_LIMIT = 2
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -790,8 +797,7 @@ def next_retry_journal(
     _validate_journal(predecessor)
     _parse_timestamp(prepared_at)
     if (
-        predecessor.state != "retryable_failed"
-        or predecessor.identity.attempt_number >= _MAX_ATTEMPTS
+        not retry_predecessor_authorized(predecessor)
         or not _strictly_after(prepared_at, predecessor.updated_at)
     ):
         raise JournalError("RETRY_PREDECESSOR_INVALID")
@@ -817,6 +823,35 @@ def next_retry_journal(
         provider_response_sha256=None,
         response_sha256=None,
     )
+
+
+def unknown_outcome_retry_authorized(journal: InflightJournal) -> bool:
+    """Authorize the single accepted duplicate-risk retry for the stopped B5 unit."""
+
+    _validate_journal(journal)
+    return (
+        journal.identity.execution_unit_id
+        == _UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID
+        and journal_sha256(journal) == _UNKNOWN_OUTCOME_RETRY_JOURNAL_SHA256
+        and journal.identity.attempt_number == 1
+        and journal.state == "uncertain"
+        and journal.sanitized_outcome_category == "unknown"
+    )
+
+
+def retry_predecessor_authorized(journal: InflightJournal) -> bool:
+    """Return whether a fresh attempt may follow this terminal journal."""
+
+    _validate_journal(journal)
+    if journal.state == "retryable_failed":
+        attempt_limit = (
+            _UNKNOWN_OUTCOME_RETRY_ATTEMPT_LIMIT
+            if journal.identity.execution_unit_id
+            == _UNKNOWN_OUTCOME_RETRY_EXECUTION_UNIT_ID
+            else _MAX_ATTEMPTS
+        )
+        return journal.identity.attempt_number < attempt_limit
+    return unknown_outcome_retry_authorized(journal)
 
 
 @dataclass(frozen=True)
@@ -997,7 +1032,9 @@ def recovery_decision(
     if journal.state == "prepared":
         return "continue_before_provider"
     if journal.state == "retryable_failed":
-        return "retry" if journal.identity.attempt_number < _MAX_ATTEMPTS else "fail_closed"
+        return "retry" if retry_predecessor_authorized(journal) else "fail_closed"
+    if unknown_outcome_retry_authorized(journal):
+        return "retry"
     return "fail_closed"
 
 
