@@ -29,6 +29,7 @@ from formal_evaluation_inflight import (
     InflightJournal,
     JournalError,
     derive_execution_unit_id,
+    derive_provider_request_id,
     journal_sha256,
     next_retry_journal,
     reconcile,
@@ -71,6 +72,7 @@ _ARCHIVE_NAME_RE = re.compile(
 )
 _JOURNAL_NAME_RE = re.compile(r"^[0-9a-f]{64}\.json$")
 _COMMIT_NAME_RE = re.compile(r"^(?:[1-9]|[1-9][0-9]|1[0-8][0-9]|190)-[0-9a-f]{64}\.json$")
+_PENDING_NAME_RE = re.compile(r"^[0-9a-f]{64}\.json$")
 _TEMP_NAME_RE = re.compile(r"^\.(?P<target>.{1,180})\.[0-9a-f]{32}\.tmp$")
 _FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 _MOVEFILE_REPLACE_EXISTING = 0x1
@@ -80,6 +82,7 @@ _RUN_CONTRACT_LIMIT = 131_072
 _JOURNAL_LIMIT = 524_288
 _ARCHIVE_LIMIT = 524_288
 _COMMIT_LIMIT = 2_097_152
+_PENDING_LIMIT = 524_288
 _JSON_MAX_DEPTH = 16
 _JSON_MAX_STRING_BYTES = 262_144
 _JSON_MAX_MAPPING_MEMBERS = 128
@@ -442,7 +445,7 @@ class DurableExecutionOutcome:
                 and self.execution_order is not None
             )
             if self.action == "advanced":
-                valid = (
+                retry_advanced = (
                     unit_identity
                     and self.attempt_number in {1, 2}
                     and self.journal_state == "retryable_failed"
@@ -452,6 +455,18 @@ class DurableExecutionOutcome:
                     and self.provider_call_count
                     == self.orchestration_outcome.provider_call_count
                 )
+                pending_advanced = (
+                    unit_identity
+                    and self.attempt_number in {1, 2, 3}
+                    and self.journal_state == "provider_returned"
+                    and self.private_commit_sha256 is None
+                    and self.block_category is None
+                    and self.orchestration_outcome is not None
+                    and self.orchestration_outcome.action == "fail_closed"
+                    and self.provider_call_count
+                    == self.orchestration_outcome.provider_call_count
+                )
+                valid = retry_advanced or pending_advanced
             elif self.action == "completed":
                 new_local = (
                     self.orchestration_outcome is not None
@@ -467,6 +482,14 @@ class DurableExecutionOutcome:
                     and self.provider_call_count == 1
                     and self.journal_state == "committed"
                 )
+                resumed_provider = (
+                    self.orchestration_outcome is not None
+                    and self.orchestration_outcome.action == "success"
+                    and self.orchestration_outcome.recovery_action == "fail_closed"
+                    and self.orchestration_outcome.provider_call_count == 0
+                    and self.provider_call_count == 0
+                    and self.journal_state == "committed"
+                )
                 reopened = (
                     self.orchestration_outcome is None
                     and self.provider_call_count == 0
@@ -478,7 +501,7 @@ class DurableExecutionOutcome:
                     and self.journal_state in {"prepared", "committed"}
                     and self.private_commit_sha256 is not None
                     and self.block_category is None
-                    and (new_local or new_provider or reopened)
+                    and (new_local or new_provider or resumed_provider or reopened)
                 )
             elif self.action == "retry_constructed":
                 valid = (
@@ -971,6 +994,10 @@ def _atomic_target_kind(path: Path) -> str:
         path.name
     ):
         return "commit"
+    if path.parent == root / "pending" and _PENDING_NAME_RE.fullmatch(
+        path.name
+    ):
+        return "pending"
     if (
         path.parent.parent == root / "attempts"
         and _SHA256_RE.fullmatch(path.parent.name)
@@ -1253,6 +1280,7 @@ def _trigger_compound_temp_fault(kind: str, phase: str) -> None:
         "archive": "before_flush",
         "commit": "before_fsync",
         "mutable": "before_close",
+        "pending": "before_close",
     }[kind]
     if phase == expected_phase and _consume_fault(
         "during_atomic_temp_failure_then_close_error"
@@ -1356,6 +1384,7 @@ def _clean_owned_temps_locked(root: Path, lock: _RunWideLock) -> None:
         root,
         root / "journals",
         root / "commits",
+        root / "pending",
         root / "attempts",
     ):
         if not _path_exists(directory):
@@ -1369,7 +1398,7 @@ def _clean_owned_temps_locked(root: Path, lock: _RunWideLock) -> None:
                     or _atomic_target_kind(path.with_name(
                         _TEMP_NAME_RE.fullmatch(path.name).group("target")
                     ))
-                    not in {"run_contract", "mutable", "commit"}
+                    not in {"run_contract", "mutable", "commit", "pending"}
                 ):
                     raise StoreError("STORE_PATH_INVALID")
                 try:
@@ -2249,6 +2278,328 @@ class _UnitState:
     mutable: Mapping[str, Any] | None
 
 
+_PENDING_RESPONSE_FIELDS = frozenset(
+    {
+        "content",
+        "provider",
+        "model",
+        "provider_request_id",
+        "provider_response_id",
+        "response_sha256",
+    }
+)
+_PENDING_RECORD_FIELDS = frozenset(
+    {
+        "schema_version",
+        "run_contract_sha256",
+        "execution_unit_id",
+        "attempt_number",
+        "attempt_id",
+        "provider_returned_journal_sha256",
+        "normalized_response",
+        "status",
+        "committed_envelope_sha256",
+        "local_failure_stage",
+        "local_failure_category",
+        "record_sha256",
+    }
+)
+_PENDING_FAILURE_STAGES = frozenset(
+    {
+        "executor_dispatch",
+        "core_result_validation",
+        "result_projection",
+        "provider_validation",
+        "formal_result_projection",
+        "checkpoint_projection",
+        "commit_construction",
+        "commit_publication",
+        "commit_reconciliation",
+        "pending_consumption",
+    }
+)
+_SANITIZED_LOCAL_FAILURE_RE = re.compile(r"^[A-Za-z0-9_]{1,96}$")
+
+
+def _pending_record_hash(value: Mapping[str, Any]) -> str:
+    content = dict(value)
+    content.pop("record_sha256", None)
+    return _domain_sha(
+        "formal-evaluation-private-pending-provider-response-v1",
+        "pending_provider_response",
+        content,
+    )
+
+
+def _pending_path(root: Path, execution_unit_id: str) -> Path:
+    try:
+        _require_sha(execution_unit_id)
+    except ValueError as exc:
+        raise StoreError("STORE_PATH_INVALID") from exc
+    return root / "pending" / f"{execution_unit_id}.json"
+
+
+def _validate_pending_record(
+    value: Mapping[str, Any],
+    *,
+    state: _UnitState,
+    run_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    if type(value) is not dict or set(value) != _PENDING_RECORD_FIELDS:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    if state.tip is None:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    response = value.get("normalized_response")
+    if type(response) is not dict or set(response) != _PENDING_RESPONSE_FIELDS:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    journal = state.tip.journal
+    try:
+        _require_exact_int(value["schema_version"], 1, 1)
+        _require_sha(value["run_contract_sha256"])
+        _require_sha(value["execution_unit_id"])
+        _require_exact_int(value["attempt_number"], 1, 3)
+        if (
+            type(value["attempt_id"]) is not str
+            or _ATTEMPT_ID_RE.fullmatch(value["attempt_id"]) is None
+        ):
+            raise ValueError
+        _require_sha(value["provider_returned_journal_sha256"])
+        _require_sha(response["response_sha256"])
+        if value["committed_envelope_sha256"] is not None:
+            _require_sha(value["committed_envelope_sha256"])
+        _require_sha(value["record_sha256"])
+    except ValueError as exc:
+        raise StoreError("STORE_SCHEMA_INVALID") from exc
+    content = response["content"]
+    provider_response_id = response["provider_response_id"]
+    failure_stage = value["local_failure_stage"]
+    failure_category = value["local_failure_category"]
+    if (
+        value["run_contract_sha256"] != run_contract["run_contract_sha256"]
+        or value["execution_unit_id"] != journal.identity.execution_unit_id
+        or value["attempt_number"] != journal.identity.attempt_number
+        or value["attempt_id"] != journal.identity.attempt_id
+        or response["provider"] != journal.identity.provider
+        or response["model"] != journal.identity.provider_model
+        or response["provider_request_id"]
+        != derive_provider_request_id(journal.identity)
+        or type(provider_response_id) is not str
+        or not provider_response_id
+        or len(provider_response_id) > 256
+        or re.search(r"[\x00-\x1f\x7f]", provider_response_id) is not None
+        or provider_response_id == response["provider_request_id"]
+        or type(content) is not str
+        or not content
+        or not content.strip()
+        or len(content) > 32_768
+        or sha256_text(content) != response["response_sha256"]
+        or (failure_stage is None) != (failure_category is None)
+        or (
+            failure_stage is not None
+            and (
+                failure_stage not in _PENDING_FAILURE_STAGES
+                or type(failure_category) is not str
+                or _SANITIZED_LOCAL_FAILURE_RE.fullmatch(failure_category)
+                is None
+            )
+        )
+        or value["status"] not in {"pending", "consumed"}
+        or (value["status"] == "pending")
+        != (value["committed_envelope_sha256"] is None)
+        or value["record_sha256"] != _pending_record_hash(value)
+    ):
+        raise StoreError("STORE_HASH_MISMATCH")
+    returned_archives = [
+        archive
+        for archive in state.archives
+        if archive.journal.state == "provider_returned"
+        and archive.journal.identity.attempt_id == value["attempt_id"]
+    ]
+    if journal.state in {"provider_returned", "committed"}:
+        if (
+            len(returned_archives) != 1
+            or value["provider_returned_journal_sha256"]
+            != returned_archives[0].value["journal_sha256"]
+            or response["provider_response_id"]
+            != returned_archives[0].journal.provider_response_id
+            or response["response_sha256"]
+            != returned_archives[0].journal.provider_response_sha256
+            or response["response_sha256"]
+            != returned_archives[0].journal.response_sha256
+        ):
+            raise StoreError("STORE_HASH_MISMATCH")
+    elif journal.state != "call_started":
+        raise StoreError("STORE_SCHEMA_INVALID")
+    if journal.state == "provider_returned" and value["status"] != "pending":
+        raise StoreError("STORE_SCHEMA_INVALID")
+    return copy.deepcopy(value)
+
+
+def _load_pending_response_locked(
+    state: _UnitState,
+    *,
+    run_contract: Mapping[str, Any],
+    lock: _RunWideLock,
+) -> dict[str, Any] | None:
+    lock.require_active()
+    if state.tip is None:
+        return None
+    path = _pending_path(lock.root, state.tip.journal.identity.execution_unit_id)
+    if not _path_exists(path):
+        return None
+    if _is_reparse(path) or not _path_is_file(path):
+        raise StoreError("STORE_PATH_INVALID")
+    return _validate_pending_record(
+        _read_json(path, _PENDING_LIMIT),
+        state=state,
+        run_contract=run_contract,
+    )
+
+
+def _ensure_pending_directory_locked(lock: _RunWideLock) -> Path:
+    lock.require_active()
+    path = lock.root / "pending"
+    if not _path_exists(path):
+        try:
+            _path_mkdir(path)
+        except FileExistsError:
+            pass
+        except OSError as exc:
+            raise StoreError("STORE_IO_FAILURE") from exc
+    if _is_reparse(path) or not _path_is_dir(path):
+        raise StoreError("STORE_PATH_INVALID")
+    return path
+
+
+def _publish_pending_response_locked(
+    journal: InflightJournal,
+    response: Mapping[str, Any],
+    *,
+    run_contract: Mapping[str, Any],
+    lock: _RunWideLock,
+) -> Mapping[str, Any]:
+    lock.require_active()
+    try:
+        validate_journal(journal)
+    except JournalError as exc:
+        raise StoreError("STORE_SCHEMA_INVALID") from exc
+    if journal.state != "provider_returned":
+        raise StoreError("STORE_SCHEMA_INVALID")
+    state = _load_unit_state_locked(
+        journal.identity.execution_unit_id,
+        run_contract=run_contract,
+        lock=lock,
+    )
+    if state.tip is None or state.tip.journal.state != "call_started":
+        raise StoreError("STORE_ARCHIVE_CHAIN_INVALID")
+    if type(response) is not dict or set(response) != _PENDING_RESPONSE_FIELDS:
+        raise StoreError("STORE_SCHEMA_INVALID")
+    content = response["content"]
+    if (
+        type(content) is not str
+        or not content
+        or not content.strip()
+        or len(content) > 32_768
+        or response["provider"] != journal.identity.provider
+        or response["model"] != journal.identity.provider_model
+        or response["provider_request_id"] != journal.provider_request_id
+        or response["provider_response_id"] != journal.provider_response_id
+        or response["response_sha256"] != journal.provider_response_sha256
+        or sha256_text(content) != journal.response_sha256
+    ):
+        raise StoreError("STORE_SCHEMA_INVALID")
+    value = {
+        "schema_version": 1,
+        "run_contract_sha256": run_contract["run_contract_sha256"],
+        "execution_unit_id": journal.identity.execution_unit_id,
+        "attempt_number": journal.identity.attempt_number,
+        "attempt_id": journal.identity.attempt_id,
+        "provider_returned_journal_sha256": journal_sha256(journal),
+        "normalized_response": copy.deepcopy(response),
+        "status": "pending",
+        "committed_envelope_sha256": None,
+        "local_failure_stage": None,
+        "local_failure_category": None,
+    }
+    value["record_sha256"] = _pending_record_hash(value)
+    pending_directory = _ensure_pending_directory_locked(lock)
+    path = pending_directory / f"{journal.identity.execution_unit_id}.json"
+    published = _atomic_publish_json(
+        path,
+        value,
+        replace=False,
+        maximum=_PENDING_LIMIT,
+    )
+    if not published:
+        existing = _read_json(path, _PENDING_LIMIT)
+        if existing != value:
+            raise StoreError("STORE_HASH_MISMATCH")
+    return MappingProxyType(copy.deepcopy(value))
+
+
+def _record_pending_failure_locked(
+    state: _UnitState,
+    *,
+    stage: str,
+    category: str,
+    run_contract: Mapping[str, Any],
+    lock: _RunWideLock,
+) -> None:
+    if (
+        stage not in _PENDING_FAILURE_STAGES
+        or type(category) is not str
+        or _SANITIZED_LOCAL_FAILURE_RE.fullmatch(category) is None
+    ):
+        raise StoreError("STORE_SCHEMA_INVALID")
+    value = _load_pending_response_locked(
+        state, run_contract=run_contract, lock=lock
+    )
+    if value is None:
+        return
+    if value["status"] != "pending":
+        raise StoreError("STORE_SCHEMA_INVALID")
+    value["local_failure_stage"] = stage
+    value["local_failure_category"] = category
+    value["record_sha256"] = _pending_record_hash(value)
+    _atomic_publish_json(
+        _pending_path(lock.root, value["execution_unit_id"]),
+        value,
+        replace=True,
+        maximum=_PENDING_LIMIT,
+    )
+
+
+def _consume_pending_response_locked(
+    state: _UnitState,
+    *,
+    committed_envelope_sha256: str,
+    run_contract: Mapping[str, Any],
+    lock: _RunWideLock,
+) -> None:
+    try:
+        _require_sha(committed_envelope_sha256)
+    except ValueError as exc:
+        raise StoreError("STORE_COMMIT_INVALID") from exc
+    value = _load_pending_response_locked(
+        state, run_contract=run_contract, lock=lock
+    )
+    if value is None:
+        return
+    if value["status"] == "consumed":
+        if value["committed_envelope_sha256"] != committed_envelope_sha256:
+            raise StoreError("STORE_COMMIT_INVALID")
+        return
+    value["status"] = "consumed"
+    value["committed_envelope_sha256"] = committed_envelope_sha256
+    value["record_sha256"] = _pending_record_hash(value)
+    _atomic_publish_json(
+        _pending_path(lock.root, value["execution_unit_id"]),
+        value,
+        replace=True,
+        maximum=_PENDING_LIMIT,
+    )
+
+
 def _archive_hash(value: Mapping[str, Any]) -> str:
     content = dict(value)
     content.pop("archive_sha256", None)
@@ -2848,6 +3199,7 @@ def _validate_store_layout_locked(
         "journals",
         "attempts",
         "commits",
+        "pending",
     }
     for path in _path_iterdir(root):
         if (
@@ -2887,6 +3239,24 @@ def _validate_store_layout_locked(
             or _COMMIT_NAME_RE.fullmatch(path.name) is None
         ):
             raise StoreError("STORE_PATH_INVALID")
+    pending_directory = root / "pending"
+    if _path_exists(pending_directory):
+        if _is_reparse(pending_directory) or not _path_is_dir(pending_directory):
+            raise StoreError("STORE_PATH_INVALID")
+        for path in _path_iterdir(pending_directory):
+            if (
+                allow_owned_temps
+                and _owned_temp_kind(path) == "pending"
+                and not _is_reparse(path)
+                and _path_is_file(path)
+            ):
+                continue
+            if (
+                _is_reparse(path)
+                or not _path_is_file(path)
+                or _PENDING_NAME_RE.fullmatch(path.name) is None
+            ):
+                raise StoreError("STORE_PATH_INVALID")
     for directory in _path_iterdir(root / "attempts"):
         if (
             _is_reparse(directory)
@@ -3733,7 +4103,12 @@ def _reconcile_commit_locked(
         raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
     commit_sha = commit["envelope_sha256"]
     identity = ExecutionIdentity.from_mapping(commit["execution_identity"])
+    pending = _load_pending_response_locked(
+        state, run_contract=run_contract, lock=lock
+    )
     if commit["success_kind"] == "local":
+        if pending is not None:
+            raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
         if state.tip.journal.state == "prepared":
             if state.tip.value["private_commit_sha256"] is None:
                 if repair:
@@ -3749,6 +4124,21 @@ def _reconcile_commit_locked(
             raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
     else:
         success = AuthoritativeSuccess.from_mapping(commit["authoritative_success"])
+        if pending is not None:
+            normalized = pending["normalized_response"]
+            if (
+                normalized["content"] != commit["formal_result"]["response_text"]
+                or normalized["response_sha256"] != commit["response_sha256"]
+                or normalized["provider_request_id"]
+                != success.provider_request_id
+                or normalized["provider_response_id"]
+                != success.provider_response_id
+                or (
+                    pending["status"] == "consumed"
+                    and pending["committed_envelope_sha256"] != commit_sha
+                )
+            ):
+                raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
         if state.tip.journal.state == "provider_returned":
             try:
                 decision = recovery_decision(
@@ -3787,11 +4177,19 @@ def _reconcile_commit_locked(
             raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
     if not repair:
         return state
-    return _load_unit_state_locked(
+    reconciled_state = _load_unit_state_locked(
         identity.execution_unit_id,
         run_contract=run_contract,
         lock=lock,
     )
+    if commit["success_kind"] == "provider" and pending is not None:
+        _consume_pending_response_locked(
+            reconciled_state,
+            committed_envelope_sha256=commit_sha,
+            run_contract=run_contract,
+            lock=lock,
+        )
+    return reconciled_state
 
 
 def _direct_unit_category_locked(
@@ -3840,9 +4238,15 @@ def _direct_unit_category_locked(
         )
     if journal.state == "committed":
         raise StoreError("STORE_COMMITTED_WITHOUT_PRIVATE_COMMIT")
+    if journal.state == "provider_returned":
+        pending = _load_pending_response_locked(
+            state, run_contract=run_contract, lock=lock
+        )
+        if pending is not None and pending["status"] == "pending":
+            return "same-attempt-continuable", state, None
+        return "permanently-non-executable", state, None
     if journal.state in {
         "call_started",
-        "provider_returned",
         "uncertain",
         "terminal_failed",
     }:
@@ -3924,6 +4328,13 @@ def _validate_known_store_members(
             continue
         if path.name not in expected_commits:
             raise StoreError("STORE_SCHEMA_INVALID")
+    pending_directory = lock.root / "pending"
+    if _path_exists(pending_directory):
+        for path in _path_iterdir(pending_directory):
+            if allow_owned_temps and _owned_temp_kind(path) == "pending":
+                continue
+            if path.stem not in known_ids:
+                raise StoreError("STORE_SCHEMA_INVALID")
 
 
 def _derive_durable_progress_locked(
@@ -4553,11 +4964,53 @@ def _orchestrate_durable_offline_unit(
             lock=lock,
         )
         predecessor = _retry_predecessor(state)
+        pending = _load_pending_response_locked(
+            state, run_contract=contract, lock=lock
+        )
         dependencies = authority.dependencies_for(selected, state)
+        if any(
+            key in dependencies
+            for key in {
+                "pending_provider_response",
+                "pending_response_persistence_callback",
+                "pending_failure_persistence_callback",
+            }
+        ):
+            raise StoreError("STORE_SCHEMA_INVALID")
 
         def persistence_callback(journal: InflightJournal) -> None:
             _publish_journal_locked(
                 journal,
+                run_contract=contract,
+                lock=lock,
+            )
+            return None
+
+        def pending_response_callback(
+            journal: InflightJournal, response: Mapping[str, Any]
+        ) -> None:
+            _publish_pending_response_locked(
+                journal,
+                response,
+                run_contract=contract,
+                lock=lock,
+            )
+            return None
+
+        def pending_failure_callback(
+            journal: InflightJournal, stage: str, failure_category: str
+        ) -> None:
+            current = _load_unit_state_locked(
+                unit_id,
+                run_contract=contract,
+                lock=lock,
+            )
+            if current.tip is None or current.tip.journal != journal:
+                raise StoreError("STORE_ARCHIVE_CHAIN_INVALID")
+            _record_pending_failure_locked(
+                current,
+                stage=stage,
+                category=failure_category,
                 run_contract=contract,
                 lock=lock,
             )
@@ -4570,6 +5023,15 @@ def _orchestrate_durable_offline_unit(
                 plan,
                 selected,
                 journal_persistence_callback=persistence_callback,
+                pending_response_persistence_callback=pending_response_callback,
+                pending_failure_persistence_callback=pending_failure_callback,
+                pending_provider_response=(
+                    copy.deepcopy(pending["normalized_response"])
+                    if pending is not None
+                    and state.tip is not None
+                    and state.tip.journal.state == "provider_returned"
+                    else None
+                ),
                 retry_predecessor=predecessor,
                 journal=state.tip.journal if state.tip is not None else None,
                 checkpoint_evidence=checkpoint,
@@ -4606,9 +5068,30 @@ def _orchestrate_durable_offline_unit(
         if orchestration.action == "fail_closed":
             if state.tip is None:
                 raise StoreError("STORE_SCHEMA_INVALID")
+            recoverable_pending = _load_pending_response_locked(
+                state, run_contract=contract, lock=lock
+            )
             progress = _derive_durable_progress_locked(
                 plan, run_contract=contract, lock=lock
             )
+            if (
+                state.tip.journal.state == "provider_returned"
+                and recoverable_pending is not None
+                and recoverable_pending["status"] == "pending"
+            ):
+                return DurableExecutionOutcome(
+                    1,
+                    "advanced",
+                    unit_id,
+                    selected["execution_order"],
+                    state.tip.journal.identity.attempt_number,
+                    state.tip.journal.state,
+                    None,
+                    None,
+                    orchestration.provider_call_count,
+                    orchestration,
+                    progress,
+                )
             return DurableExecutionOutcome(
                 1,
                 "permanently_non_executable",
@@ -4624,29 +5107,72 @@ def _orchestrate_durable_offline_unit(
             )
         if orchestration.action not in {"success", "local_success"}:
             raise StoreError("STORE_SCHEMA_INVALID")
-        commit_candidate = _construct_private_commit(
-            plan,
-            selected,
-            orchestration,
-            run_contract=contract,
-            state=state,
-            turn_one_commit_sha256=turn_one_commit_sha,
-        )
+        try:
+            commit_candidate = _construct_private_commit(
+                plan,
+                selected,
+                orchestration,
+                run_contract=contract,
+                state=state,
+                turn_one_commit_sha256=turn_one_commit_sha,
+            )
+        except StoreError as exc:
+            if orchestration.authoritative_success is not None:
+                _record_pending_failure_locked(
+                    state,
+                    stage="commit_construction",
+                    category=exc.category,
+                    run_contract=contract,
+                    lock=lock,
+                )
+            raise
         if _ACTIVE_FAULT_CONTEXT is not None:
             _ACTIVE_FAULT_CONTEXT["provider_call_count"] = (
                 orchestration.provider_call_count
             )
-        commit, _published = _publish_private_commit_locked(
-            commit_candidate,
-            unit=selected,
-            lock=lock,
-        )
-        state = _reconcile_commit_locked(
-            commit,
-            state,
-            run_contract=contract,
-            lock=lock,
-        )
+        try:
+            commit, _published = _publish_private_commit_locked(
+                commit_candidate,
+                unit=selected,
+                lock=lock,
+            )
+        except StoreError as exc:
+            if orchestration.authoritative_success is not None:
+                _record_pending_failure_locked(
+                    state,
+                    stage="commit_publication",
+                    category=exc.category,
+                    run_contract=contract,
+                    lock=lock,
+                )
+            raise
+        try:
+            state = _reconcile_commit_locked(
+                commit,
+                state,
+                run_contract=contract,
+                lock=lock,
+            )
+            if orchestration.authoritative_success is not None:
+                _consume_pending_response_locked(
+                    state,
+                    committed_envelope_sha256=commit["envelope_sha256"],
+                    run_contract=contract,
+                    lock=lock,
+                )
+        except StoreError as exc:
+            if orchestration.authoritative_success is not None:
+                try:
+                    _record_pending_failure_locked(
+                        state,
+                        stage="commit_reconciliation",
+                        category=exc.category,
+                        run_contract=contract,
+                        lock=lock,
+                    )
+                except StoreError:
+                    pass
+            raise
         progress = _derive_durable_progress_locked(
             plan, run_contract=contract, lock=lock
         )
@@ -4765,6 +5291,18 @@ def _orchestrate_durable_prefix_locked(
             lock=lock,
             new_successes=new_successes,
         )
+        if (
+            outcome.action == "advanced"
+            and outcome.journal_state == "provider_returned"
+            and state.action in {"ready", "prefix_paused"}
+        ):
+            return DurablePrefixOutcome(
+                1,
+                "prefix_paused",
+                new_successes,
+                None,
+                state.progress,
+            )
         if state.action in {"blocked", "run_complete"}:
             return state
     if state.action != "prefix_paused":

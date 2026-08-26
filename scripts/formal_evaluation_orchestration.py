@@ -925,6 +925,58 @@ def _projection_base(
     }
 
 
+_PENDING_PROVIDER_RESPONSE_FIELDS = frozenset(
+    {
+        "content",
+        "provider",
+        "model",
+        "provider_request_id",
+        "provider_response_id",
+        "response_sha256",
+    }
+)
+
+
+def _normalized_provider_response_mapping(
+    response: NormalizedProviderResponse,
+) -> dict[str, Any]:
+    if type(response) is not NormalizedProviderResponse:
+        raise OrchestrationError("PROVIDER_RESPONSE_EVIDENCE_MISSING")
+    return {
+        "content": response.content,
+        "provider": response.provider,
+        "model": response.model,
+        "provider_request_id": response.provider_request_id,
+        "provider_response_id": response.provider_response_id,
+        "response_sha256": response.response_sha256,
+    }
+
+
+def _checked_pending_provider_response(
+    value: Mapping[str, Any],
+    *,
+    identity: ExecutionIdentity,
+    journal: InflightJournal,
+) -> dict[str, Any]:
+    if type(value) is not dict or set(value) != _PENDING_PROVIDER_RESPONSE_FIELDS:
+        raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
+    checked = copy.deepcopy(value)
+    if (
+        journal.state != "provider_returned"
+        or journal.identity != identity
+        or type(checked["content"]) is not str
+        or not checked["content"]
+        or checked["provider"] != identity.provider
+        or checked["model"] != identity.provider_model
+        or checked["provider_request_id"] != journal.provider_request_id
+        or checked["provider_response_id"] != journal.provider_response_id
+        or checked["response_sha256"] != journal.provider_response_sha256
+        or sha256_text(checked["content"]) != journal.response_sha256
+    ):
+        raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
+    return checked
+
+
 def orchestrate_validated_unit(
     plan: Sequence[Mapping[str, Any]],
     unit: Mapping[str, Any],
@@ -957,6 +1009,15 @@ def _orchestrate_plan_member(
     runtime_identity_sha256: str,
     snapshot_validator: Callable[[Mapping[str, Any]], Any],
     journal_persistence_callback: Callable[[InflightJournal], None] | None = None,
+    pending_response_persistence_callback: Callable[
+        [InflightJournal, Mapping[str, Any]], None
+    ]
+    | None = None,
+    pending_failure_persistence_callback: Callable[
+        [InflightJournal, str, str], None
+    ]
+    | None = None,
+    pending_provider_response: Mapping[str, Any] | None = None,
     retry_predecessor: InflightJournal | None = None,
     journal: InflightJournal | None = None,
     authoritative_success: AuthoritativeSuccess | Mapping[str, Any] | None = None,
@@ -986,6 +1047,14 @@ def _orchestrate_plan_member(
         raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
     if journal_persistence_callback is not None and not callable(
         journal_persistence_callback
+    ):
+        raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
+    if (
+        pending_response_persistence_callback is not None
+        and not callable(pending_response_persistence_callback)
+    ) or (
+        pending_failure_persistence_callback is not None
+        and not callable(pending_failure_persistence_callback)
     ):
         raise OrchestrationError("ORCHESTRATION_DEPENDENCY_INVALID")
 
@@ -1083,6 +1152,16 @@ def _orchestrate_plan_member(
         raise OrchestrationError(exc.category) from exc
 
     initial_decision = decision
+    checked_pending_response: dict[str, Any] | None = None
+    if pending_provider_response is not None:
+        if journal is None or decision != "fail_closed":
+            raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
+        checked_pending_response = _checked_pending_provider_response(
+            pending_provider_response,
+            identity=identity,
+            journal=journal,
+        )
+        decision = "continue_after_provider"
     predecessor: InflightJournal | None = None
     resumed_retry_predecessor: InflightJournal | None = None
     if journal is None:
@@ -1140,7 +1219,7 @@ def _orchestrate_plan_member(
         decision = recovery_decision(journal, expected=identity)
         validate_journal(journal, identity)
         persist_new_journal(journal)
-    elif decision == "continue_before_provider":
+    elif decision in {"continue_before_provider", "continue_after_provider"}:
         predecessor = resumed_retry_predecessor
     elif decision in {
         "authoritative_success",
@@ -1176,7 +1255,7 @@ def _orchestrate_plan_member(
     else:
         raise OrchestrationError("UNKNOWN_RECOVERY_ACTION")
 
-    if decision != "continue_before_provider" or journal is None:
+    if decision not in {"continue_before_provider", "continue_after_provider"} or journal is None:
         raise OrchestrationError("RECOVERY_NOT_AUTHORIZED")
     if journal.identity.attempt_number > 1 and predecessor is None:
         raise OrchestrationError("RECOVERY_PREDECESSOR_REQUIRED")
@@ -1186,8 +1265,37 @@ def _orchestrate_plan_member(
     boundary = _RawClientBoundary(fake_raw_client, journal, clock, provider_request_id)
     proxy = FixedGenerationProxy()
     provider_invocation_attempted = False
+    provider_persistence_failed = False
+    pending_replay_count = 0
 
-    def post_call_failure(failure_category: str) -> OrchestrationOutcome:
+    def persist_pending_response(
+        returned: InflightJournal, response: NormalizedProviderResponse
+    ) -> None:
+        if pending_response_persistence_callback is None:
+            return
+        result = pending_response_persistence_callback(
+            returned,
+            _normalized_provider_response_mapping(response),
+        )
+        if result is not None:
+            raise OrchestrationError(
+                "PENDING_RESPONSE_PERSISTENCE_CALLBACK_RETURN_INVALID"
+            )
+
+    def persist_pending_failure(
+        returned: InflightJournal, stage: str, category: str
+    ) -> None:
+        if pending_failure_persistence_callback is None:
+            return
+        result = pending_failure_persistence_callback(returned, stage, category)
+        if result is not None:
+            raise OrchestrationError(
+                "PENDING_FAILURE_PERSISTENCE_CALLBACK_RETURN_INVALID"
+            )
+
+    def post_call_failure(
+        failure_stage: str, failure_category: str
+    ) -> OrchestrationOutcome:
         failed = boundary.journal
         authoritative_category = failure_category
         try:
@@ -1215,6 +1323,7 @@ def _orchestrate_plan_member(
                             provider_response_sha256=provider_result.response_sha256,
                             response_sha256=sha256_text(provider_result.content),
                         )
+                        persist_pending_response(failed, provider_result)
                     else:
                         authoritative_category = "invalid_response"
                         failed = transition(
@@ -1236,6 +1345,10 @@ def _orchestrate_plan_member(
         if failed != boundary.journal:
             persist_new_journal(failed)
         boundary.journal = failed
+        if failed.state == "provider_returned":
+            persist_pending_failure(
+                failed, failure_stage, authoritative_category
+            )
         retry_available = (
             failed.state == "retryable_failed" and _may_retry_journal(failed)
         )
@@ -1257,6 +1370,42 @@ def _orchestrate_plan_member(
         messages: Sequence[Mapping[str, str]], **overrides: Any
     ) -> NormalizedProviderResponse:
         nonlocal provider_invocation_attempted
+        nonlocal provider_persistence_failed
+        nonlocal pending_replay_count
+        if decision == "continue_after_provider":
+            if checked_pending_response is None or pending_replay_count != 0:
+                raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
+
+            def recovered_raw_response(**_request: Any) -> dict[str, Any]:
+                return {
+                    "request_id": checked_pending_response[
+                        "provider_request_id"
+                    ],
+                    "id": checked_pending_response["provider_response_id"],
+                    "choices": [
+                        {
+                            "message": {
+                                "content": checked_pending_response["content"]
+                            }
+                        }
+                    ],
+                }
+
+            response = proxy.invoke(
+                recovered_raw_response,
+                tracker,
+                messages,
+                provider_request_id=provider_request_id,
+                **overrides,
+            )
+            if (
+                _normalized_provider_response_mapping(response)
+                != checked_pending_response
+            ):
+                raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
+            pending_replay_count = 1
+            boundary.normalized_response = response
+            return response
         provider_invocation_attempted = True
         call_started = transition(
             boundary.journal,
@@ -1274,6 +1423,21 @@ def _orchestrate_plan_member(
             **overrides,
         )
         boundary.normalized_response = response
+        returned = transition(
+            boundary.journal,
+            "provider_returned",
+            clock(),
+            provider_response_id=response.provider_response_id,
+            provider_response_sha256=response.response_sha256,
+            response_sha256=sha256_text(response.content),
+        )
+        try:
+            persist_pending_response(returned, response)
+            persist_new_journal(returned)
+        except BaseException:
+            provider_persistence_failed = True
+            raise
+        boundary.journal = returned
         return response
 
     snapshot = dict(checkpoint.snapshot) if checkpoint is not None else None
@@ -1286,7 +1450,7 @@ def _orchestrate_plan_member(
     try:
         raw_core_result = executors.dispatch(context)
     except TransportError as exc:
-        if boundary.call_count == 0:
+        if boundary.call_count == 0 and decision != "continue_after_provider":
             if (
                 exc.category == "pre_send_failure"
                 and boundary.journal.state == "prepared"
@@ -1313,13 +1477,13 @@ def _orchestrate_plan_member(
                     failure_category="pre_send_failure",
                 )
             raise OrchestrationError(exc.category) from exc
-        return post_call_failure(exc.category)
+        return post_call_failure("executor_dispatch", exc.category)
     except (JournalError, OrchestrationError) as exc:
-        if boundary.call_count == 0:
+        if boundary.call_count == 0 and decision != "continue_after_provider":
             raise
-        return post_call_failure(exc.category)
+        return post_call_failure("executor_dispatch", exc.category)
     except Exception as exc:
-        if boundary.call_count == 0:
+        if boundary.call_count == 0 and decision != "continue_after_provider":
             # A durable call-start publication failure occurs inside the
             # executor callback, before the fake client is entered.  It
             # is the primary persistence failure and must retain its
@@ -1328,7 +1492,9 @@ def _orchestrate_plan_member(
             if provider_invocation_attempted:
                 raise
             raise OrchestrationError("EXECUTOR_FAILURE") from exc
-        return post_call_failure("EXECUTOR_FAILURE")
+        if provider_persistence_failed:
+            raise
+        return post_call_failure("executor_dispatch", "EXECUTOR_FAILURE")
 
     turn_one = (
         checked["rq"] == "RQ3"
@@ -1339,7 +1505,9 @@ def _orchestrate_plan_member(
         core_result = _checked_core_result(raw_core_result, turn_one=turn_one)
     except OrchestrationError as exc:
         if boundary.call_count != 0:
-            return post_call_failure(exc.category)
+            return post_call_failure("core_result_validation", exc.category)
+        if decision == "continue_after_provider":
+            return post_call_failure("core_result_validation", exc.category)
         raise
     response_text = core_result["response_text"]
     try:
@@ -1351,7 +1519,9 @@ def _orchestrate_plan_member(
         )
     except OrchestrationError as exc:
         if boundary.call_count != 0:
-            return post_call_failure(exc.category)
+            return post_call_failure("result_projection", exc.category)
+        if decision == "continue_after_provider":
+            return post_call_failure("result_projection", exc.category)
         raise
     projection["checkpoint_snapshot_sha256"] = (
         checkpoint.snapshot_sha256 if checkpoint is not None else None
@@ -1384,15 +1554,26 @@ def _orchestrate_plan_member(
             }
         )
     elif tracker.state == "validated_success":
-        if boundary.call_count != 1:
-            return post_call_failure("PROVIDER_CALL_COUNT_INVALID")
+        expected_call_count = 0 if decision == "continue_after_provider" else 1
+        if boundary.call_count != expected_call_count or (
+            decision == "continue_after_provider" and pending_replay_count != 1
+        ):
+            return post_call_failure(
+                "provider_validation", "PROVIDER_CALL_COUNT_INVALID"
+            )
         if core_result["route"] in _LOCAL_ROUTES:
-            return post_call_failure("PROVIDER_PROVENANCE_INVALID")
+            return post_call_failure(
+                "provider_validation", "PROVIDER_PROVENANCE_INVALID"
+            )
         provider_result = getattr(boundary, "normalized_response", None)
         if type(provider_result) is not NormalizedProviderResponse:
-            return post_call_failure("PROVIDER_RESPONSE_EVIDENCE_MISSING")
+            return post_call_failure(
+                "provider_validation", "PROVIDER_RESPONSE_EVIDENCE_MISSING"
+            )
         if provider_result.content != response_text:
-            return post_call_failure("PROVIDER_CORE_RESPONSE_MISMATCH")
+            return post_call_failure(
+                "provider_validation", "PROVIDER_CORE_RESPONSE_MISMATCH"
+            )
         try:
             validate_core_result(
                 tracker,
@@ -1401,18 +1582,11 @@ def _orchestrate_plan_member(
                 local_result=False,
             )
         except TransportError as exc:
-            return post_call_failure(exc.category)
+            return post_call_failure("provider_validation", exc.category)
         try:
-            returned_journal = transition(
-                boundary.journal,
-                "provider_returned",
-                clock(),
-                provider_response_id=provider_result.provider_response_id,
-                provider_response_sha256=provider_result.response_sha256,
-                response_sha256=sha256_text(response_text),
-            )
-            persist_new_journal(returned_journal)
-            boundary.journal = returned_journal
+            returned_journal = boundary.journal
+            if returned_journal.state != "provider_returned":
+                raise OrchestrationError("PROVIDER_RESPONSE_EVIDENCE_MISSING")
             committed_at = clock()
             success = AuthoritativeSuccess(
                 schema_version=1,
@@ -1428,7 +1602,9 @@ def _orchestrate_plan_member(
             )
             success = validate_authoritative_success(success, identity)
         except JournalError as exc:
-            return post_call_failure(exc.category)
+            return post_call_failure("provider_validation", exc.category)
+        except OrchestrationError as exc:
+            return post_call_failure("provider_validation", exc.category)
         journal = returned_journal
         projection.update(
             {
@@ -1446,14 +1622,22 @@ def _orchestrate_plan_member(
         )
     else:
         if boundary.call_count != 0:
-            return post_call_failure("UNSAFE_CORE_FALLBACK")
+            return post_call_failure(
+                "provider_validation", "UNSAFE_CORE_FALLBACK"
+            )
+        if decision == "continue_after_provider":
+            return post_call_failure(
+                "provider_validation", "UNSAFE_CORE_FALLBACK"
+            )
         raise OrchestrationError("UNSAFE_CORE_FALLBACK")
 
     try:
         formal_result = project_formal_result(projection)
     except TransportError as exc:
         if boundary.call_count != 0:
-            return post_call_failure(exc.category)
+            return post_call_failure("formal_result_projection", exc.category)
+        if decision == "continue_after_provider":
+            return post_call_failure("formal_result_projection", exc.category)
         raise OrchestrationError(exc.category) from exc
 
     produced_checkpoint: CheckpointEvidence | None = checkpoint
@@ -1472,7 +1656,9 @@ def _orchestrate_plan_member(
             )
         except OrchestrationError as exc:
             if boundary.call_count != 0:
-                return post_call_failure(exc.category)
+                return post_call_failure("checkpoint_projection", exc.category)
+            if decision == "continue_after_provider":
+                return post_call_failure("checkpoint_projection", exc.category)
             raise
 
     return OrchestrationOutcome(

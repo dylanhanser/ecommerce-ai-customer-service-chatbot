@@ -1667,14 +1667,15 @@ def test_proven_pre_send_failure_is_the_only_no_call_retry_class():
     assert transport.may_retry(3, "retryable") is False
 
 
-def test_provider_returned_persistence_failure_blocks_without_recall(
+def test_pending_provider_response_survives_commit_failure_and_resumes_locally(
     monkeypatch: pytest.MonkeyPatch,
 ):
     _patch_synthetic_plan_authority(monkeypatch)
     plan = _synthetic_plan()
     evidence = _evidence()
     contract = _real_contract(plan, evidence)
-    client = _SuccessCompletions()
+    content = "PRIVATE_PENDING_RESPONSE_SENTINEL"
+    client = _SuccessCompletions(content)
     authority = _ProviderAuthority(evidence, contract, client)
     original = store._publish_private_commit_locked
 
@@ -1690,11 +1691,112 @@ def test_provider_returned_persistence_failure_blocks_without_recall(
             max_new_successes=1,
         )
     assert client.calls == 1
+    unit_id = store._execution_unit_id(plan[0])
+    pending_path = store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json"
+    pending = store._read_json(pending_path, store._PENDING_LIMIT)
+    assert pending["status"] == "pending"
+    assert pending["normalized_response"]["content"] == content
+    assert pending["local_failure_stage"] == "commit_publication"
+    assert pending["local_failure_category"] == "STORE_IO_FAILURE"
+    assert list(store._PRIVATE_STATE_ROOT.glob("commits/*.json")) == []
+
     monkeypatch.setattr(store, "_publish_private_commit_locked", original)
+    state = store._real_prefix_progress(plan, contract)
+    assert state.action == "ready"
+    assert state.block_category is None
+    assert content not in repr(state)
+    assert store._observe_validated_canonical_private_results(plan, contract) == ()
+    assert not projection._REVIEWER_PROJECTION_ROOT.exists()
+
+    resumed = store._orchestrate_durable_prefix(
+        plan,
+        expected_contract=contract,
+        authority=authority,
+        max_new_successes=1,
+    )
+    assert (resumed.action, resumed.new_successes) == ("prefix_paused", 1)
+    assert client.calls == 1
+    commits = list(store._PRIVATE_STATE_ROOT.glob("commits/*.json"))
+    assert len(commits) == 1
+    commit = store._read_json(commits[0], store._COMMIT_LIMIT)
+    consumed = store._read_json(pending_path, store._PENDING_LIMIT)
+    assert consumed["status"] == "consumed"
+    assert consumed["committed_envelope_sha256"] == commit["envelope_sha256"]
+    observed = store._observe_validated_canonical_private_results(plan, contract)
+    assert len(observed) == 1
+    assert observed[0].response_text == content
+
+
+def test_legacy_hash_only_provider_returned_remains_uncertain_without_recall(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    client = _SuccessCompletions()
+    authority = _ProviderAuthority(evidence, contract, client)
+    original_pending = store._publish_pending_response_locked
+    original_commit = store._publish_private_commit_locked
+
+    monkeypatch.setattr(
+        store, "_publish_pending_response_locked", lambda *_args, **_kwargs: None
+    )
+
+    def fail_commit(*_args, **_kwargs):
+        raise store.StoreError("STORE_IO_FAILURE")
+
+    monkeypatch.setattr(store, "_publish_private_commit_locked", fail_commit)
+    with pytest.raises(store.StoreError, match="STORE_IO_FAILURE"):
+        store._orchestrate_durable_prefix(
+            plan,
+            expected_contract=contract,
+            authority=authority,
+            max_new_successes=1,
+        )
+    assert client.calls == 1
+    monkeypatch.setattr(store, "_publish_pending_response_locked", original_pending)
+    monkeypatch.setattr(store, "_publish_private_commit_locked", original_commit)
+
     state = store._real_prefix_progress(plan, contract)
     assert state.action == "blocked"
     assert state.block_category == "provider_returned_without_commit"
+    resumed = store._orchestrate_durable_prefix(
+        plan,
+        expected_contract=contract,
+        authority=authority,
+        max_new_successes=1,
+    )
+    assert resumed.action == "blocked"
+    assert resumed.block_category == "provider_returned_without_commit"
     assert client.calls == 1
+
+
+def test_normal_provider_execution_commits_once_with_consumed_pending_response(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _patch_synthetic_plan_authority(monkeypatch)
+    plan = _synthetic_plan()
+    evidence = _evidence()
+    contract = _real_contract(plan, evidence)
+    client = _SuccessCompletions()
+    authority = _ProviderAuthority(evidence, contract, client)
+
+    outcome = store._orchestrate_durable_prefix(
+        plan,
+        expected_contract=contract,
+        authority=authority,
+        max_new_successes=1,
+    )
+    assert (outcome.action, outcome.new_successes) == ("prefix_paused", 1)
+    assert client.calls == 1
+    commits = list(store._PRIVATE_STATE_ROOT.glob("commits/*.json"))
+    pending = list(store._PRIVATE_STATE_ROOT.glob("pending/*.json"))
+    assert len(commits) == len(pending) == 1
+    commit = store._read_json(commits[0], store._COMMIT_LIMIT)
+    record = store._read_json(pending[0], store._PENDING_LIMIT)
+    assert record["status"] == "consumed"
+    assert record["committed_envelope_sha256"] == commit["envelope_sha256"]
 
 
 def test_credentials_are_synthetic_redacted_and_client_retries_are_disabled(
