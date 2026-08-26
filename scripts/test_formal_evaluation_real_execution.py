@@ -1083,6 +1083,81 @@ def test_v2_pending_raw_response_resumes_without_provider_recall(
     assert committed["journal"]["response_sha256"] == final_sha256
 
 
+@pytest.mark.parametrize("system_config", ["baseline", "v2"])
+def test_pending_provider_response_commits_despite_redundant_precommit_response_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    system_config: str,
+):
+    raw_content = "您好。待恢复的合成提供方回答"
+    if system_config == "baseline":
+        plan, contract, completions, authority = _baseline_provider_case(
+            monkeypatch, raw_content
+        )
+        unit = plan[0]
+        finalized = authority._finalize_baseline_provider_response(raw_content)
+    else:
+        plan, unit, contract, completions, authority = _v2_provider_case(
+            monkeypatch, raw_content
+        )
+        finalized = authority._finalize_v2_provider_response(raw_content)
+
+    raw_sha256 = transport.sha256_text(raw_content)
+    final_sha256 = transport.sha256_text(finalized)
+    redundant_precommit_sha256 = transport.sha256_text(
+        "synthetic redundant precommit projection"
+    )
+    assert len({raw_sha256, final_sha256, redundant_precommit_sha256}) == 3
+    original_transition = orchestration.transition
+    original_publish = store._publish_private_commit_locked
+
+    def redundant_precommit_transition(journal, state, updated_at, **updates):
+        if state == "provider_returned":
+            updates["response_sha256"] = redundant_precommit_sha256
+        return original_transition(journal, state, updated_at, **updates)
+
+    def fail_commit(*_args, **_kwargs):
+        raise store.StoreError("STORE_IO_FAILURE")
+
+    monkeypatch.setattr(orchestration, "transition", redundant_precommit_transition)
+    monkeypatch.setattr(store, "_publish_private_commit_locked", fail_commit)
+    with pytest.raises(store.StoreError, match="STORE_IO_FAILURE"):
+        store._orchestrate_durable_offline_unit(
+            plan,
+            unit,
+            expected_contract=contract,
+            authority=authority,
+        )
+    assert completions.calls == 1
+
+    unit_id = store._execution_unit_id(unit)
+    pending_path = store._PRIVATE_STATE_ROOT / "pending" / f"{unit_id}.json"
+    pending = store._read_json(pending_path, store._PENDING_LIMIT)
+    assert pending["status"] == "pending"
+    assert pending["normalized_response"]["response_sha256"] == raw_sha256
+
+    monkeypatch.setattr(orchestration, "transition", original_transition)
+    monkeypatch.setattr(store, "_publish_private_commit_locked", original_publish)
+    resumed = store._orchestrate_durable_offline_unit(
+        plan,
+        unit,
+        expected_contract=contract,
+        authority=authority,
+    )
+
+    assert resumed.action == "completed"
+    assert resumed.provider_call_count == 0
+    assert completions.calls == 1
+    executed = resumed.orchestration_outcome
+    assert executed is not None
+    assert executed.formal_result is not None
+    assert executed.formal_result["response_text"] == finalized
+    assert executed.formal_result["response_sha256"] == final_sha256
+    success = executed.authoritative_success
+    assert success is not None
+    assert success.provider_response_sha256 == raw_sha256
+    assert success.response_sha256 == final_sha256
+
+
 def test_v2_unrelated_core_response_remains_a_mismatch(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -1290,18 +1365,28 @@ def test_baseline_pending_dual_hash_tampering_fails_closed(
             json.dumps(value, ensure_ascii=False, sort_keys=True), encoding="utf-8"
         )
 
-    expected_error = (
-        orchestration.OrchestrationError
-        if tamper_target == "finalized_content"
-        else store.StoreError
-    )
-    with pytest.raises(expected_error):
-        store._orchestrate_durable_offline_unit(
+    if tamper_target == "finalized_content":
+        rejected = store._orchestrate_durable_offline_unit(
             plan,
             plan[0],
             expected_contract=contract,
             authority=authority,
         )
+        assert rejected.action == "advanced"
+        assert rejected.provider_call_count == 0
+        assert rejected.orchestration_outcome is not None
+        assert (
+            rejected.orchestration_outcome.failure_category
+            == "PROVIDER_CORE_RESPONSE_MISMATCH"
+        )
+    else:
+        with pytest.raises(store.StoreError):
+            store._orchestrate_durable_offline_unit(
+                plan,
+                plan[0],
+                expected_contract=contract,
+                authority=authority,
+            )
     assert completions.calls == 1
     assert list(store._PRIVATE_STATE_ROOT.glob("commits/*.json")) == []
 

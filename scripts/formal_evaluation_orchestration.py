@@ -1199,24 +1199,6 @@ def _orchestrate_plan_member(
         expected_pending_content = finalize_provider_content(
             checked_pending_response["content"]
         )
-        expected_pending_sha256 = sha256_text(expected_pending_content)
-        legacy_pending_raw_hash = (
-            identity.system_config_id
-            in {
-                "qa_only_reconstructed_baseline",
-                "v2",
-                "single_turn",
-                "context_aware",
-            }
-            and journal.response_sha256 == journal.provider_response_sha256
-            and journal.response_sha256
-            == checked_pending_response["response_sha256"]
-        )
-        if (
-            journal.response_sha256 != expected_pending_sha256
-            and not legacy_pending_raw_hash
-        ):
-            raise OrchestrationError("RECOVERY_EVIDENCE_INVALID")
         decision = "continue_after_provider"
     predecessor: InflightJournal | None = None
     resumed_retry_predecessor: InflightJournal | None = None

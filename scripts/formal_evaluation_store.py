@@ -4139,38 +4139,11 @@ def _reconcile_commit_locked(
             ):
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
         if state.tip.journal.state == "provider_returned":
-            legacy_baseline_finalization = (
-                pending is not None
-                and pending["status"] == "pending"
-                and identity.system_config_id
-                == "qa_only_reconstructed_baseline"
-                and state.tip.journal.response_sha256
-                == state.tip.journal.provider_response_sha256
-                and state.tip.journal.provider_response_sha256
-                == pending["normalized_response"]["response_sha256"]
-                and success.provider_response_sha256
-                == state.tip.journal.provider_response_sha256
-                and success.response_sha256 != success.provider_response_sha256
-            )
-            legacy_v2_finalization = (
-                pending is not None
-                and pending["status"] == "pending"
-                and identity.system_config_id in {"v2", "single_turn", "context_aware"}
-                and state.tip.journal.response_sha256
-                == state.tip.journal.provider_response_sha256
-                and state.tip.journal.provider_response_sha256
-                == pending["normalized_response"]["response_sha256"]
-                and success.provider_response_sha256
-                == state.tip.journal.provider_response_sha256
-                and success.response_sha256 != success.provider_response_sha256
-            )
             try:
                 decision = recovery_decision(
                     state.tip.journal,
                     authoritative_success=success,
                     expected=identity,
-                    allow_legacy_baseline_finalization=legacy_baseline_finalization,
-                    allow_legacy_v2_finalization=legacy_v2_finalization,
                 )
                 if decision != "reconcile_committed":
                     raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT")
@@ -4178,8 +4151,6 @@ def _reconcile_commit_locked(
                     state.tip.journal,
                     success,
                     identity,
-                    allow_legacy_baseline_finalization=legacy_baseline_finalization,
-                    allow_legacy_v2_finalization=legacy_v2_finalization,
                 )
             except JournalError as exc:
                 raise StoreError("STORE_COMMIT_JOURNAL_CONFLICT") from exc
