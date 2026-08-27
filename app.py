@@ -4,17 +4,21 @@
 from __future__ import annotations
 
 import os
+import re
+import secrets
 import sys
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.requests import Request
+from starlette.responses import Response
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,13 +30,21 @@ if str(OUTPUTS_DIR) not in sys.path:
 import rag_answer_demo as rag  # noqa: E402
 
 DEFAULT_CACHE_DIR = rag.DEFAULT_CACHE_ROOT
-DEFAULT_SESSION_ID = "demo"
 MAX_SESSION_HISTORY_TURNS = 3
+SESSION_COOKIE_NAME = "eai_session"
+SECURE_COOKIE_ENV = "EAI_SESSION_COOKIE_SECURE"
+SESSION_TOKEN_BYTES = 32
+SESSION_TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
+GENERIC_CHAT_ERROR = "暂时无法处理，请稍后重试。"
+GENERIC_CHAT_ERROR_CODE = "CHAT_UNAVAILABLE"
+INVALID_REQUEST_ERROR = "请输入有效的问题。"
+INVALID_REQUEST_ERROR_CODE = "INVALID_REQUEST"
 
 
 class ChatRequest(BaseModel):
     question: str
-    session_id: str = DEFAULT_SESSION_ID
+    # Accepted only for backward-compatible request parsing. The server cookie is authoritative.
+    session_id: str | None = None
 
 
 class RAGEngine:
@@ -123,7 +135,7 @@ class RAGEngine:
         with self.session_lock:
             self.session_states[session_id] = dict(state)
 
-    def chat(self, question: str, session_id: str = DEFAULT_SESSION_ID) -> dict[str, Any]:
+    def chat(self, question: str, *, session_id: str) -> dict[str, Any]:
         self.load()
         top_k = int(os.getenv("RAG_TOP_K", "10"))
         threshold = float(
@@ -205,25 +217,90 @@ def serialize_results(results: list) -> list[dict[str, Any]]:
     return serialized
 
 
+def _secure_cookie_enabled() -> bool:
+    return os.getenv(SECURE_COOKIE_ENV, "false").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _valid_session_token(value: str | None) -> bool:
+    return bool(value and SESSION_TOKEN_PATTERN.fullmatch(value))
+
+
+def _server_session(request: Request) -> tuple[str, bool]:
+    cookie_value = request.cookies.get(SESSION_COOKIE_NAME)
+    if _valid_session_token(cookie_value):
+        return cookie_value, False
+    return secrets.token_urlsafe(SESSION_TOKEN_BYTES), True
+
+
+def _set_session_cookie(response: Response, session_token: str) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_token,
+        httponly=True,
+        secure=_secure_cookie_enabled(),
+        samesite="lax",
+        path="/",
+    )
+
+
+def _public_success_payload(result: dict[str, Any]) -> dict[str, str]:
+    """Whitelist the sole field currently required by the public chat UI."""
+    return {"final_answer": str(result.get("final_answer", ""))}
+
+
 app = FastAPI(title="JD QA + Knowledge Base RAG Web Demo")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 engine = RAGEngine()
 
 
+@app.exception_handler(RequestValidationError)
+async def request_validation_error(request: Request, _exc: RequestValidationError):
+    session_token, rotate_cookie = _server_session(request)
+    response = JSONResponse(
+        {
+            "final_answer": INVALID_REQUEST_ERROR,
+            "error_code": INVALID_REQUEST_ERROR_CODE,
+        },
+        status_code=422,
+    )
+    if rotate_cookie:
+        _set_session_cookie(response, session_token)
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse(
-    request=request,
-    name="index.html",
-    context={}
-)
+    session_token, rotate_cookie = _server_session(request)
+    response = templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={},
+    )
+    if rotate_cookie:
+        _set_session_cookie(response, session_token)
+    return response
 
 @app.post("/chat")
-def chat(request: ChatRequest):
-    question = request.question.strip()
-    session_id = (request.session_id or DEFAULT_SESSION_ID).strip() or DEFAULT_SESSION_ID
+def chat(chat_request: ChatRequest, request: Request):
+    question = chat_request.question.strip()
+    session_token, rotate_cookie = _server_session(request)
     try:
-        return engine.chat(question, session_id=session_id)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        internal_result = engine.chat(question, session_id=session_token)
+        response = JSONResponse(_public_success_payload(internal_result))
+    except Exception:
+        response = JSONResponse(
+            {
+                "final_answer": GENERIC_CHAT_ERROR,
+                "error_code": GENERIC_CHAT_ERROR_CODE,
+            },
+            status_code=500,
+        )
+    if rotate_cookie:
+        _set_session_cookie(response, session_token)
+    return response

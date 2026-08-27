@@ -9,6 +9,7 @@ import os
 import re
 import sys
 from dataclasses import asdict, dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Iterable
 
@@ -28,6 +29,14 @@ V2_CACHE_SUBDIR = "v2_mixed"
 QA_CORPUS_SOURCE_FILE = "jd_final_safe_qa_refined_category.csv"
 SNIPPETS_CORPUS_SOURCE_FILE = "knowledge_snippets_v2_reviewed.csv"
 BACKEND_SOURCE_TYPES = frozenset({"backend_rule"})
+QUARANTINED_KNOWLEDGE_DOC_IDS = {
+    "snippet_yf_1": (
+        "conflicting absolute freight-insurance statement; use conditional current-policy guidance"
+    ),
+    "snippet_zp_1": (
+        "unverified PICC/authenticity-insurance endorsement; canonical support is absent"
+    ),
+}
 SNIPPET_EMBED_CONTENT_LIMIT = 240
 EMBEDDING_FILENAME = "qa_embeddings.npy"
 CORPUS_FILENAME = "qa_corpus.pkl"
@@ -108,6 +117,7 @@ POLICY_CATEGORY_KEYWORDS = {
     CATEGORY_LOGISTICS: [
         "\u53d1\u4ec0\u4e48\u5feb\u9012",
         "\u4ec0\u4e48\u65f6\u5019\u53d1\u8d27",
+        "多久发货",
         "\u591a\u4e45\u5230",
         "\u4ec0\u4e48\u65f6\u5019\u80fd\u5230",
     ],
@@ -1042,6 +1052,34 @@ class FollowupResolution:
     retrieval_query: str
 
 
+class AnswerRoute(str, Enum):
+    """Minimal product routing states for shipping, refund, and exchange."""
+
+    DIRECT_ANSWER = "DIRECT_ANSWER"
+    CLARIFY_THEN_ANSWER = "CLARIFY_THEN_ANSWER"
+    POLICY_PLUS_HANDOFF = "POLICY_PLUS_HANDOFF"
+    FULL_HANDOFF = "FULL_HANDOFF"
+
+
+@dataclass(frozen=True)
+class AnswerRouteDecision:
+    route: AnswerRoute
+    domain: str | None
+    has_policy_facet: bool = False
+    needs_realtime_status: bool = False
+    needs_backend_action: bool = False
+    policy_query: str | None = None
+    clarification_question: str | None = None
+    reason: str = "outside_p0_s1_scope"
+
+
+@dataclass(frozen=True)
+class ClaimValidationResult:
+    answer: str
+    blocked_claims: tuple[str, ...] = ()
+    rewritten: bool = False
+
+
 @dataclass
 class FinancialRiskInheritance:
     query_type: str
@@ -1210,12 +1248,26 @@ def row_is_backend_only(row) -> bool:
     return row_needs_backend_api(row) or source_type in BACKEND_SOURCE_TYPES
 
 
+def knowledge_quarantine_reason(row) -> str | None:
+    """Return a reason only for an exact, stable structured-knowledge identity."""
+
+    source_file = str(row.get("source_file", "")).strip()
+    doc_id = str(row.get("doc_id", "")).strip()
+    if source_file != SNIPPETS_CORPUS_SOURCE_FILE:
+        return None
+    return QUARANTINED_KNOWLEDGE_DOC_IDS.get(doc_id)
+
+
+def filter_quarantined_knowledge_results(results: list) -> list:
+    return [item for item in results if knowledge_quarantine_reason(item[0]) is None]
+
+
 def filter_results_for_answer_generation(
     results: list,
     backend_required: bool,
     user_question: str = "",
 ) -> list:
-    filtered = results
+    filtered = filter_quarantined_knowledge_results(results)
     if not backend_required:
         filtered = [item for item in filtered if not row_is_backend_only(item[0])]
         filtered = [
@@ -2119,6 +2171,182 @@ def detect_policy_category(user_question: str) -> str | None:
     return None
 
 
+def decide_p0_s1_answer_route(user_question: str) -> AnswerRouteDecision:
+    """Route only the P0-S1 shipping/refund/exchange slice.
+
+    Questions outside these three domains retain the legacy product path.
+    """
+
+    normalized = re.sub(r"\s+", "", str(user_question or "").strip()).casefold()
+    if not normalized:
+        return AnswerRouteDecision(
+            route=AnswerRoute.CLARIFY_THEN_ANSWER,
+            domain=None,
+            clarification_question="请问您想咨询发货、退款还是换货问题？",
+            reason="empty_input",
+        )
+
+    if normalized in {"退", "退款", "换", "换货", "发货"}:
+        clarification = (
+            "请问您想咨询退货流程、退款进度，还是其他售后问题？"
+            if "退" in normalized
+            else "请问您想了解一般流程、当前处理状态，还是需要人工执行操作？"
+        )
+        return AnswerRouteDecision(
+            route=AnswerRoute.CLARIFY_THEN_ANSWER,
+            domain=None,
+            clarification_question=clarification,
+            reason="short_or_object_only_input",
+        )
+
+    if (
+        "客服" in normalized
+        and contains_any(normalized, ["没回", "未回", "不回复"])
+        and contains_any(normalized, ["物流", "快递"])
+        and contains_any(normalized, ["没更新", "未更新", "不更新"])
+    ):
+        return AnswerRouteDecision(
+            route=AnswerRoute.CLARIFY_THEN_ANSWER,
+            domain=None,
+            clarification_question="请问您主要想确认人工客服回复进度，还是订单物流是否更新？",
+            reason="customer_service_or_logistics_ambiguity",
+        )
+
+    domains: list[str] = []
+    shipping = contains_any(normalized, ["发货", "物流", "快递", "催发"])
+    refund = contains_any(normalized, ["退款", "退钱", "返款", "到账"])
+    exchange = contains_any(normalized, ["换货", "换码", "改码", "换尺码"]) or bool(
+        re.search(r"(?:改成|换成)\d{2}码", normalized)
+    )
+    if shipping:
+        domains.append("shipping")
+    if refund:
+        domains.append("refund")
+    if exchange:
+        domains.append("exchange")
+
+    if len(domains) > 1:
+        return AnswerRouteDecision(
+            route=AnswerRoute.CLARIFY_THEN_ANSWER,
+            domain=None,
+            clarification_question="请问您这次主要想处理发货、退款还是换货中的哪一项？",
+            reason="multiple_p0_s1_domains",
+        )
+    if not domains:
+        return AnswerRouteDecision(route=AnswerRoute.DIRECT_ANSWER, domain=None)
+    domain = domains[0]
+
+    backend_action = False
+    if domain == "shipping":
+        backend_action = bool(
+            re.search(r"(?:帮我|请|麻烦).{0,6}(?:催|催促).{0,6}发货", normalized)
+            or contains_any(normalized, ["帮我催发货", "催一下发货", "催促发货"])
+        )
+    elif domain == "refund":
+        backend_action = contains_any(normalized, ["帮我退款", "给我退款", "立即退款"])
+    elif domain == "exchange":
+        backend_action = bool(
+            re.search(r"(?:帮我|请|麻烦|把这单).{0,10}(?:改成|换成)\d{2}码", normalized)
+            or re.search(r"(?:修改|更改).{0,6}(?:尺码|码数)", normalized)
+        )
+
+    general_markers = ["一般", "通常", "流程", "怎么", "如何", "申请", "规则", "政策", "多久"]
+    has_policy_facet = contains_any(normalized, general_markers) and not backend_action
+    specific_order = contains_any(normalized, ["我的", "我这", "这单", "当前订单", "订单现在"])
+
+    if domain == "shipping":
+        status_signal = contains_any(
+            normalized,
+            ["什么时候发货", "发货了吗", "还没发货", "发了没", "处理到哪", "状态", "没更新"],
+        )
+        needs_realtime = status_signal and (specific_order or not has_policy_facet)
+        policy_query = "一般多久发货"
+    elif domain == "refund":
+        status_signal = contains_any(
+            normalized,
+            ["到账", "进度", "处理到哪", "退款了吗", "退了吗", "退款状态"],
+        )
+        explicit_general_policy = contains_any(
+            normalized, ["一般", "通常", "流程", "怎么", "如何", "申请", "规则", "政策"]
+        )
+        needs_realtime = status_signal and (specific_order or not explicit_general_policy)
+        policy_query = "退款流程是什么"
+    else:
+        status_signal = contains_any(
+            normalized,
+            ["处理到哪", "进度", "换好了吗", "完成了吗", "换货状态", "现在处理"],
+        )
+        needs_realtime = status_signal and (specific_order or not has_policy_facet)
+        policy_query = "尺码不合适怎么申请换货"
+
+    if backend_action:
+        route = AnswerRoute.FULL_HANDOFF
+        reason = "backend_action_required"
+    elif has_policy_facet and needs_realtime:
+        route = AnswerRoute.POLICY_PLUS_HANDOFF
+        reason = "policy_and_realtime_facets"
+    elif needs_realtime:
+        route = AnswerRoute.FULL_HANDOFF
+        reason = "realtime_status_required"
+    else:
+        route = AnswerRoute.DIRECT_ANSWER
+        reason = "general_policy"
+
+    return AnswerRouteDecision(
+        route=route,
+        domain=domain,
+        has_policy_facet=has_policy_facet,
+        needs_realtime_status=needs_realtime,
+        needs_backend_action=backend_action,
+        policy_query=policy_query if has_policy_facet else None,
+        reason=reason,
+    )
+
+
+def answer_for_p0_s1_route(decision: AnswerRouteDecision) -> str:
+    if decision.route is AnswerRoute.CLARIFY_THEN_ANSWER:
+        return decision.clarification_question or "请问您想咨询哪一项具体问题？"
+    if decision.route is not AnswerRoute.FULL_HANDOFF:
+        return ""
+    if decision.needs_backend_action:
+        if decision.domain == "exchange":
+            return (
+                "当前系统没有后台执行能力，不能直接修改这笔订单的尺码；"
+                "请先在订单页查看是否可修改，若无法操作请联系人工客服处理。"
+            )
+        if decision.domain == "shipping":
+            return (
+                "当前系统没有后台执行能力，不能直接催促发货；"
+                "请先查看订单页的预计发货信息，仍需处理时请联系人工客服。"
+            )
+        return (
+            "当前系统没有后台执行能力，不能直接为订单发起退款；"
+            "请在订单页申请售后，或联系人工客服处理。"
+        )
+    if decision.domain == "refund":
+        return (
+            "我无法查询当前退款进度或是否到账；请先查看订单页的退款记录，"
+            "如仍不明确请联系人工客服核验。"
+        )
+    if decision.domain == "exchange":
+        return (
+            "我无法查询当前换货处理状态；请先查看订单页的售后进度，"
+            "如仍不明确请联系人工客服核验。"
+        )
+    return (
+        "我无法查询当前订单的实时发货状态；请先查看订单页的预计发货信息，"
+        "如仍不明确请联系人工客服核验。"
+    )
+
+
+def p0_s1_status_handoff_boundary(decision: AnswerRouteDecision) -> str:
+    if decision.domain == "refund":
+        return "这笔订单是否已经退款到账我无法查询，请以订单页记录为准，必要时联系人工客服核验。"
+    if decision.domain == "exchange":
+        return "这笔订单当前的换货进度我无法查询，请以订单页售后记录为准，必要时联系人工客服核验。"
+    return "这笔订单当前是否已经发货我无法查询，请以订单页记录为准，必要时联系人工客服核验。"
+
+
 def invalid_input_guard(user_question: str) -> tuple[bool, str | None]:
     stripped = user_question.strip()
     if not stripped:
@@ -2154,6 +2382,15 @@ def intent_guard(user_question: str) -> tuple[bool, str, str | None]:
 
     if contains_any(normalized, HUMAN_HANDOVER_KEYWORDS):
         return True, "human_handover", HUMAN_HANDOVER_ANSWER
+
+    route_decision = decide_p0_s1_answer_route(user_question)
+    if route_decision.domain is not None or route_decision.route is AnswerRoute.CLARIFY_THEN_ANSWER:
+        if route_decision.route is AnswerRoute.CLARIFY_THEN_ANSWER:
+            return True, "unclear", answer_for_p0_s1_route(route_decision)
+        if route_decision.route is AnswerRoute.FULL_HANDOFF:
+            return True, "backend_required", answer_for_p0_s1_route(route_decision)
+        if route_decision.has_policy_facet:
+            return False, "normal", None
 
     if requires_backend_api(user_question):
         return True, "backend_required", BACKEND_REQUIRED_ANSWER
@@ -2473,6 +2710,136 @@ def cleanup_final_answer(answer: str) -> str:
 
 def finalize_answer(answer: str) -> str:
     return cleanup_final_answer(answer)
+
+
+BACKEND_SUCCESS_CLAIM_PATTERNS = (
+    re.compile(r"(?:已经|已)(?:为您|帮您|替您)?.{0,3}(?:查询到|查询|查到)"),
+    re.compile(r"(?:已经|已).{0,10}(?:修改|改成|换成).{0,10}(?:地址|尺码|码)"),
+    re.compile(r"(?:已经|已)(?:为您|帮您|替您)?.{0,4}(?:退款|退回款项)"),
+    re.compile(r"(?:退款|款项).{0,6}(?:已经|已)(?:到账|退回|完成)"),
+    re.compile(r"(?:已经|已)(?:为您|帮您|替您)?.{0,4}(?:催促|催发货|催快递)"),
+    re.compile(r"(?:已经|已)(?:为您|帮您|替您)?.{0,4}(?:补发|重发)"),
+    re.compile(r"(?:换货|退货|退换货).{0,8}(?:已经|已).{0,4}(?:处理完成|完成|办结)"),
+    re.compile(r"(?:已经|已).{0,6}(?:完成换货|办结换货)"),
+)
+WAREHOUSE_LOCATION_CLAIM_PATTERNS = (
+    re.compile(
+        r"(?:从|由)?(?:北京|上海|广州|深圳|杭州|成都|武汉|南京|天津|苏州|东莞)"
+        r".{0,4}仓(?:库)?(?:发出|发货|直发)?"
+    ),
+    re.compile(r"仓库(?:位于|在)(?:北京|上海|广州|深圳|杭州|成都|武汉|南京|天津|苏州|东莞)"),
+    re.compile(r"全国.{0,6}(?:个|处)仓(?:库)?"),
+)
+INSURANCE_ENDORSEMENT_CLAIM_PATTERNS = (
+    re.compile(r"中国人保", flags=re.IGNORECASE),
+    re.compile(r"\bPICC\b", flags=re.IGNORECASE),
+    re.compile(r"正品险|正品保险|保险公司承保"),
+)
+SAFE_CLAIM_CONTEXT_MARKERS = (
+    "无法",
+    "不能",
+    "不可",
+    "未能",
+    "不会",
+    "不应",
+    "禁止",
+    "不要",
+    "是否",
+    "确认是否",
+    "需要确认",
+    "需确认",
+    "如已",
+    "若已",
+    "如果已经",
+    "声称",
+)
+
+
+def _has_unqualified_claim(text: str, patterns: Iterable[re.Pattern[str]]) -> bool:
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            prefix_window = text[max(0, match.start() - 16):match.start()]
+            if not contains_any(prefix_window, SAFE_CLAIM_CONTEXT_MARKERS):
+                return True
+    return False
+
+
+def _claim_validation_boundary(
+    blocked_claims: Iterable[str],
+    route_decision: AnswerRouteDecision | None,
+) -> list[str]:
+    blocked = set(blocked_claims)
+    boundaries: list[str] = []
+    if "backend_success" in blocked:
+        route_answer = answer_for_p0_s1_route(route_decision) if route_decision else ""
+        boundaries.append(
+            route_answer
+            or (
+                "当前系统没有后台查询或执行能力，无法确认动作已经完成；"
+                "请通过订单页查看当前状态，必要时联系人工客服处理。"
+            )
+        )
+    if "warehouse_location" in blocked:
+        boundaries.append("具体发货仓库需以订单页实际信息为准，当前无法确认。")
+    if "insurance_endorsement" in blocked:
+        boundaries.append(
+            "运费险或正品保障以当前商品详情页、订单页和店铺规则为准，"
+            "当前无法确认具体承保机构。"
+        )
+    return boundaries
+
+
+def validate_final_answer_claims(
+    answer: str,
+    route_decision: AnswerRouteDecision | None = None,
+    backend_receipt_verified: bool = False,
+    canonical_support: Iterable[str] | None = None,
+) -> ClaimValidationResult:
+    """Block unsupported success, warehouse, and insurance claims.
+
+    Trusted support is explicit and claim-scoped. Negative statements,
+    capability boundaries, and questions about whether an action happened are
+    not treated as success claims.
+    """
+
+    text = str(answer or "")
+    supported = frozenset(canonical_support or ())
+    chunks = [part for part in re.split(r"(?<=[。！？!?；;，,\n])", text) if part]
+    kept: list[str] = []
+    blocked: list[str] = []
+
+    for chunk in chunks or [text]:
+        chunk_claims: list[str] = []
+        if not backend_receipt_verified and _has_unqualified_claim(
+            chunk, BACKEND_SUCCESS_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("backend_success")
+        if "warehouse_location" not in supported and _has_unqualified_claim(
+            chunk, WAREHOUSE_LOCATION_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("warehouse_location")
+        if "insurance_endorsement" not in supported and _has_unqualified_claim(
+            chunk, INSURANCE_ENDORSEMENT_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("insurance_endorsement")
+        if chunk_claims:
+            for claim_type in chunk_claims:
+                if claim_type not in blocked:
+                    blocked.append(claim_type)
+        else:
+            kept.append(chunk)
+
+    if not blocked:
+        return ClaimValidationResult(answer=text)
+
+    safe_parts = [part.strip() for part in kept if part.strip()]
+    safe_parts.extend(_claim_validation_boundary(blocked, route_decision))
+    rewritten = finalize_answer("".join(safe_parts))
+    return ClaimValidationResult(
+        answer=rewritten or finalize_answer(SAFE_HUMAN_VERIFICATION_ANSWER),
+        blocked_claims=tuple(blocked),
+        rewritten=True,
+    )
 
 
 def filter_unverified_live_logistics_answer(
@@ -2916,6 +3283,7 @@ def run_rag_query(
     generation_config: GenerationConfig | None = None,
 ) -> dict:
     question = str(user_question or "").strip()
+    route_decision = decide_p0_s1_answer_route(question)
     prior_state = coerce_conversation_state(
         conversation_state,
         previous_user_query=previous_user_query,
@@ -2936,6 +3304,9 @@ def run_rag_query(
         result.setdefault("inherited_backend_required", False)
         result.setdefault("inherited_financial_risk", False)
         result.setdefault("inherited_aftersales_operation", False)
+        result.setdefault("answer_route", route_decision.route.value)
+        result.setdefault("answer_route_domain", route_decision.domain)
+        result.setdefault("answer_route_reason", route_decision.reason)
         filtered_answer, blocked_live_logistics = filter_unverified_live_logistics_answer(
             result.get("final_answer", ""),
             backend_access_verified=bool(result.get("backend_access_verified", False)),
@@ -2957,6 +3328,17 @@ def run_rag_query(
             state_update_reason = "unsafe_live_logistics_answer_filter"
         else:
             result.setdefault("unsafe_live_logistics_answer_filtered", False)
+        claim_validation = validate_final_answer_claims(
+            result.get("final_answer", ""),
+            route_decision=route_decision,
+            backend_receipt_verified=bool(result.get("backend_access_verified", False)),
+            canonical_support=result.get("canonical_claim_support", ()),
+        )
+        result["final_answer"] = claim_validation.answer
+        result["claim_validation_rewritten"] = claim_validation.rewritten
+        result["blocked_claim_types"] = list(claim_validation.blocked_claims)
+        if claim_validation.rewritten:
+            state_update_reason = "final_claim_validation"
         result["conversation_state"] = update_conversation_state(
             prior_state, result, followup
         ).to_dict()
@@ -3001,7 +3383,7 @@ def run_rag_query(
         }, "invalid_input")
 
     financial_risk = detect_financial_risk_query(question)
-    if financial_risk:
+    if financial_risk and route_decision.route is not AnswerRoute.POLICY_PLUS_HANDOFF:
         financial_query_type, financial_answer = financial_risk
         return finish({
             "question": question,
@@ -3127,15 +3509,20 @@ def run_rag_query(
             **debug,
         }, "aftersales_operation_guard")
 
-    retrieval_query = followup.retrieval_query
-    original_results = retrieve(
+    mixed_policy_handoff = route_decision.route is AnswerRoute.POLICY_PLUS_HANDOFF
+    retrieval_query = (
+        route_decision.policy_query
+        if mixed_policy_handoff and route_decision.policy_query
+        else followup.retrieval_query
+    )
+    original_results = filter_quarantined_knowledge_results(retrieve(
         retrieval_query,
         corpus,
         embeddings,
         embedding_model,
         top_k,
         cosine_similarity,
-    )
+    ))
     reranked_results, policy_category = rerank_retrieved_results(
         retrieval_query, original_results
     )
@@ -3150,13 +3537,14 @@ def run_rag_query(
         policy_category,
         domain_query=retrieval_query,
     )
+    generation_question = retrieval_query if mixed_policy_handoff else question
     final_answer, _prompt = generate_final_answer(
-        question,
+        generation_question,
         original_results,
         reranked_results,
         low_confidence_threshold,
         llm_config,
-        backend_required,
+        False if mixed_policy_handoff else backend_required,
         query_type=query_type,
         retrieval_query=retrieval_query,
         previous_user_query=followup.previous_user_query,
@@ -3165,14 +3553,20 @@ def run_rag_query(
         contextual_query=followup.contextual_query,
         generation_config=generation_config,
     )
+    if mixed_policy_handoff:
+        final_answer = finalize_answer(
+            f"{final_answer} {p0_s1_status_handoff_boundary(route_decision)}"
+        )
+    effective_backend_required = backend_required or mixed_policy_handoff
+    provider_was_available = llm_config.has_api_key and llm_config.client is not None
     return finish({
         "question": question,
         "final_answer": final_answer,
-        "requires_backend_api": backend_required,
+        "requires_backend_api": effective_backend_required,
         "invalid_input": False,
         "skip_retrieval": False,
-        "skip_llm": backend_required,
-        "query_type": query_type,
+        "skip_llm": backend_required or (mixed_policy_handoff and not provider_was_available),
+        "query_type": "policy_plus_handoff" if mixed_policy_handoff else query_type,
         "policy_category": policy_category,
         "original_results": original_results,
         "reranked_results": reranked_results,

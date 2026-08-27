@@ -33,6 +33,17 @@ body {
   padding: 28px;
 }
 
+.page.chat-only {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
+.page.chat-only .chat-card {
+  width: min(100%, 760px);
+  max-width: 760px;
+  min-width: 0;
+}
+
 .chat-card,
 .debug-card {
   background: var(--card);
@@ -259,6 +270,30 @@ pre {
   .page {
     grid-template-columns: 1fr;
     padding: 14px;
+  }
+
+  .page.chat-only {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .page.chat-only .chat-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .composer {
+    min-width: 0;
+  }
+
+  .composer input {
+    min-width: 0;
+  }
+
+  .composer button {
+    flex: 0 0 auto;
+    padding: 0 16px;
   }
 
   .chat-card,
