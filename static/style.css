@@ -302,3 +302,69 @@ pre {
     max-height: none;
   }
 }
+
+@media (max-width: 600px) {
+  .page {
+    min-height: 100vh;
+    min-height: 100svh;
+    min-height: 100dvh;
+  }
+
+  .page.chat-only .chat-card {
+    height: calc(100vh - 28px);
+    height: calc(100svh - 28px);
+    height: calc(100dvh - 28px);
+    min-height: calc(100vh - 28px);
+    min-height: calc(100svh - 28px);
+    min-height: calc(100dvh - 28px);
+  }
+
+  .chat-header,
+  .composer {
+    flex: 0 0 auto;
+  }
+
+  .chat-header {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px;
+  }
+
+  .chat-header > div {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .chat-header h1,
+  .chat-header p {
+    overflow-wrap: anywhere;
+  }
+
+  .status-pill {
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  .chat-window {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .composer {
+    width: 100%;
+    padding: 14px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .composer input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .composer button {
+    max-width: 100%;
+    white-space: nowrap;
+  }
+}
