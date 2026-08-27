@@ -22,6 +22,231 @@ REVIEWER_TRACE_METADATA = (
 
 
 class P0S1DemoHardeningTests(unittest.TestCase):
+    def test_standalone_vague_queries_route_to_fixed_clarification(self) -> None:
+        expected = "请问您具体想咨询哪方面呢？是尺码、发货、退换货，还是订单/物流状态？"
+        cases = (
+            "怎么办",
+            "怎么办啊",
+            "怎么办呢",
+            "咋办",
+            "咋整",
+            "咋整啊",
+            "那咋整",
+            "这咋整",
+            "该咋整",
+            "我该咋整",
+            "怎么弄",
+            "怎么整",
+            "怎么处理",
+            "如何处理",
+            "现在怎么办",
+            "那怎么办",
+            "我该怎么办",
+            "这该怎么弄",
+            "怎么了",
+            "有问题",
+            "帮帮我",
+            "  怎么办？！  ",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                decision = rag.decide_p0_s1_answer_route(question)
+                self.assertIs(decision.route, rag.AnswerRoute.CLARIFY_THEN_ANSWER)
+                self.assertEqual(decision.reason, "standalone_vague_query")
+                self.assertEqual(rag.answer_for_p0_s1_route(decision), expected)
+
+    def test_standalone_vague_guard_skips_retrieval_rerank_and_provider(self) -> None:
+        llm_config = rag.LLMConfig(api_key="synthetic-key", base_url="", model="offline", client=mock.Mock())
+        with (
+            mock.patch.object(rag, "retrieve") as retrieve_call,
+            mock.patch.object(rag, "rerank_retrieved_results") as rerank_call,
+            mock.patch.object(rag, "call_deepseek_api") as provider_call,
+        ):
+            result = rag.run_rag_query(
+                "怎么办",
+                corpus=None,
+                embeddings=None,
+                embedding_model=None,
+                top_k=1,
+                cosine_similarity=None,
+                low_confidence_threshold=0.55,
+                llm_config=llm_config,
+            )
+
+        retrieve_call.assert_not_called()
+        rerank_call.assert_not_called()
+        provider_call.assert_not_called()
+        self.assertEqual(result["answer_route"], rag.AnswerRoute.CLARIFY_THEN_ANSWER.value)
+        self.assertEqual(result["answer_route_reason"], "standalone_vague_query")
+        self.assertTrue(result["skip_retrieval"])
+        self.assertTrue(result["skip_llm"])
+        self.assertEqual(
+            result["final_answer"],
+            "请问您具体想咨询哪方面呢？是尺码、发货、退换货，还是订单/物流状态？",
+        )
+        self.assertNotIn("39码", result["final_answer"])
+
+    def test_standalone_zazheng_guard_skips_rag_and_guessing(self) -> None:
+        expected = "请问您具体想咨询哪方面呢？是尺码、发货、退换货，还是订单/物流状态？"
+        llm_config = rag.LLMConfig(
+            api_key="synthetic-key",
+            base_url="",
+            model="offline",
+            client=mock.Mock(),
+        )
+        with (
+            mock.patch.object(rag, "retrieve") as retrieve_call,
+            mock.patch.object(rag, "rerank_retrieved_results") as rerank_call,
+            mock.patch.object(rag, "call_deepseek_api") as provider_call,
+        ):
+            result = rag.run_rag_query(
+                "咋整",
+                corpus=None,
+                embeddings=None,
+                embedding_model=None,
+                top_k=1,
+                cosine_similarity=None,
+                low_confidence_threshold=0.55,
+                llm_config=llm_config,
+            )
+
+        retrieve_call.assert_not_called()
+        rerank_call.assert_not_called()
+        provider_call.assert_not_called()
+        self.assertEqual(result["answer_route"], rag.AnswerRoute.CLARIFY_THEN_ANSWER.value)
+        self.assertEqual(result["answer_route_reason"], "standalone_vague_query")
+        self.assertTrue(result["skip_retrieval"])
+        self.assertTrue(result["skip_llm"])
+        self.assertEqual(result["final_answer"], expected)
+        for guessed_content in ("货号", "快递面单", "39码"):
+            self.assertNotIn(guessed_content, result["final_answer"])
+
+    def test_specific_questions_are_not_misclassified_as_standalone_vague(self) -> None:
+        cases = (
+            "怎么退货",
+            "怎么换货",
+            "怎么发货",
+            "怎么查物流",
+            "怎么选尺码",
+            "鞋子开胶了怎么办",
+            "鞋子开胶了咋整",
+            "退货咋整",
+            "物流咋查",
+            "42码咋选",
+            "鞋子偏大怎么办",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                decision = rag.decide_p0_s1_answer_route(question)
+                self.assertNotEqual(decision.reason, "standalone_vague_query")
+                self.assertIsNot(decision.route, rag.AnswerRoute.CLARIFY_THEN_ANSWER)
+
+    def test_vague_short_followup_keeps_explicit_previous_context(self) -> None:
+        decision = rag.decide_p0_s1_answer_route(
+            "怎么办",
+            has_conversation_context=True,
+        )
+        followup = rag.resolve_followup_context(
+            "怎么办",
+            previous_user_query="鞋子开胶了",
+            previous_assistant_answer="请说明商品情况。",
+        )
+
+        self.assertIsNot(decision.route, rag.AnswerRoute.CLARIFY_THEN_ANSWER)
+        self.assertTrue(followup.is_followup_query)
+        self.assertIn("鞋子开胶了", followup.retrieval_query)
+        self.assertIn("怎么办", followup.retrieval_query)
+
+    def test_standalone_ambiguous_delivery_location_asks_targeted_question(self) -> None:
+        expected = "请问您是下单时收货地址填错了，还是物流显示包裹送错了地点？"
+        cases = (
+            "发错位置了",
+            "发错地方了",
+            "寄错位置了",
+            "寄错地方了",
+            "送错位置了",
+            "送错地方了",
+            "送错地方了啊",
+            "  发错位置了？！  ",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                decision = rag.decide_p0_s1_answer_route(question)
+                self.assertIs(decision.route, rag.AnswerRoute.CLARIFY_THEN_ANSWER)
+                self.assertEqual(
+                    decision.reason,
+                    "standalone_ambiguous_delivery_location",
+                )
+                self.assertEqual(rag.answer_for_p0_s1_route(decision), expected)
+
+    def test_standalone_ambiguous_delivery_location_skips_rag(self) -> None:
+        expected = "请问您是下单时收货地址填错了，还是物流显示包裹送错了地点？"
+        llm_config = rag.LLMConfig(
+            api_key="synthetic-key",
+            base_url="",
+            model="offline",
+            client=mock.Mock(),
+        )
+        with (
+            mock.patch.object(rag, "retrieve") as retrieve_call,
+            mock.patch.object(rag, "rerank_retrieved_results") as rerank_call,
+            mock.patch.object(rag, "call_deepseek_api") as provider_call,
+        ):
+            result = rag.run_rag_query(
+                "发错位置了",
+                corpus=None,
+                embeddings=None,
+                embedding_model=None,
+                top_k=1,
+                cosine_similarity=None,
+                low_confidence_threshold=0.55,
+                llm_config=llm_config,
+            )
+
+        retrieve_call.assert_not_called()
+        rerank_call.assert_not_called()
+        provider_call.assert_not_called()
+        self.assertEqual(result["answer_route"], rag.AnswerRoute.CLARIFY_THEN_ANSWER.value)
+        self.assertEqual(
+            result["answer_route_reason"],
+            "standalone_ambiguous_delivery_location",
+        )
+        self.assertTrue(result["skip_retrieval"])
+        self.assertTrue(result["skip_llm"])
+        self.assertEqual(result["final_answer"], expected)
+        for wrong_content in ("实物", "鞋盒", "白色标签", "拍照"):
+            self.assertNotIn(wrong_content, result["final_answer"])
+
+    def test_ambiguous_delivery_location_guard_preserves_specific_objects(self) -> None:
+        cases = (
+            "发错货了",
+            "发错款式了",
+            "鞋子发错码了",
+            "发错颜色了",
+            "收货地址填错了",
+            "物流显示送错地方了",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                decision = rag.decide_p0_s1_answer_route(question)
+                self.assertNotEqual(
+                    decision.reason,
+                    "standalone_ambiguous_delivery_location",
+                )
+                self.assertNotEqual(
+                    rag.answer_for_p0_s1_route(decision),
+                    "请问您是下单时收货地址填错了，还是物流显示包裹送错了地点？",
+                )
+
+        contextual = rag.decide_p0_s1_answer_route(
+            "发错位置了",
+            has_conversation_context=True,
+        )
+        self.assertNotEqual(
+            contextual.reason,
+            "standalone_ambiguous_delivery_location",
+        )
+
     def test_general_policy_routes_to_direct_answer(self) -> None:
         cases = (
             ("一般多久发货", "shipping"),

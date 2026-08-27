@@ -1040,6 +1040,52 @@ UNCLEAR_SHORT_KEYWORDS = [
     "\u55ef",
     "\u54e6",
 ]
+STANDALONE_VAGUE_CLARIFICATION = (
+    "请问您具体想咨询哪方面呢？是尺码、发货、退换货，还是订单/物流状态？"
+)
+STANDALONE_VAGUE_ACTION_FORMS = frozenset(
+    {
+        "怎么办",
+        "咋办",
+        "咋整",
+        "怎么弄",
+        "怎么整",
+        "怎么处理",
+        "如何处理",
+    }
+)
+STANDALONE_VAGUE_PREFIXES = frozenset(
+    {
+        "",
+        "那",
+        "这",
+        "该",
+        "我该",
+        "现在",
+        "那该",
+        "这该",
+    }
+)
+STANDALONE_VAGUE_EXACT_FORMS = frozenset(
+    {
+        "怎么了",
+        "有问题",
+        "帮帮我",
+    }
+)
+AMBIGUOUS_DELIVERY_LOCATION_CLARIFICATION = (
+    "请问您是下单时收货地址填错了，还是物流显示包裹送错了地点？"
+)
+STANDALONE_AMBIGUOUS_DELIVERY_LOCATION_FORMS = frozenset(
+    {
+        "发错位置了",
+        "发错地方了",
+        "寄错位置了",
+        "寄错地方了",
+        "送错位置了",
+        "送错地方了",
+    }
+)
 
 
 @dataclass
@@ -1942,16 +1988,25 @@ def count_effective_query_chars(query: str) -> int:
     return len(re.findall(r"[\u4e00-\u9fffA-Za-z0-9]", compact))
 
 
-def is_intent_guard_priority_query(query: str) -> bool:
-    skip_retrieval, _guarded_type, _answer = intent_guard(query)
+def is_intent_guard_priority_query(
+    query: str,
+    has_conversation_context: bool = False,
+) -> bool:
+    skip_retrieval, _guarded_type, _answer = intent_guard(
+        query,
+        has_conversation_context=has_conversation_context,
+    )
     return skip_retrieval
 
 
-def is_followup_query(query: str) -> bool:
+def is_followup_query(query: str, has_conversation_context: bool = False) -> bool:
     stripped = str(query or "").strip()
     if not stripped:
         return False
-    if is_intent_guard_priority_query(stripped):
+    if is_intent_guard_priority_query(
+        stripped,
+        has_conversation_context=has_conversation_context,
+    ):
         return False
 
     normalized = re.sub(r"\s+", "", stripped)
@@ -2024,7 +2079,10 @@ def resolve_followup_context(
     previous_answer = str(previous_assistant_answer or "").strip()
     has_previous = bool(previous_user)
 
-    if has_previous and (is_followup_query(original) or is_financial_risk_query(original)):
+    if has_previous and (
+        is_followup_query(original, has_conversation_context=True)
+        or is_financial_risk_query(original)
+    ):
         contextual = build_contextual_query(original, previous_user, previous_answer)
         retrieval_query = contextual
         is_followup = True
@@ -2163,6 +2221,41 @@ def contains_any(text: str, keywords: Iterable[str]) -> bool:
     return any(keyword in text for keyword in keywords)
 
 
+def normalize_standalone_vague_query(user_question: str) -> str:
+    """Normalize only syntax that cannot add a concrete business object."""
+
+    normalized = str(user_question or "").casefold()
+    normalized = re.sub(r"\s+", "", normalized)
+    normalized = re.sub(r"[，。！？!?、,.…~～；;：:\"'“”‘’（）()【】\[\]]+", "", normalized)
+    return re.sub(r"[啊呀呢吧嘛呐哦喔啦哈]+$", "", normalized)
+
+
+def is_standalone_vague_query(
+    user_question: str,
+    has_conversation_context: bool = False,
+) -> bool:
+    if has_conversation_context:
+        return False
+    normalized = normalize_standalone_vague_query(user_question)
+    if normalized in STANDALONE_VAGUE_EXACT_FORMS:
+        return True
+    return any(
+        normalized == f"{prefix}{action}"
+        for prefix in STANDALONE_VAGUE_PREFIXES
+        for action in STANDALONE_VAGUE_ACTION_FORMS
+    )
+
+
+def is_standalone_ambiguous_delivery_location_query(
+    user_question: str,
+    has_conversation_context: bool = False,
+) -> bool:
+    if has_conversation_context:
+        return False
+    normalized = normalize_standalone_vague_query(user_question)
+    return normalized in STANDALONE_AMBIGUOUS_DELIVERY_LOCATION_FORMS
+
+
 def detect_policy_category(user_question: str) -> str | None:
     normalized = re.sub(r"\s+", "", user_question)
     for category in POLICY_CATEGORY_PRIORITY:
@@ -2171,7 +2264,10 @@ def detect_policy_category(user_question: str) -> str | None:
     return None
 
 
-def decide_p0_s1_answer_route(user_question: str) -> AnswerRouteDecision:
+def decide_p0_s1_answer_route(
+    user_question: str,
+    has_conversation_context: bool = False,
+) -> AnswerRouteDecision:
     """Route only the P0-S1 shipping/refund/exchange slice.
 
     Questions outside these three domains retain the legacy product path.
@@ -2184,6 +2280,25 @@ def decide_p0_s1_answer_route(user_question: str) -> AnswerRouteDecision:
             domain=None,
             clarification_question="请问您想咨询发货、退款还是换货问题？",
             reason="empty_input",
+        )
+
+    if is_standalone_ambiguous_delivery_location_query(
+        user_question,
+        has_conversation_context,
+    ):
+        return AnswerRouteDecision(
+            route=AnswerRoute.CLARIFY_THEN_ANSWER,
+            domain=None,
+            clarification_question=AMBIGUOUS_DELIVERY_LOCATION_CLARIFICATION,
+            reason="standalone_ambiguous_delivery_location",
+        )
+
+    if is_standalone_vague_query(user_question, has_conversation_context):
+        return AnswerRouteDecision(
+            route=AnswerRoute.CLARIFY_THEN_ANSWER,
+            domain=None,
+            clarification_question=STANDALONE_VAGUE_CLARIFICATION,
+            reason="standalone_vague_query",
         )
 
     if normalized in {"退", "退款", "换", "换货", "发货"}:
@@ -2372,7 +2487,10 @@ def is_business_query(text: str) -> bool:
     return contains_any(normalized, BUSINESS_QUERY_KEYWORDS)
 
 
-def intent_guard(user_question: str) -> tuple[bool, str, str | None]:
+def intent_guard(
+    user_question: str,
+    has_conversation_context: bool = False,
+) -> tuple[bool, str, str | None]:
     normalized = re.sub(r"\s+", "", user_question.strip()).casefold()
     if not normalized:
         return False, "normal", None
@@ -2383,7 +2501,10 @@ def intent_guard(user_question: str) -> tuple[bool, str, str | None]:
     if contains_any(normalized, HUMAN_HANDOVER_KEYWORDS):
         return True, "human_handover", HUMAN_HANDOVER_ANSWER
 
-    route_decision = decide_p0_s1_answer_route(user_question)
+    route_decision = decide_p0_s1_answer_route(
+        user_question,
+        has_conversation_context=has_conversation_context,
+    )
     if route_decision.domain is not None or route_decision.route is AnswerRoute.CLARIFY_THEN_ANSWER:
         if route_decision.route is AnswerRoute.CLARIFY_THEN_ANSWER:
             return True, "unclear", answer_for_p0_s1_route(route_decision)
@@ -3283,7 +3404,6 @@ def run_rag_query(
     generation_config: GenerationConfig | None = None,
 ) -> dict:
     question = str(user_question or "").strip()
-    route_decision = decide_p0_s1_answer_route(question)
     prior_state = coerce_conversation_state(
         conversation_state,
         previous_user_query=previous_user_query,
@@ -3292,6 +3412,11 @@ def run_rag_query(
     previous_user_query = previous_user_query or prior_state.last_user_query or None
     previous_assistant_answer = (
         previous_assistant_answer or prior_state.last_assistant_answer or None
+    )
+    has_conversation_context = bool(str(previous_user_query or "").strip())
+    route_decision = decide_p0_s1_answer_route(
+        question,
+        has_conversation_context=has_conversation_context,
     )
     followup = resolve_followup_context(
         question,
@@ -3345,7 +3470,10 @@ def run_rag_query(
         result["state_update_reason"] = state_update_reason
         return result
 
-    skip_retrieval, guarded_type, guarded_answer = intent_guard(question)
+    skip_retrieval, guarded_type, guarded_answer = intent_guard(
+        question,
+        has_conversation_context=has_conversation_context,
+    )
     if skip_retrieval:
         backend_required = guarded_type == "backend_required"
         return finish({
