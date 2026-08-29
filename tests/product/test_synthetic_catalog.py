@@ -352,9 +352,323 @@ class ProductAnswerTests(unittest.TestCase):
         product = dict(self.catalog.lookup("DEMO-WORK-004"))
         product["functions"]["water_resistance"]["description"] = ""
         answer = answer_product_question("这款防水吗？", product)
-        self.assertIn("暂时没有标注", answer)
-        self.assertIn("商品详情页", answer)
+        self.assertIn("没有标注", answer)
+        self.assertIn("雨天穿着能力", answer)
         self.assertNotIn("防水", answer.replace("防水信息", ""))
+
+
+class ProductSemanticAnalysisAndPlanningTests(unittest.TestCase):
+    """Table-driven coverage for semantic analysis, evidence, and planning."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = load_catalog(CATALOG_PATH)
+
+    def answer(self, product_id: str, question: str) -> str | None:
+        return answer_product_question(
+            question,
+            self.catalog.lookup(product_id),
+            business_now=SHANGHAI_BEFORE_CUTOFF,
+        )
+
+    def test_semantic_matrix_collects_facets_and_separates_question_mode(self) -> None:
+        F = catalog_module.ProductFacet
+        M = catalog_module.ProductQuestionMode
+        cases = (
+            ("鞋底是什么材质", {F.SOLE_MATERIAL}, M.FACTUAL_LOOKUP),
+            ("这双鞋舒适性怎么样", {F.GENERAL_COMFORT}, M.SUBJECTIVE_ASSESSMENT),
+            ("上班久站舒服吗", {F.GENERAL_COMFORT, F.LONG_WEAR_COMFORT, F.USE_SCENARIO}, M.COMPARISON_OR_MULTI_FACET),
+            ("脚背会不会压", {F.WIDTH_AND_INSTEP, F.RUBBING_OR_PRESSURE}, M.RISK_OR_LIMITATION),
+            ("鞋底软吗，缓震怎么样", {F.SOLE_SOFTNESS, F.CUSHIONING}, M.COMPARISON_OR_MULTI_FACET),
+            ("夏天穿会不会闷脚", {F.BREATHABILITY, F.USE_SCENARIO}, M.COMPARISON_OR_MULTI_FACET),
+            ("冬天暖不暖，里面有绒吗", {F.WARMTH, F.LINING_MATERIAL, F.USE_SCENARIO}, M.COMPARISON_OR_MULTI_FACET),
+            ("这鞋重不重", {F.WEIGHT}, M.SUBJECTIVE_ASSESSMENT),
+            ("耐不耐穿", {F.DURABILITY_OR_QUALITY}, M.RISK_OR_LIMITATION),
+            ("适合通勤吗", {F.USE_SCENARIO}, M.SUITABILITY_ASSESSMENT),
+            ("下雨爬山会不会滑", {F.RAIN_USE, F.SLIP_RESISTANCE, F.USE_SCENARIO}, M.COMPARISON_OR_MULTI_FACET),
+            ("这个好吗", set(), M.AMBIGUOUS_CLARIFICATION),
+        )
+        for question, expected_facets, expected_mode in cases:
+            with self.subTest(question=question):
+                analysis = catalog_module.analyze_product_question(question)
+                self.assertTrue(expected_facets.issubset(set(analysis.facets)))
+                self.assertEqual(analysis.mode, expected_mode)
+
+    def test_all_six_products_use_grounded_behavior_families(self) -> None:
+        cases = (
+            ("DEMO-CASUAL-001", "鞋底是什么材质", ("橡胶",), ("缓震",)),
+            ("DEMO-RUN-002", "这双鞋舒适性怎么样", ("轻", "透气", "织物", "偏小"), ("保证舒适",)),
+            ("DEMO-WIDE-003", "鞋头挤不挤", ("宽楦", "前掌", "尺码表"), ("绝对不挤", "保证不磨脚")),
+            ("DEMO-WORK-004", "上班久站舒服吗", ("长期穿着测试", "日常站立"), ("久站不累",)),
+            ("DEMO-RAIN-005", "这鞋重不重", ("225", "克"), ("非常轻",)),
+            ("DEMO-PREORDER-006", "冬天暖不暖，里面有绒吗", ("保暖织物", "冬季"), ("保证暖和",)),
+        )
+        for product_id, question, required, prohibited in cases:
+            with self.subTest(product_id=product_id, question=question):
+                answer = self.answer(product_id, question)
+                self.assertIsNotNone(answer)
+                for fact in required:
+                    self.assertIn(fact, answer)
+                for unsafe in prohibited:
+                    self.assertNotIn(unsafe, answer)
+
+    def test_missing_experience_evidence_is_explicit_and_never_fabricated(self) -> None:
+        cases = (
+            ("DEMO-CASUAL-001", "鞋底软吗", ("没有", "软硬"), ("橡胶所以软", "鞋底柔软")),
+            ("DEMO-RUN-002", "缓震怎么样", ("没有", "缓震"), ("缓震出色", "减震")),
+            ("DEMO-WORK-004", "穿久了累不累", ("长期穿着测试",), ("不会累", "全天不累")),
+            ("DEMO-CASUAL-001", "会不会磨脚", ("没有", "磨脚", "尺码表"), ("不会磨脚",)),
+            ("DEMO-WORK-004", "会不会开胶", ("长期耐用",), ("不会开胶", "保证耐穿")),
+        )
+        for product_id, question, required, prohibited in cases:
+            with self.subTest(question=question):
+                answer = self.answer(product_id, question)
+                self.assertIsNotNone(answer)
+                for text in required:
+                    self.assertIn(text, answer)
+                for text in prohibited:
+                    self.assertNotIn(text, answer)
+
+    def test_scenario_suitability_uses_declared_scenarios_not_neighboring_features(self) -> None:
+        supported = self.answer("DEMO-CASUAL-001", "适合日常通勤和走路吗")
+        professional_run = self.answer("DEMO-RUN-002", "能不能专业跑步")
+        hiking = self.answer("DEMO-RAIN-005", "下雨爬山会不会滑")
+        work = self.answer("DEMO-WORK-004", "上班工作穿合适吗")
+
+        self.assertIn("通勤", supported)
+        self.assertIn("日常步行", supported)
+        self.assertIn("没有标注专业跑步", professional_run)
+        self.assertNotIn("适合专业跑步", professional_run)
+        for part in ("小雨", "日常防滑", "没有标注登山"):
+            self.assertIn(part, hiking)
+        self.assertIn("室内工作", work)
+
+    def test_multifacet_questions_keep_every_concern_without_duplicate_caveats(self) -> None:
+        cases = (
+            ("DEMO-RUN-002", "这鞋舒服吗，会不会偏小", ("轻", "透气", "偏小")),
+            ("DEMO-RUN-002", "轻不轻，夏天闷不闷", ("255", "透气")),
+            ("DEMO-RAIN-005", "下雨爬山会不会滑", ("小雨", "防滑", "没有标注登山")),
+            ("DEMO-CASUAL-001", "鞋底软吗，走久了会不会累", ("软硬", "长期穿着测试")),
+            ("DEMO-PREORDER-006", "冬天暖不暖，雨天能穿吗", ("保暖织物", "轻微泼溅")),
+        )
+        for product_id, question, expected in cases:
+            with self.subTest(question=question):
+                answer = self.answer(product_id, question)
+                for text in expected:
+                    self.assertIn(text, answer)
+                self.assertLessEqual(answer.count("尺码表"), 1)
+                self.assertLessEqual(answer.count("实际"), 1)
+
+    def test_ambiguity_asks_one_stable_clarification_instead_of_summary_or_fit(self) -> None:
+        expected = "亲，您主要想了解尺码、舒适度、透气性，还是适合什么场景呢？"
+        for question in ("穿着怎么样", "这个好吗", "适合我吗", "这款怎么样？", "请问这个好吗呀"):
+            with self.subTest(question=question):
+                answer = self.answer("DEMO-CASUAL-001", question)
+                self.assertEqual(answer, expected)
+                self.assertNotIn("标准版型", answer)
+                self.assertNotIn("基础款日常休闲鞋", answer)
+
+    def test_collision_boundaries_preserve_dedicated_routes(self) -> None:
+        F = catalog_module.ProductFacet
+        dedicated = (
+            ("我脚26，这款穿多大", F.SIZE_RECOMMENDATION),
+            ("这款有42码吗", F.STOCK),
+            ("这款偏小吗", F.FIT),
+            ("鞋面是什么材料", F.UPPER_MATERIAL),
+            ("什么时候发货", F.SHIPPING),
+        )
+        for question, expected in dedicated:
+            with self.subTest(question=question):
+                analysis = catalog_module.analyze_product_question(question)
+                self.assertIn(expected, analysis.facets)
+
+        self.assertNotIn(F.SIZE_RECOMMENDATION, catalog_module.analyze_product_question("26号下单").facets)
+        self.assertIsNone(self.answer("DEMO-CASUAL-001", "鞋子开胶了怎么办"))
+        self.assertIsNone(self.answer("DEMO-CASUAL-001", "物流慢怎么办"))
+
+    def test_metamorphic_variants_preserve_evidence_and_add_facets_monotonically(self) -> None:
+        F = catalog_module.ProductFacet
+        equivalent = (
+            "这鞋舒服吗",
+            "请问，这鞋舒服吗？",
+            "这鞋舒服吗呀",
+            "这鞋好不好穿",
+        )
+        analyses = [catalog_module.analyze_product_question(item) for item in equivalent]
+        for analysis in analyses:
+            self.assertIn(F.GENERAL_COMFORT, analysis.facets)
+        evidence_classes = {
+            tuple(item.status for item in catalog_module.build_product_answer_plan(
+                analysis,
+                self.catalog.lookup("DEMO-RUN-002"),
+            ).evidence)
+            for analysis in analyses
+        }
+        self.assertEqual(len(evidence_classes), 1)
+
+        first = catalog_module.analyze_product_question("这鞋下雨会不会滑")
+        reordered = catalog_module.analyze_product_question("会不会滑，下雨穿呢")
+        extended = catalog_module.analyze_product_question("这鞋下雨爬山会不会滑")
+        self.assertEqual(set(first.facets), set(reordered.facets))
+        self.assertTrue(set(first.facets).issubset(set(extended.facets)))
+        self.assertIn(F.USE_SCENARIO, extended.facets)
+
+    def test_answer_plan_marks_supported_conditional_and_unsupported_claims(self) -> None:
+        F = catalog_module.ProductFacet
+        S = catalog_module.ProductClaimStatus
+        analysis = catalog_module.analyze_product_question(
+            "这鞋透气吗，鞋底软吗，适合跑步吗"
+        )
+        plan = catalog_module.build_product_answer_plan(
+            analysis,
+            self.catalog.lookup("DEMO-RUN-002"),
+        )
+        statuses = {item.facet: item.status for item in plan.evidence}
+        self.assertEqual(statuses[F.BREATHABILITY], S.SUPPORTED)
+        self.assertEqual(statuses[F.SOLE_SOFTNESS], S.UNSUPPORTED)
+        self.assertEqual(statuses[F.USE_SCENARIO], S.CONDITIONALLY_SUPPORTED)
+
+    def test_personal_medical_constraints_are_explicit_and_never_inferred(self) -> None:
+        F = catalog_module.ProductFacet
+        M = catalog_module.ProductQuestionMode
+        analysis = catalog_module.analyze_product_question("孕妇脚受伤了能穿吗")
+        self.assertIn(F.TARGET_GENDER_OR_GROUP, analysis.facets)
+        self.assertEqual(analysis.mode, M.SUITABILITY_ASSESSMENT)
+        self.assertEqual(set(analysis.constraints), {"孕期", "受伤或康复"})
+
+        answer = self.answer("DEMO-CASUAL-001", "孕妇脚受伤了能穿吗")
+        self.assertIn("没有提供", answer)
+        self.assertIn("孕期", answer)
+        self.assertIn("受伤或康复", answer)
+        self.assertNotIn("适合孕妇", answer)
+        self.assertNotIn("有助康复", answer)
+
+    def test_temperature_suitability_uses_warmth_evidence_without_inventing_a_range(self) -> None:
+        analysis = catalog_module.analyze_product_question("零下30度还能穿吗")
+        self.assertIn(catalog_module.ProductFacet.WARMTH, analysis.facets)
+        answer = self.answer("DEMO-PREORDER-006", "零下30度还能穿吗")
+        for expected in ("加绒冬季款", "保暖织物", "没有标注具体适用温度", "零下30℃", "严寒环境"):
+            self.assertIn(expected, answer)
+        for unsupported in ("零下5-10", "零下5～10", "适合零下", "可以在零下30"):
+            self.assertNotIn(unsupported, answer)
+        self.assertIn("不建议只凭商品参数判断", answer)
+
+    def test_numeric_claim_validator_requires_matching_structured_evidence(self) -> None:
+        temperature_analysis = catalog_module.analyze_product_question("零下30度还能穿吗")
+        temperature_plan = catalog_module.build_product_answer_plan(
+            temperature_analysis,
+            self.catalog.lookup("DEMO-PREORDER-006"),
+        )
+        invented_temperature = "亲，这款建议零下5-10℃穿，能保暖8小时哦。"
+        validated_temperature = catalog_module.validate_product_answer_claims(
+            invented_temperature,
+            temperature_plan,
+        )
+        self.assertNotIn("5-10", validated_temperature)
+        self.assertNotIn("8小时", validated_temperature)
+        self.assertIn("没有标注具体适用温度", validated_temperature)
+
+        weight_analysis = catalog_module.analyze_product_question("单只鞋多重")
+        weight_plan = catalog_module.build_product_answer_plan(
+            weight_analysis,
+            self.catalog.lookup("DEMO-RUN-002"),
+        )
+        supported_weight = "亲，这款单只鞋约重255克哦。"
+        self.assertEqual(
+            catalog_module.validate_product_answer_claims(supported_weight, weight_plan),
+            supported_weight,
+        )
+        self.assertNotIn(
+            "280克",
+            catalog_module.validate_product_answer_claims(
+                "亲，这款单只鞋约重280克哦。",
+                weight_plan,
+            ),
+        )
+
+        height_analysis = catalog_module.analyze_product_question("跟高多少")
+        height_plan = catalog_module.build_product_answer_plan(
+            height_analysis,
+            self.catalog.lookup("DEMO-RUN-002"),
+        )
+        self.assertEqual(
+            catalog_module.validate_product_answer_claims("亲，这款跟高约3厘米哦。", height_plan),
+            "亲，这款跟高约3厘米哦。",
+        )
+        for invented in ("跟高8厘米", "耐磨10级", "可以走20公里"):
+            with self.subTest(invented=invented):
+                self.assertNotIn(
+                    invented,
+                    catalog_module.validate_product_answer_claims(
+                        f"亲，这款{invented}哦。",
+                        height_plan,
+                    ),
+                )
+
+    def test_final_product_claim_validator_uses_plan_and_preserves_negated_boundaries(self) -> None:
+        analysis = catalog_module.analyze_product_question("鞋底软吗，缓震怎么样")
+        plan = catalog_module.build_product_answer_plan(
+            analysis,
+            self.catalog.lookup("DEMO-CASUAL-001"),
+        )
+        unsafe = "这款鞋底很柔软，缓震出色，而且绝对防滑，不会开胶。"
+        validated = catalog_module.validate_product_answer_claims(unsafe, plan)
+        for claim in ("鞋底很柔软", "缓震出色", "绝对防滑", "不会开胶"):
+            self.assertNotIn(claim, validated)
+        self.assertIn("没有鞋底软硬度测量", validated)
+        self.assertIn("没有缓震测试数据", validated)
+
+        bounded = "当前资料不能保证不会开胶，也无法确认绝对防滑。"
+        self.assertEqual(
+            catalog_module.validate_product_answer_claims(bounded, plan),
+            bounded,
+        )
+
+
+class ProductSemanticRuntimeIsolationTests(unittest.TestCase):
+    def test_every_semantic_behavior_family_bypasses_heavy_dependencies(self) -> None:
+        engine = web_app.RAGEngine()
+        forbidden = mock.Mock(side_effect=AssertionError("heavy product dependency called"))
+        cases = (
+            ("DEMO-CASUAL-001", "鞋底是什么材质"),
+            ("DEMO-RUN-002", "这双鞋舒适性怎么样"),
+            ("DEMO-WORK-004", "上班久站舒服吗"),
+            ("DEMO-WIDE-003", "脚背会不会压"),
+            ("DEMO-CASUAL-001", "鞋底软吗，缓震怎么样"),
+            ("DEMO-RUN-002", "夏天穿会不会闷脚"),
+            ("DEMO-PREORDER-006", "冬天暖不暖，里面有绒吗"),
+            ("DEMO-PREORDER-006", "零下30度还能穿吗"),
+            ("DEMO-RAIN-005", "这鞋重不重"),
+            ("DEMO-WORK-004", "耐不耐穿"),
+            ("DEMO-RAIN-005", "下雨爬山会不会滑"),
+            ("DEMO-CASUAL-001", "孕妇脚受伤了能穿吗"),
+            ("DEMO-CASUAL-001", "这个好吗"),
+        )
+        with (
+            mock.patch.object(web_app, "engine", engine),
+            mock.patch.object(engine, "load", forbidden),
+            mock.patch.object(web_app.rag, "load_dependencies", forbidden),
+            mock.patch.object(web_app.rag, "load_llm_config", forbidden),
+            mock.patch.object(web_app.rag, "load_or_create_cache", forbidden),
+            mock.patch.object(web_app.rag, "retrieve", forbidden),
+            mock.patch.object(web_app.rag, "rerank_retrieved_results", forbidden),
+            mock.patch.object(web_app.rag, "call_deepseek_api", forbidden),
+            mock.patch.object(web_app.rag, "run_rag_query", forbidden),
+            mock.patch.object(socket, "create_connection", forbidden),
+        ):
+            with TestClient(web_app.app) as client:
+                for product_id, question in cases:
+                    with self.subTest(product_id=product_id, question=question):
+                        selected = client.post(
+                            "/api/demo-products/select",
+                            json={"product_id": product_id},
+                        )
+                        self.assertEqual(selected.status_code, 200)
+                        response = client.post("/chat", json={"question": question})
+                        self.assertEqual(response.status_code, 200)
+                        self.assertTrue(response.json()["final_answer"])
+
+        forbidden.assert_not_called()
 
 
 class ProductApiAndSessionTests(unittest.TestCase):
@@ -1003,7 +1317,7 @@ class RichProductAnswerRevisionTests(unittest.TestCase):
             ("DEMO-RAIN-005", "能下雨天穿吗？", "小雨"),
             ("DEMO-WORK-004", "这款防滑吗？", "防滑"),
             ("DEMO-WORK-004", "这款耐磨吗？", "耐磨"),
-            ("DEMO-CASUAL-001", "这款怎么样？", "基础款日常休闲鞋"),
+            ("DEMO-CASUAL-001", "请介绍一下这款", "基础款日常休闲鞋"),
         )
         mechanical_phrases = (
             "说明是：",
@@ -1056,12 +1370,11 @@ class RichProductAnswerRevisionTests(unittest.TestCase):
         self.assertNotIn("PVC纹理鞋底", water_only)
         self.assertNotIn("小雨", slip_only)
 
-    def test_null_parameter_is_reported_without_invention(self) -> None:
+    def test_missing_exact_weight_uses_only_existing_qualitative_evidence(self) -> None:
         answer = self.answer("DEMO-WIDE-003", "单只鞋多重？")
-        self.assertEqual(
-            answer,
-            "亲，这款暂时没有标注单只鞋重量哦。建议以商品详情页展示为准。",
-        )
+        self.assertIn("没有标注具体克重", answer)
+        self.assertIn("常规轻便度", answer)
+        self.assertNotRegex(answer, r"\d+克")
 
     def test_recommended_size_is_checked_against_named_variant(self) -> None:
         product = self.catalog.lookup("DEMO-CASUAL-001")
