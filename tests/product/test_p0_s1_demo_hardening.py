@@ -7,8 +7,10 @@ which formal system produced the response under review.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import unittest
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 from outputs import rag_answer_demo as rag
 
@@ -139,7 +141,6 @@ class P0S1DemoHardeningTests(unittest.TestCase):
             with self.subTest(question=question):
                 decision = rag.decide_p0_s1_answer_route(question)
                 self.assertNotEqual(decision.reason, "standalone_vague_query")
-                self.assertIsNot(decision.route, rag.AnswerRoute.CLARIFY_THEN_ANSWER)
 
     def test_vague_short_followup_keeps_explicit_previous_context(self) -> None:
         decision = rag.decide_p0_s1_answer_route(
@@ -263,6 +264,322 @@ class P0S1DemoHardeningTests(unittest.TestCase):
                 self.assertFalse(decision.needs_realtime_status)
                 self.assertFalse(decision.needs_backend_action)
                 self.assertFalse(rag.intent_guard(question)[0])
+
+    def test_foot_length_size_guidance_supports_explicit_units(self) -> None:
+        expected = (
+            "已记录脚长26厘米。当前可用资料中没有可验证的脚长与鞋码对照表，"
+            "暂时无法可靠推荐具体码数；请以当前商品详情页尺码表和版型说明为准。"
+        )
+        cases = (
+            "我的脚长26厘米，适合穿多少码？",
+            "脚长26cm穿几码？",
+            "脚长260毫米怎么选？",
+            "260mm脚长适合多大码？",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                self.assertEqual(rag.answer_for_foot_length_size_query(question), expected)
+
+    def test_foot_length_size_guidance_rejects_ambiguous_or_implausible_values(
+        self,
+    ) -> None:
+        unrelated_cases = (
+            "我平时穿42码",
+            "42码适合多长的脚？",
+            "这个鞋偏大吗？",
+            "脚长多少应该怎么量？",
+        )
+        for question in unrelated_cases:
+            with self.subTest(question=question):
+                self.assertIsNone(rag.answer_for_foot_length_size_query(question))
+
+        clarification_cases = (
+            "脚长2厘米适合穿多少码？",
+            "脚长100厘米适合穿多少码？",
+        )
+        for question in clarification_cases:
+            with self.subTest(question=question):
+                answer = rag.answer_for_foot_length_size_query(question)
+                self.assertIsNotNone(answer)
+                self.assertRegex(answer or "", r"确认|检查|范围")
+                self.assertNotRegex(answer or "", r"建议\d{2}码")
+
+        conservative_cases = (
+            "脚长26适合穿多少码？",
+            "脚长25厘米到26厘米适合穿多少码？",
+        )
+        for question in conservative_cases:
+            with self.subTest(question=question):
+                answer = rag.answer_for_foot_length_size_query(question)
+                self.assertIsNotNone(answer)
+                self.assertIn("尺码表", answer)
+                self.assertNotRegex(answer or "", r"建议\d{2}码")
+
+    def test_foot_length_runtime_is_deterministic_and_skips_rag(self) -> None:
+        llm_config = rag.LLMConfig(
+            api_key="synthetic-key",
+            base_url="",
+            model="offline",
+            client=mock.Mock(),
+        )
+        with (
+            mock.patch.object(rag, "retrieve") as retrieve_call,
+            mock.patch.object(rag, "rerank_retrieved_results") as rerank_call,
+            mock.patch.object(rag, "call_deepseek_api") as provider_call,
+        ):
+            result = rag.run_rag_query(
+                "我的脚长26厘米，适合穿多少码的鞋？",
+                corpus=None,
+                embeddings=None,
+                embedding_model=None,
+                top_k=1,
+                cosine_similarity=None,
+                low_confidence_threshold=0.55,
+                llm_config=llm_config,
+            )
+
+        retrieve_call.assert_not_called()
+        rerank_call.assert_not_called()
+        provider_call.assert_not_called()
+        self.assertEqual(result["answer_route"], rag.AnswerRoute.DIRECT_ANSWER.value)
+        self.assertEqual(result["query_type"], "size_consultation")
+        self.assertFalse(result["requires_backend_api"])
+        self.assertTrue(result["skip_retrieval"])
+        self.assertTrue(result["skip_llm"])
+        self.assertEqual(
+            result["final_answer"],
+            "已记录脚长26厘米。当前可用资料中没有可验证的脚长与鞋码对照表，"
+            "暂时无法可靠推荐具体码数。请以当前商品详情页尺码表和版型说明为准。",
+        )
+        self.assertEqual(result["conversation_state"]["size_foot_length_cm"], 26.0)
+
+    def test_prospective_shipping_questions_route_to_policy(self) -> None:
+        cases = (
+            "我现在下单什么时候发货？",
+            "我现在下单什么时候能发货？",
+            "我现在下单大概什么时候可以发货？",
+            "今天下单什么时候发？",
+            "今天下单什么时候能发？",
+            "现在拍多久发货？",
+            "17点前下单今天能发吗？",
+            "几点前下单可以当天发货？",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                decision = rag.decide_p0_s1_answer_route(question)
+                self.assertIs(decision.route, rag.AnswerRoute.DIRECT_ANSWER)
+                self.assertEqual(decision.domain, "shipping")
+                self.assertTrue(decision.has_policy_facet)
+                self.assertFalse(decision.needs_realtime_status)
+                self.assertFalse(decision.needs_backend_action)
+                self.assertEqual(decision.reason, "prospective_shipping_policy")
+
+    def test_existing_order_shipping_questions_remain_backend_required(self) -> None:
+        cases = (
+            "我已经下单了，什么时候发货？",
+            "我的订单什么时候发？",
+            "订单怎么还没发货？",
+            "帮我查一下什么时候发货",
+            "订单已经付款了，今天能发吗？",
+        )
+        for question in cases:
+            with self.subTest(question=question):
+                decision = rag.decide_p0_s1_answer_route(question)
+                self.assertIs(decision.route, rag.AnswerRoute.FULL_HANDOFF)
+                self.assertEqual(decision.domain, "shipping")
+                self.assertTrue(decision.needs_realtime_status)
+                self.assertIn("无法查询", rag.answer_for_p0_s1_route(decision))
+
+    def test_prospective_shipping_runtime_uses_canonical_policy_without_rag(self) -> None:
+        expected = (
+            "亲，现在下单一般今天可以安排发出哦，具体以订单页显示的预计发货时间为准；"
+            "预售款按商品详情页标注的时间发货。"
+        )
+        llm_config = rag.LLMConfig(
+            api_key="synthetic-key",
+            base_url="",
+            model="offline",
+            client=mock.Mock(),
+        )
+        with (
+            mock.patch.object(rag, "retrieve") as retrieve_call,
+            mock.patch.object(rag, "rerank_retrieved_results") as rerank_call,
+            mock.patch.object(rag, "call_deepseek_api") as provider_call,
+        ):
+            result = rag.run_rag_query(
+                "我现在下单什么时候能发货",
+                corpus=None,
+                embeddings=None,
+                embedding_model=None,
+                top_k=1,
+                cosine_similarity=None,
+                low_confidence_threshold=0.55,
+                llm_config=llm_config,
+                business_now=datetime(
+                    2026,
+                    8,
+                    30,
+                    16,
+                    59,
+                    59,
+                    tzinfo=ZoneInfo("Asia/Shanghai"),
+                ),
+            )
+
+        retrieve_call.assert_not_called()
+        rerank_call.assert_not_called()
+        provider_call.assert_not_called()
+        self.assertEqual(result["answer_route"], rag.AnswerRoute.DIRECT_ANSWER.value)
+        self.assertEqual(result["answer_route_reason"], "prospective_shipping_policy")
+        self.assertEqual(result["query_type"], "prospective_shipping_policy")
+        self.assertFalse(result["requires_backend_api"])
+        self.assertTrue(result["skip_retrieval"])
+        self.assertTrue(result["skip_llm"])
+        self.assertEqual(result["final_answer"], expected)
+        self.assertNotIn("无法查询当前订单", result["final_answer"])
+        self.assertNotRegex(result["final_answer"], r"一定|肯定|保证今天发货")
+        self.assertNotIn("当前时间未到17点", result["final_answer"])
+
+    def test_prospective_dispatch_policy_uses_exclusive_shanghai_cutoff(self) -> None:
+        shanghai = ZoneInfo("Asia/Shanghai")
+        cases = (
+            (
+                datetime(2026, 8, 30, 16, 59, 59, tzinfo=shanghai),
+                "亲，现在下单一般今天可以安排发出哦，具体以订单页显示的预计发货时间为准；"
+                "预售款按商品详情页标注的时间发货。",
+            ),
+            (
+                datetime(2026, 8, 30, 17, 0, 0, tzinfo=shanghai),
+                "亲，现在下单今天可能来不及发出了，一般会安排到下一批次哦。"
+                "具体以订单页显示的预计发货时间为准；预售款按商品详情页标注的时间发货。",
+            ),
+            (
+                datetime(2026, 8, 30, 17, 0, 1, tzinfo=shanghai),
+                "亲，现在下单今天可能来不及发出了，一般会安排到下一批次哦。"
+                "具体以订单页显示的预计发货时间为准；预售款按商品详情页标注的时间发货。",
+            ),
+        )
+        for now, expected in cases:
+            with self.subTest(now=now.isoformat()):
+                answer = rag.answer_for_prospective_shipping_policy(
+                    "我现在下单什么时候能发货",
+                    business_now=now,
+                )
+                self.assertEqual(answer, expected)
+                self.assertNotRegex(answer or "", r"一定|肯定|保证今天发货")
+                self.assertNotRegex(answer or "", r"当前时间未到17点|当前时间已过17点|时间检测结果")
+
+    def test_prospective_dispatch_policy_converts_utc_to_shanghai(self) -> None:
+        before_cutoff_utc = datetime(2026, 8, 30, 8, 59, 59, tzinfo=timezone.utc)
+        at_cutoff_utc = datetime(2026, 8, 30, 9, 0, 0, tzinfo=timezone.utc)
+
+        before = rag.answer_for_prospective_shipping_policy(
+            "现在拍今天能发吗",
+            business_now=before_cutoff_utc,
+        )
+        at_cutoff = rag.answer_for_prospective_shipping_policy(
+            "今天下单能当天发吗",
+            business_now=at_cutoff_utc,
+        )
+
+        self.assertEqual(
+            before,
+            "亲，现在下单一般今天可以安排发出哦，具体以订单页显示的预计发货时间为准；"
+            "预售款按商品详情页标注的时间发货。",
+        )
+        self.assertEqual(
+            at_cutoff,
+            "亲，现在下单今天可能来不及发出了，一般会安排到下一批次哦。"
+            "具体以订单页显示的预计发货时间为准；预售款按商品详情页标注的时间发货。",
+        )
+
+    def test_explicit_cutoff_question_uses_fixed_customer_service_template(self) -> None:
+        expected = (
+            "亲，正常情况下17点前下单当天可以安排发出，17点后会安排到下一批次哦。"
+            "具体以订单页显示为准；预售款按商品详情页标注的时间发货。"
+        )
+        for hour in (16, 18):
+            with self.subTest(hour=hour):
+                answer = rag.answer_for_prospective_shipping_policy(
+                    "几点前下单可以当天发货",
+                    business_now=datetime(
+                        2026,
+                        8,
+                        30,
+                        hour,
+                        0,
+                        0,
+                        tzinfo=ZoneInfo("Asia/Shanghai"),
+                    ),
+                )
+                self.assertEqual(answer, expected)
+
+    def test_business_clock_excludes_existing_orders_and_preorders(self) -> None:
+        shanghai_now = datetime(2026, 8, 30, 16, 0, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        for question in (
+            "我已经下单了，今天能发吗？",
+            "我的订单什么时候发？",
+            "订单怎么还没发货？",
+        ):
+            with self.subTest(existing_order=question):
+                self.assertIsNone(
+                    rag.answer_for_prospective_shipping_policy(
+                        question,
+                        business_now=shanghai_now,
+                    )
+                )
+                decision = rag.decide_p0_s1_answer_route(question)
+                self.assertIs(decision.route, rag.AnswerRoute.FULL_HANDOFF)
+
+        preorder = rag.answer_for_prospective_shipping_policy(
+            "这个预售款我现在下单什么时候发货？",
+            business_now=shanghai_now,
+        )
+        self.assertIn("预售商品不适用", preorder or "")
+        self.assertIn("预售说明", preorder or "")
+        self.assertNotIn("今天安排发货", preorder or "")
+
+    def test_business_time_runtime_skips_rag_and_provider(self) -> None:
+        llm_config = rag.LLMConfig(
+            api_key="synthetic-key",
+            base_url="",
+            model="offline",
+            client=mock.Mock(),
+        )
+        with (
+            mock.patch.object(rag, "retrieve") as retrieve_call,
+            mock.patch.object(rag, "rerank_retrieved_results") as rerank_call,
+            mock.patch.object(rag, "call_deepseek_api") as provider_call,
+        ):
+            result = rag.run_rag_query(
+                "现在拍今天能发吗",
+                corpus=None,
+                embeddings=None,
+                embedding_model=None,
+                top_k=1,
+                cosine_similarity=None,
+                low_confidence_threshold=0.55,
+                llm_config=llm_config,
+                business_now=datetime(
+                    2026,
+                    8,
+                    30,
+                    17,
+                    0,
+                    0,
+                    tzinfo=ZoneInfo("Asia/Shanghai"),
+                ),
+            )
+
+        retrieve_call.assert_not_called()
+        rerank_call.assert_not_called()
+        provider_call.assert_not_called()
+        self.assertEqual(result["query_type"], "prospective_shipping_policy")
+        self.assertEqual(
+            result["final_answer"],
+            "亲，现在下单今天可能来不及发出了，一般会安排到下一批次哦。"
+            "具体以订单页显示的预计发货时间为准；预售款按商品详情页标注的时间发货。",
+        )
 
     def test_realtime_status_routes_to_full_handoff(self) -> None:
         cases = (

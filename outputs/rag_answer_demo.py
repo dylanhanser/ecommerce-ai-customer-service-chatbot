@@ -9,9 +9,11 @@ import os
 import re
 import sys
 from dataclasses import asdict, dataclass
+from datetime import datetime, time
 from enum import Enum
 from pathlib import Path
 from typing import Iterable
+from zoneinfo import ZoneInfo
 
 
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -1086,6 +1088,43 @@ STANDALONE_AMBIGUOUS_DELIVERY_LOCATION_FORMS = frozenset(
         "送错地方了",
     }
 )
+FOOT_LENGTH_MIN_CM = 10.0
+FOOT_LENGTH_MAX_CM = 35.0
+FOOT_LENGTH_CLARIFICATION = (
+    "请提供脚长（厘米或毫米，例如24厘米）；如方便，也可补充平时鞋码、"
+    "脚宽或高脚背情况。"
+)
+SIZE_FIT_UNKNOWN_ANSWER = (
+    "目前没有当前商品可靠的尺码表或版型证据，无法确认这款是标准码、"
+    "偏大还是偏小。请查看商品详情页的尺码表和版型说明；如需进一步参考，"
+    "也可以补充商品名称或编号及脚长。"
+)
+# The reviewed knowledge snippets contain sizing cautions and fit scripts, but
+# no approved foot-length-to-size table. Keep this empty until merchant-owned
+# ranges are supplied; never derive an exact size from model knowledge.
+MERCHANT_APPROVED_GENERIC_SIZE_CHART: tuple[tuple[float, float, str], ...] = ()
+TRUSTED_SIZE_DATA_SOURCES = frozenset(
+    {"merchant_product_data", "merchant_size_chart", "canonical_product_record"}
+)
+BUSINESS_TIMEZONE_NAME = "Asia/Shanghai"
+BUSINESS_TIMEZONE = ZoneInfo(BUSINESS_TIMEZONE_NAME)
+PROSPECTIVE_DISPATCH_CUTOFF = time(17, 0, 0)
+PROSPECTIVE_SHIPPING_BEFORE_CUTOFF_ANSWER = (
+    "亲，现在下单一般今天可以安排发出哦，具体以订单页显示的预计发货时间为准；"
+    "预售款按商品详情页标注的时间发货。"
+)
+PROSPECTIVE_SHIPPING_AFTER_CUTOFF_ANSWER = (
+    "亲，现在下单今天可能来不及发出了，一般会安排到下一批次哦。"
+    "具体以订单页显示的预计发货时间为准；预售款按商品详情页标注的时间发货。"
+)
+PROSPECTIVE_SHIPPING_CUTOFF_ANSWER = (
+    "亲，正常情况下17点前下单当天可以安排发出，17点后会安排到下一批次哦。"
+    "具体以订单页显示为准；预售款按商品详情页标注的时间发货。"
+)
+PROSPECTIVE_PREORDER_ANSWER = (
+    "预售商品不适用普通当日发货时段，请以商品详情页标注的预计发货时间"
+    "和预售说明为准。"
+)
 
 
 @dataclass
@@ -1117,6 +1156,30 @@ class AnswerRouteDecision:
     policy_query: str | None = None
     clarification_question: str | None = None
     reason: str = "outside_p0_s1_scope"
+
+
+@dataclass(frozen=True)
+class FootLengthParse:
+    status: str
+    normalized_cm: float | None = None
+    values_cm: tuple[float, ...] = ()
+    unit_inferred: bool = False
+    uncertain: bool = False
+    is_range: bool = False
+    correction_hint: str | None = None
+
+
+@dataclass(frozen=True)
+class SizeConsultationDecision:
+    matched: bool
+    query_type: str = "normal"
+    answer: str | None = None
+    foot_length: FootLengthParse | None = None
+    usual_shoe_size: float | None = None
+    foot_width: str | None = None
+    high_instep: bool | None = None
+    awaiting_foot_length: bool = False
+    secondary_policy_query: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1162,6 +1225,18 @@ class ConversationState:
     state_turn_count: int = 0
     updated_at_turn: int = 0
     should_reset: bool = False
+    size_foot_length_cm: float | None = None
+    size_foot_length_values_cm: tuple[float, ...] = ()
+    size_measurement_uncertain: bool = False
+    size_usual_shoe_size: float | None = None
+    size_foot_width: str = "unknown"
+    size_high_instep: bool | None = None
+    size_product_context: str = ""
+    size_product_fit: str = ""
+    size_product_fit_source: str = ""
+    size_product_size_chart: tuple[tuple[float, float, str], ...] = ()
+    size_product_size_chart_source: str = ""
+    size_awaiting_foot_length: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -2256,6 +2331,709 @@ def is_standalone_ambiguous_delivery_location_query(
     return normalized in STANDALONE_AMBIGUOUS_DELIVERY_LOCATION_FORMS
 
 
+def _format_centimeters(value: float) -> str:
+    return f"{value:g}"
+
+
+def _chinese_integer_to_arabic(token: str) -> int | None:
+    digits = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+    if token == "十":
+        return 10
+    if "十" in token:
+        tens, ones = token.split("十", 1)
+        tens_value = 1 if not tens else digits.get(tens)
+        ones_value = 0 if not ones else digits.get(ones)
+        if tens_value is None or ones_value is None:
+            return None
+        return tens_value * 10 + ones_value
+    if len(token) == 1:
+        return digits.get(token)
+    return None
+
+
+def _normalize_chinese_measurement_numbers(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        value = _chinese_integer_to_arabic(match.group(1))
+        return str(value) if value is not None else match.group(1)
+
+    return re.sub(
+        r"([零〇一二两三四五六七八九十]{1,3})(?=厘米|公分|毫米|cm|mm)",
+        replace,
+        text,
+    )
+
+
+def _convert_foot_length_value(value: float, unit: str) -> float:
+    return value / 10.0 if unit in {"mm", "毫米"} else value
+
+
+def _valid_foot_length_cm(value: float) -> bool:
+    # Deliberately broad enough for children's and adult footwear.
+    return FOOT_LENGTH_MIN_CM <= value <= FOOT_LENGTH_MAX_CM
+
+
+def _invalid_measurement_hint(value: float, unit: str) -> str:
+    if unit in {"厘米", "cm", "公分"} and 100 <= value <= 350:
+        intended = value / 10.0
+        return (
+            f"请确认“{value:g}{unit}”是否想表达{value:g}毫米"
+            f"（{intended:g}厘米）？确认后我再结合当前商品尺码表提供参考。"
+        )
+    if unit in {"毫米", "mm"} and 10 <= value <= 35:
+        return (
+            f"请确认“{value:g}{unit}”是否想表达{value:g}厘米"
+            f"（{value * 10:g}毫米）？确认后我再结合当前商品尺码表提供参考。"
+        )
+    return (
+        f"脚长“{value:g}{unit}”超出可合理核对的范围，请检查数值和单位后重试，"
+        "例如填写24厘米或240毫米。"
+    )
+
+
+def _build_foot_length_parse(
+    values_cm: list[float],
+    *,
+    unit_inferred: bool,
+    uncertain: bool,
+    is_range: bool,
+) -> FootLengthParse:
+    if not values_cm:
+        return FootLengthParse(status="not_found")
+    if not all(_valid_foot_length_cm(value) for value in values_cm):
+        return FootLengthParse(
+            status="invalid",
+            values_cm=tuple(values_cm),
+            unit_inferred=unit_inferred,
+            uncertain=uncertain,
+            is_range=is_range,
+            correction_hint=(
+                "脚长数值超出可合理核对的范围，请检查数值和单位后重试，"
+                "例如填写24厘米或240毫米。"
+            ),
+        )
+    values = tuple(round(value, 3) for value in values_cm)
+    return FootLengthParse(
+        status="valid",
+        normalized_cm=max(values),
+        values_cm=values,
+        unit_inferred=unit_inferred,
+        uncertain=uncertain,
+        is_range=is_range,
+    )
+
+
+def parse_foot_length_expression(
+    text: str,
+    *,
+    expecting_foot_length: bool = False,
+) -> FootLengthParse:
+    """Normalize deterministic foot-length expressions without LLM reasoning."""
+
+    normalized = re.sub(r"\s+", "", str(text or "")).casefold()
+    normalized = _normalize_chinese_measurement_numbers(normalized)
+    if not normalized:
+        return FootLengthParse(status="not_found")
+    uncertainty = contains_any(
+        normalized,
+        ["大概", "差不多", "左右", "约", "不准", "不太准", "之间"],
+    )
+
+    range_match = re.search(
+        r"(?<![\d.])(\d+(?:\.\d+)?)(?:到|至|[-~～])"
+        r"(\d+(?:\.\d+)?)(厘米|公分|毫米|cm|mm)(?![a-z])",
+        normalized,
+    )
+    if range_match:
+        first, second = float(range_match.group(1)), float(range_match.group(2))
+        unit = range_match.group(3)
+        values = [_convert_foot_length_value(first, unit), _convert_foot_length_value(second, unit)]
+        if not all(_valid_foot_length_cm(value) for value in values):
+            return FootLengthParse(
+                status="invalid",
+                values_cm=tuple(values),
+                uncertain=True,
+                is_range=True,
+                correction_hint=_invalid_measurement_hint(max(first, second), unit),
+            )
+        return _build_foot_length_parse(
+            values,
+            unit_inferred=False,
+            uncertain=True,
+            is_range=True,
+        )
+
+    explicit = re.findall(
+        r"(?<![\d.])(\d+(?:\.\d+)?)(厘米|公分|毫米|cm|mm)(?![a-z])",
+        normalized,
+    )
+    if explicit:
+        values: list[float] = []
+        for raw_value, unit in explicit:
+            value = float(raw_value)
+            converted = _convert_foot_length_value(value, unit)
+            if not _valid_foot_length_cm(converted):
+                return FootLengthParse(
+                    status="invalid",
+                    values_cm=(converted,),
+                    uncertain=uncertainty,
+                    correction_hint=_invalid_measurement_hint(value, unit),
+                )
+            values.append(converted)
+        return _build_foot_length_parse(
+            values,
+            unit_inferred=False,
+            uncertain=uncertainty or any(value % 0.5 != 0 for value in values),
+            is_range=len(values) > 1,
+        )
+
+    has_foot_context = contains_any(normalized, ["脚长", "脚是", "左脚", "右脚"])
+    if not expecting_foot_length and not has_foot_context:
+        return FootLengthParse(status="not_found")
+
+    bare_values: list[float] = []
+    is_range = False
+    bare_range = re.search(
+        r"(\d+(?:\.\d+)?)(?:到|至|[-~～])(\d+(?:\.\d+)?)",
+        normalized,
+    )
+    if bare_range:
+        bare_values = [float(bare_range.group(1)), float(bare_range.group(2))]
+        is_range = True
+    elif "左脚" in normalized and "右脚" in normalized:
+        left = re.search(r"左脚(?:长|是|约)?(\d+(?:\.\d+)?)", normalized)
+        right = re.search(r"右脚(?:长|是|约)?(\d+(?:\.\d+)?)", normalized)
+        if left and right:
+            bare_values = [float(left.group(1)), float(right.group(1))]
+    elif has_foot_context:
+        contextual = re.search(
+            r"(?:脚长|脚是)(?:是|为|约|大概|有|[:：])?(\d+(?:\.\d+)?)",
+            normalized,
+        )
+        if contextual:
+            bare_values = [float(contextual.group(1))]
+    elif expecting_foot_length:
+        numbers = re.findall(r"(?<![\d.])\d+(?:\.\d+)?(?![\d.])", normalized)
+        if len(numbers) == 1:
+            bare_values = [float(numbers[0])]
+
+    if not bare_values:
+        return FootLengthParse(status="not_found")
+
+    inferred_cm: list[float] = []
+    for value in bare_values:
+        if FOOT_LENGTH_MIN_CM <= value <= FOOT_LENGTH_MAX_CM:
+            inferred_cm.append(value)
+        elif 100 <= value <= FOOT_LENGTH_MAX_CM * 10:
+            inferred_cm.append(value / 10.0)
+        else:
+            return FootLengthParse(
+                status="ambiguous",
+                unit_inferred=True,
+                uncertain=uncertainty or is_range,
+                is_range=is_range,
+                correction_hint=FOOT_LENGTH_CLARIFICATION,
+            )
+    return _build_foot_length_parse(
+        inferred_cm,
+        unit_inferred=True,
+        uncertain=(
+            uncertainty
+            or is_range
+            or any(value % 0.5 != 0 for value in inferred_cm)
+        ),
+        is_range=is_range or len(inferred_cm) > 1,
+    )
+
+
+def _extract_usual_shoe_size(text: str) -> float | None:
+    normalized = re.sub(r"\s+", "", str(text or "")).casefold()
+    patterns = (
+        r"(?:平时|平常|通常)(?:穿|是)?(\d{2}(?:\.\d+)?)码?",
+        r"(?:耐克|运动鞋|皮鞋)(?:平时)?穿(\d{2}(?:\.\d+)?)码?",
+        r"(?:另一款|上一双|以前买.{0,8})(\d{2}(?:\.\d+)?)码?",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, normalized)
+        if match:
+            value = float(match.group(1))
+            if 20 <= value <= 55:
+                return value
+    return None
+
+
+def _extract_foot_shape(text: str) -> tuple[str | None, bool | None]:
+    normalized = re.sub(r"\s+", "", str(text or "")).casefold()
+    if contains_any(normalized, ["脚比较宽", "脚宽", "脚胖", "宽脚"]):
+        width = "wide"
+    elif contains_any(normalized, ["脚很瘦", "脚瘦", "窄脚"]):
+        width = "slim"
+    else:
+        width = None
+    high_instep = True if contains_any(normalized, ["脚背高", "高脚背"]) else None
+    return width, high_instep
+
+
+def _is_size_recommendation_query(text: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(text or "")).casefold()
+    return contains_any(
+        normalized,
+        [
+            "穿多大",
+            "穿几码",
+            "多少码",
+            "多大码",
+            "买几码",
+            "什么码",
+            "怎么选",
+            "选尺码",
+            "推荐个尺码",
+            "适合穿",
+            "这个穿多少",
+            "这款也",
+        ],
+    )
+
+
+def _is_product_fit_query(text: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(text or "")).casefold()
+    return contains_any(
+        normalized,
+        ["偏大", "偏小", "标准码", "大一码", "小一码", "尺码一样", "版型"],
+    )
+
+
+def _trusted_product_fit_answer(state: ConversationState) -> str | None:
+    if state.size_product_fit_source not in TRUSTED_SIZE_DATA_SOURCES:
+        return None
+    fit_labels = {
+        "narrow": "偏窄",
+        "wide": "偏宽",
+        "large": "偏大",
+        "small": "偏小",
+        "standard": "标准",
+    }
+    label = fit_labels.get(state.size_product_fit)
+    if not label:
+        return None
+    return (
+        f"商家商品资料显示当前商品版型为{label}。这只适用于该商品；"
+        "请同时核对商品详情页尺码表，并结合脚长、脚宽和脚背情况选择。"
+    )
+
+
+def _size_from_authoritative_chart(
+    foot_length_cm: float,
+    state: ConversationState,
+) -> tuple[str, str] | None:
+    charts: tuple[tuple[tuple[float, float, str], ...], str] = (
+        (state.size_product_size_chart, state.size_product_size_chart_source),
+        (MERCHANT_APPROVED_GENERIC_SIZE_CHART, "merchant_approved_generic"),
+    )
+    for chart, source in charts:
+        if not chart:
+            continue
+        if source != "merchant_approved_generic" and source not in TRUSTED_SIZE_DATA_SOURCES:
+            continue
+        for entry in chart:
+            if len(entry) != 3:
+                continue
+            lower, upper, size_label = entry
+            if float(lower) <= foot_length_cm <= float(upper):
+                return str(size_label), source
+    return None
+
+
+def _measurement_display(parsed: FootLengthParse) -> str:
+    if parsed.is_range and len(parsed.values_cm) > 1:
+        return "–".join(_format_centimeters(value) for value in parsed.values_cm)
+    return _format_centimeters(parsed.normalized_cm or 0.0)
+
+
+def _has_meaningful_size_conflict(
+    foot_length_cm: float,
+    usual_shoe_size: float,
+    chart_result: tuple[str, str] | None,
+) -> bool:
+    if chart_result:
+        try:
+            return abs(float(chart_result[0]) - usual_shoe_size) >= 3.0
+        except ValueError:
+            return False
+    # The product requirement explicitly identifies <=24 cm with >=41 as a
+    # clearly suspicious pair. This is a correction guard, not a size mapping.
+    return foot_length_cm <= 24.0 and usual_shoe_size >= 41.0
+
+
+def _base_size_guidance_answer(
+    parsed: FootLengthParse,
+    state: ConversationState,
+    *,
+    usual_shoe_size: float | None,
+) -> str:
+    display = _measurement_display(parsed)
+    chart_result = _size_from_authoritative_chart(parsed.normalized_cm or 0.0, state)
+    if chart_result:
+        size_label, source = chart_result
+        source_label = "当前商品的商家尺码表" if source != "merchant_approved_generic" else "商家批准的通用尺码表"
+        answer = (
+            f"按{source_label}，脚长{display}厘米可先参考{size_label}码。"
+            "这是初步参考，请再核对当前商品详情页的尺码表和版型说明。"
+        )
+    else:
+        answer = (
+            f"已记录脚长{display}厘米。当前可用资料中没有可验证的脚长与鞋码对照表，"
+            "暂时无法可靠推荐具体码数；请以当前商品详情页尺码表和版型说明为准。"
+        )
+
+    if parsed.uncertain or parsed.is_range:
+        answer += (
+            "该测量值带有范围、误差或临界可能，请不要直接四舍五入；"
+            "可复测较长一只脚，并结合脚宽、高脚背、袜子厚度和松紧偏好判断。"
+        )
+    if usual_shoe_size is not None:
+        if _has_meaningful_size_conflict(
+            parsed.normalized_cm or 0.0,
+            usual_shoe_size,
+            chart_result,
+        ):
+            answer += (
+                f"您还提供了常穿{usual_shoe_size:g}码，这与脚长信息存在明显不一致风险；"
+                "建议重新测量脚长并以当前商品尺码表核对后再决定。"
+            )
+        else:
+            answer += (
+                f"常穿{usual_shoe_size:g}码可作为补充信息，但不同品牌和鞋款不能直接等同。"
+            )
+    return answer
+
+
+def decide_size_consultation(
+    user_question: str,
+    conversation_state: ConversationState | dict | None = None,
+    business_now: datetime | None = None,
+) -> SizeConsultationDecision:
+    state = coerce_conversation_state(conversation_state)
+    question = str(user_question or "").strip()
+    normalized = re.sub(r"\s+", "", question).casefold()
+    parsed = parse_foot_length_expression(
+        question,
+        expecting_foot_length=state.size_awaiting_foot_length,
+    )
+    usual_size = _extract_usual_shoe_size(question)
+    foot_width, high_instep = _extract_foot_shape(question)
+    asks_size = _is_size_recommendation_query(question)
+    asks_fit = _is_product_fit_query(question)
+    has_shape = foot_width is not None or high_instep is not None
+    explicit_size_context = contains_any(normalized, ["脚长", "尺码", "鞋码", "脚是"])
+    standalone_numeric_ambiguity = bool(
+        re.fullmatch(r"(?:大概|差不多|约)?\d+(?:\.\d+)?(?:左右)?[？?。！!]?", normalized)
+    )
+    aftersales_size_operation = contains_any(
+        normalized,
+        ["尺码不合适", "换货", "退货", "换码", "改码", "申请换"],
+    )
+    matched = (
+        parsed.status != "not_found"
+        or asks_size
+        or asks_fit
+        or has_shape
+        or (state.size_awaiting_foot_length and bool(question))
+        or (state.size_foot_length_cm is not None and (asks_fit or has_shape))
+        or explicit_size_context
+        or standalone_numeric_ambiguity
+    )
+    if aftersales_size_operation and parsed.status == "not_found" and not has_shape:
+        matched = False
+    if not matched:
+        return SizeConsultationDecision(matched=False)
+
+    if standalone_numeric_ambiguity and parsed.status == "not_found":
+        return SizeConsultationDecision(
+            matched=True,
+            query_type="size_measurement_clarification",
+            answer=(
+                f"请问“{question.strip('？?。！! ')}”是指脚长（厘米/毫米）、鞋码，"
+                "还是其他信息？"
+            ),
+            foot_length=parsed,
+            awaiting_foot_length=False,
+        )
+
+    if parsed.status in {"invalid", "ambiguous"}:
+        return SizeConsultationDecision(
+            matched=True,
+            query_type="size_measurement_clarification",
+            answer=parsed.correction_hint or FOOT_LENGTH_CLARIFICATION,
+            foot_length=parsed,
+            usual_shoe_size=usual_size,
+            foot_width=foot_width,
+            high_instep=high_instep,
+            awaiting_foot_length=True,
+        )
+
+    if asks_fit:
+        trusted_fit = _trusted_product_fit_answer(state)
+        if trusted_fit:
+            return SizeConsultationDecision(
+                matched=True,
+                query_type="size_consultation",
+                answer=trusted_fit,
+                foot_length=parsed,
+                usual_shoe_size=usual_size,
+                foot_width=foot_width,
+                high_instep=high_instep,
+            )
+        known_facts: list[str] = []
+        if state.size_foot_length_cm is not None:
+            known_facts.append(f"脚长{state.size_foot_length_cm:g}厘米")
+        if state.size_usual_shoe_size is not None:
+            known_facts.append(f"常穿{state.size_usual_shoe_size:g}码")
+        answer = SIZE_FIT_UNKNOWN_ANSWER
+        if known_facts:
+            answer += f"已记录{'、'.join(known_facts)}，但这些信息不能替代当前商品的版型证据。"
+        return SizeConsultationDecision(
+            matched=True,
+            query_type="size_fit_unknown",
+            answer=answer,
+            foot_length=parsed,
+            usual_shoe_size=usual_size,
+            foot_width=foot_width,
+            high_instep=high_instep,
+            awaiting_foot_length=state.size_foot_length_cm is None,
+        )
+
+    effective_parsed = parsed
+    if parsed.status == "not_found" and state.size_foot_length_cm is not None:
+        effective_parsed = FootLengthParse(
+            status="valid",
+            normalized_cm=state.size_foot_length_cm,
+            values_cm=state.size_foot_length_values_cm or (state.size_foot_length_cm,),
+            uncertain=state.size_measurement_uncertain,
+            is_range=len(state.size_foot_length_values_cm) > 1,
+        )
+
+    if has_shape and effective_parsed.status == "valid":
+        display = _measurement_display(effective_parsed)
+        answer = (
+            f"已记录脚长{display}厘米及您的脚型信息。脚宽、脚背高度与脚长是不同维度，"
+            "不能据此固定大一码；请结合当前商品详情页尺码表和版型说明判断。"
+        )
+        if state.size_product_fit_source in TRUSTED_SIZE_DATA_SOURCES:
+            fit_answer = _trusted_product_fit_answer(state)
+            if fit_answer:
+                answer += fit_answer
+        decision = SizeConsultationDecision(
+            matched=True,
+            query_type="size_consultation",
+            answer=answer,
+            foot_length=effective_parsed,
+            usual_shoe_size=usual_size,
+            foot_width=foot_width,
+            high_instep=high_instep,
+        )
+    elif effective_parsed.status == "valid":
+        answer = _base_size_guidance_answer(
+            effective_parsed,
+            state,
+            usual_shoe_size=usual_size or state.size_usual_shoe_size,
+        )
+        decision = SizeConsultationDecision(
+            matched=True,
+            query_type="size_consultation",
+            answer=answer,
+            foot_length=effective_parsed,
+            usual_shoe_size=usual_size,
+            foot_width=foot_width,
+            high_instep=high_instep,
+        )
+    else:
+        prefix = "仅凭其他品牌或鞋款的常穿码不能推定当前商品尺码。" if usual_size else ""
+        if has_shape:
+            prefix += "脚宽或高脚背不能机械地换算为大一码。"
+        decision = SizeConsultationDecision(
+            matched=True,
+            query_type="size_clarification",
+            answer=f"{prefix}{FOOT_LENGTH_CLARIFICATION}",
+            foot_length=parsed,
+            usual_shoe_size=usual_size,
+            foot_width=foot_width,
+            high_instep=high_instep,
+            awaiting_foot_length=True,
+        )
+
+    if is_prospective_shipping_policy_query(question):
+        shipping_answer = answer_for_prospective_shipping_policy(
+            question,
+            business_now=business_now,
+        )
+        return SizeConsultationDecision(
+            matched=decision.matched,
+            query_type="size_and_shipping_policy",
+            answer=f"{decision.answer} {shipping_answer or ''}".strip(),
+            foot_length=decision.foot_length,
+            usual_shoe_size=decision.usual_shoe_size,
+            foot_width=decision.foot_width,
+            high_instep=decision.high_instep,
+            awaiting_foot_length=decision.awaiting_foot_length,
+        )
+    if is_existing_order_shipping_status_query(question):
+        return SizeConsultationDecision(
+            matched=decision.matched,
+            query_type="size_and_backend_handoff",
+            answer=f"{decision.answer} {BACKEND_REQUIRED_ANSWER}",
+            foot_length=decision.foot_length,
+            usual_shoe_size=decision.usual_shoe_size,
+            foot_width=decision.foot_width,
+            high_instep=decision.high_instep,
+            awaiting_foot_length=decision.awaiting_foot_length,
+        )
+    explicit_size_backend_action = bool(
+        re.search(r"(?:帮我|给我|替我).{0,12}(?:改|换).{0,8}\d{2}码", normalized)
+        or re.search(r"(?:这单|当前订单|订单).{0,8}(?:改|换).{0,8}\d{2}码", normalized)
+    )
+    if explicit_size_backend_action or is_aftersales_operation_request(question):
+        return SizeConsultationDecision(
+            matched=decision.matched,
+            query_type="size_and_backend_handoff",
+            answer=f"{decision.answer} {AFTERSALES_OPERATION_SAFE_ANSWER}",
+            foot_length=decision.foot_length,
+            usual_shoe_size=decision.usual_shoe_size,
+            foot_width=decision.foot_width,
+            high_instep=decision.high_instep,
+            awaiting_foot_length=decision.awaiting_foot_length,
+        )
+    refund_status = contains_any(normalized, ["退款", "返款"]) and contains_any(
+        normalized, ["到账", "进度", "处理到哪", "退了吗"]
+    )
+    exchange_status = "换货" in normalized and contains_any(
+        normalized, ["进度", "处理到哪", "到哪了", "完成了吗"]
+    )
+    if refund_status or exchange_status:
+        boundary = (
+            REFUND_STATUS_OR_AMOUNT_SAFE_ANSWER
+            if refund_status
+            else "当前换货进度需要结合订单售后记录核验；请查看订单页或联系人工客服确认。"
+        )
+        return SizeConsultationDecision(
+            matched=decision.matched,
+            query_type="size_and_backend_handoff",
+            answer=f"{decision.answer} {boundary}",
+            foot_length=decision.foot_length,
+            usual_shoe_size=decision.usual_shoe_size,
+            foot_width=decision.foot_width,
+            high_instep=decision.high_instep,
+            awaiting_foot_length=decision.awaiting_foot_length,
+        )
+    general_policy_markers = ["怎么", "如何", "流程", "申请", "规则", "政策"]
+    secondary_policy_query: str | None = None
+    if contains_any(normalized, ["退货", "退款"]) and contains_any(
+        normalized, general_policy_markers
+    ):
+        secondary_policy_query = "退款流程是什么"
+    elif "换货" in normalized and contains_any(normalized, general_policy_markers):
+        secondary_policy_query = "尺码不合适怎么申请换货"
+    if secondary_policy_query:
+        return SizeConsultationDecision(
+            matched=decision.matched,
+            query_type="size_and_policy_retrieval",
+            answer=decision.answer,
+            foot_length=decision.foot_length,
+            usual_shoe_size=decision.usual_shoe_size,
+            foot_width=decision.foot_width,
+            high_instep=decision.high_instep,
+            awaiting_foot_length=decision.awaiting_foot_length,
+            secondary_policy_query=secondary_policy_query,
+        )
+    return decision
+
+
+def answer_for_foot_length_size_query(user_question: str) -> str | None:
+    """Compatibility wrapper around the structured size-consultation decision."""
+
+    decision = decide_size_consultation(user_question)
+    if (
+        not decision.matched
+        or decision.foot_length is None
+        or decision.foot_length.status == "not_found"
+    ):
+        return None
+    return decision.answer
+
+
+def is_existing_order_shipping_status_query(user_question: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(user_question or "")).casefold()
+    patterns = (
+        r"(?:我)?(?:已经|已)下单",
+        r"我的订单.{0,12}(?:发货|什么时候发|发了吗|发了没)",
+        r"订单.{0,8}(?:还没|未).{0,4}发货",
+        r"帮我查.{0,10}(?:什么时候发|发货)",
+        r"订单.{0,8}(?:已经|已)付款.{0,10}(?:今天|什么时候).{0,6}(?:能)?发(?:货|吗)",
+    )
+    return any(re.search(pattern, normalized) for pattern in patterns)
+
+
+def is_prospective_shipping_policy_query(user_question: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(user_question or "")).casefold()
+    if is_existing_order_shipping_status_query(normalized):
+        return False
+    shipping_time_expression = (
+        r"(?:大概)?什么时候(?:能|可以)?发(?:货)?|多久(?:能|可以)?发货"
+    )
+    patterns = (
+        rf"(?:我)?现在下单.{{0,12}}(?:{shipping_time_expression})",
+        rf"今天下单.{{0,12}}(?:{shipping_time_expression})",
+        rf"现在拍.{{0,12}}(?:{shipping_time_expression})",
+        r"(?:我)?现在下单.{0,8}(?:今天|当天)(?:能|可以)?发(?:货)?",
+        r"现在拍.{0,8}(?:今天|当天)(?:能|可以)?发(?:货)?",
+        r"今天下单.{0,8}(?:(?:能|可以)?(?:当天|今天)?发(?:货)?|(?:当天|今天)(?:能|可以)?发(?:货)?)",
+        r"(?:\d{1,2}点|几点)前下单.{0,12}(?:当天|今天).{0,6}(?:能|可以)?发(?:货|吗)",
+        r"几点前下单.{0,12}(?:可以|能)?当天发货",
+    )
+    return any(re.search(pattern, normalized) for pattern in patterns)
+
+
+def is_explicit_dispatch_cutoff_query(user_question: str) -> bool:
+    normalized = re.sub(r"\s+", "", str(user_question or "")).casefold()
+    return bool(
+        re.search(r"(?:几点|什么时候|\d{1,2}点)前.{0,8}下单", normalized)
+        or re.search(r"下单.{0,8}(?:截止|最晚).{0,6}(?:几点|什么时候)", normalized)
+    )
+
+
+def answer_for_prospective_shipping_policy(
+    user_question: str,
+    *,
+    business_now: datetime | None = None,
+) -> str | None:
+    """Return time-aware policy guidance for a future purchase only.
+
+    The injected clock must be timezone-aware. Runtime calls use an explicit
+    Asia/Shanghai clock and never consult the operating-system timezone.
+    """
+
+    if not is_prospective_shipping_policy_query(user_question):
+        return None
+    normalized = re.sub(r"\s+", "", str(user_question or "")).casefold()
+    if contains_any(normalized, ["预售", "预定", "预订"]):
+        return PROSPECTIVE_PREORDER_ANSWER
+    if is_explicit_dispatch_cutoff_query(user_question):
+        return PROSPECTIVE_SHIPPING_CUTOFF_ANSWER
+
+    current = business_now or datetime.now(BUSINESS_TIMEZONE)
+    if current.tzinfo is None or current.utcoffset() is None:
+        raise ValueError("business_now must be timezone-aware")
+    shanghai_now = current.astimezone(BUSINESS_TIMEZONE)
+    local_time = time(
+        shanghai_now.hour,
+        shanghai_now.minute,
+        shanghai_now.second,
+        shanghai_now.microsecond,
+    )
+    if local_time < PROSPECTIVE_DISPATCH_CUTOFF:
+        return PROSPECTIVE_SHIPPING_BEFORE_CUTOFF_ANSWER
+    return PROSPECTIVE_SHIPPING_AFTER_CUTOFF_ANSWER
+
+
 def detect_policy_category(user_question: str) -> str | None:
     normalized = re.sub(r"\s+", "", user_question)
     for category in POLICY_CATEGORY_PRIORITY:
@@ -2267,6 +3045,9 @@ def detect_policy_category(user_question: str) -> str | None:
 def decide_p0_s1_answer_route(
     user_question: str,
     has_conversation_context: bool = False,
+    conversation_state: ConversationState | dict | None = None,
+    size_decision: SizeConsultationDecision | None = None,
+    business_now: datetime | None = None,
 ) -> AnswerRouteDecision:
     """Route only the P0-S1 shipping/refund/exchange slice.
 
@@ -2280,6 +3061,49 @@ def decide_p0_s1_answer_route(
             domain=None,
             clarification_question="请问您想咨询发货、退款还是换货问题？",
             reason="empty_input",
+        )
+
+    size_decision = size_decision or decide_size_consultation(
+        user_question,
+        conversation_state,
+        business_now=business_now,
+    )
+    if size_decision.matched:
+        if size_decision.query_type in {
+            "size_clarification",
+            "size_measurement_clarification",
+        }:
+            return AnswerRouteDecision(
+                route=AnswerRoute.CLARIFY_THEN_ANSWER,
+                domain=None,
+                clarification_question=size_decision.answer,
+                reason=size_decision.query_type,
+            )
+        if size_decision.query_type == "size_and_backend_handoff":
+            return AnswerRouteDecision(
+                route=AnswerRoute.FULL_HANDOFF,
+                domain="shipping",
+                needs_realtime_status=True,
+                reason=size_decision.query_type,
+            )
+        if size_decision.query_type == "size_and_policy_retrieval":
+            policy_domain = (
+                "exchange"
+                if size_decision.secondary_policy_query and "换货" in size_decision.secondary_policy_query
+                else "refund"
+            )
+            return AnswerRouteDecision(
+                route=AnswerRoute.DIRECT_ANSWER,
+                domain=policy_domain,
+                has_policy_facet=True,
+                policy_query=size_decision.secondary_policy_query,
+                reason=size_decision.query_type,
+            )
+        return AnswerRouteDecision(
+            route=AnswerRoute.DIRECT_ANSWER,
+            domain="shipping" if size_decision.query_type == "size_and_shipping_policy" else None,
+            has_policy_facet=size_decision.query_type == "size_and_shipping_policy",
+            reason=size_decision.query_type,
         )
 
     if is_standalone_ambiguous_delivery_location_query(
@@ -2327,8 +3151,14 @@ def decide_p0_s1_answer_route(
             reason="customer_service_or_logistics_ambiguity",
         )
 
+    prospective_shipping = is_prospective_shipping_policy_query(normalized)
+    existing_order_shipping = is_existing_order_shipping_status_query(normalized)
     domains: list[str] = []
-    shipping = contains_any(normalized, ["发货", "物流", "快递", "催发"])
+    shipping = (
+        prospective_shipping
+        or existing_order_shipping
+        or contains_any(normalized, ["发货", "物流", "快递", "催发"])
+    )
     refund = contains_any(normalized, ["退款", "退钱", "返款", "到账"])
     exchange = contains_any(normalized, ["换货", "换码", "改码", "换尺码"]) or bool(
         re.search(r"(?:改成|换成)\d{2}码", normalized)
@@ -2366,15 +3196,28 @@ def decide_p0_s1_answer_route(
         )
 
     general_markers = ["一般", "通常", "流程", "怎么", "如何", "申请", "规则", "政策", "多久"]
-    has_policy_facet = contains_any(normalized, general_markers) and not backend_action
-    specific_order = contains_any(normalized, ["我的", "我这", "这单", "当前订单", "订单现在"])
+    has_policy_facet = (
+        prospective_shipping
+        or (
+            contains_any(normalized, general_markers)
+            and not existing_order_shipping
+        )
+    ) and not backend_action
+    specific_order = existing_order_shipping or contains_any(
+        normalized, ["我的", "我这", "这单", "当前订单", "订单现在"]
+    )
 
     if domain == "shipping":
         status_signal = contains_any(
             normalized,
             ["什么时候发货", "发货了吗", "还没发货", "发了没", "处理到哪", "状态", "没更新"],
         )
-        needs_realtime = status_signal and (specific_order or not has_policy_facet)
+        if prospective_shipping:
+            needs_realtime = False
+        elif existing_order_shipping:
+            needs_realtime = True
+        else:
+            needs_realtime = status_signal and (specific_order or not has_policy_facet)
         policy_query = "一般多久发货"
     elif domain == "refund":
         status_signal = contains_any(
@@ -2394,7 +3237,10 @@ def decide_p0_s1_answer_route(
         needs_realtime = status_signal and (specific_order or not has_policy_facet)
         policy_query = "尺码不合适怎么申请换货"
 
-    if backend_action:
+    if prospective_shipping:
+        route = AnswerRoute.DIRECT_ANSWER
+        reason = "prospective_shipping_policy"
+    elif backend_action:
         route = AnswerRoute.FULL_HANDOFF
         reason = "backend_action_required"
     elif has_policy_facet and needs_realtime:
@@ -2490,6 +3336,9 @@ def is_business_query(text: str) -> bool:
 def intent_guard(
     user_question: str,
     has_conversation_context: bool = False,
+    conversation_state: ConversationState | dict | None = None,
+    size_decision: SizeConsultationDecision | None = None,
+    business_now: datetime | None = None,
 ) -> tuple[bool, str, str | None]:
     normalized = re.sub(r"\s+", "", user_question.strip()).casefold()
     if not normalized:
@@ -2504,7 +3353,33 @@ def intent_guard(
     route_decision = decide_p0_s1_answer_route(
         user_question,
         has_conversation_context=has_conversation_context,
+        conversation_state=conversation_state,
+        size_decision=size_decision,
+        business_now=business_now,
     )
+    if route_decision.reason in {
+        "size_consultation",
+        "size_clarification",
+        "size_measurement_clarification",
+        "size_fit_unknown",
+        "size_and_shipping_policy",
+        "size_and_backend_handoff",
+    }:
+        size_decision = size_decision or decide_size_consultation(
+            user_question,
+            conversation_state,
+            business_now=business_now,
+        )
+        return True, route_decision.reason, size_decision.answer
+    if route_decision.reason == "prospective_shipping_policy":
+        return (
+            True,
+            "prospective_shipping_policy",
+            answer_for_prospective_shipping_policy(
+                user_question,
+                business_now=business_now,
+            ),
+        )
     if route_decision.domain is not None or route_decision.route is AnswerRoute.CLARIFY_THEN_ANSWER:
         if route_decision.route is AnswerRoute.CLARIFY_THEN_ANSWER:
             return True, "unclear", answer_for_p0_s1_route(route_decision)
@@ -2578,6 +3453,10 @@ def detect_query_type(
 
 def requires_backend_api(user_question: str) -> bool:
     normalized = re.sub(r"\s+", "", user_question)
+    if is_prospective_shipping_policy_query(normalized):
+        return False
+    if is_existing_order_shipping_status_query(normalized):
+        return True
     if any(re.search(pattern, normalized) for pattern in LIVE_LOGISTICS_STATUS_PATTERNS):
         return True
     if contains_any(normalized, BACKEND_API_REQUIRED_KEYWORDS):
@@ -3164,6 +4043,34 @@ def coerce_conversation_state(
     state.state_confidence = max(0.0, min(1.0, float(state.state_confidence or 0.0)))
     state.state_turn_count = max(0, int(state.state_turn_count or 0))
     state.updated_at_turn = max(0, int(state.updated_at_turn or 0))
+    if state.size_foot_length_cm is not None:
+        try:
+            state.size_foot_length_cm = float(state.size_foot_length_cm)
+        except (TypeError, ValueError):
+            state.size_foot_length_cm = None
+    try:
+        state.size_foot_length_values_cm = tuple(
+            float(item) for item in (state.size_foot_length_values_cm or ())
+        )
+    except (TypeError, ValueError):
+        state.size_foot_length_values_cm = ()
+    if state.size_usual_shoe_size is not None:
+        try:
+            state.size_usual_shoe_size = float(state.size_usual_shoe_size)
+        except (TypeError, ValueError):
+            state.size_usual_shoe_size = None
+    normalized_chart: list[tuple[float, float, str]] = []
+    for entry in state.size_product_size_chart or ():
+        if not isinstance(entry, (list, tuple)) or len(entry) != 3:
+            continue
+        try:
+            lower, upper = float(entry[0]), float(entry[1])
+        except (TypeError, ValueError):
+            continue
+        label = str(entry[2]).strip()
+        if lower <= upper and label:
+            normalized_chart.append((lower, upper, label))
+    state.size_product_size_chart = tuple(normalized_chart)
     return state
 
 
@@ -3227,7 +4134,11 @@ def inherit_backend_required_from_state(
     normalized = re.sub(r"\s+", "", current)
     if not current or state.should_reset or not state.requires_backend_api:
         return None
-    if state.query_type not in {"backend_required", "refund_status_or_amount_request"}:
+    if state.query_type not in {
+        "backend_required",
+        "refund_status_or_amount_request",
+        "size_and_backend_handoff",
+    }:
         return None
     if state.state_confidence < 0.6 or state.state_turn_count > 3:
         return None
@@ -3302,6 +4213,66 @@ def inherit_aftersales_operation_from_state(
     )
 
 
+def _size_state_kwargs(state: ConversationState) -> dict[str, object]:
+    return {
+        "size_foot_length_cm": state.size_foot_length_cm,
+        "size_foot_length_values_cm": state.size_foot_length_values_cm,
+        "size_measurement_uncertain": state.size_measurement_uncertain,
+        "size_usual_shoe_size": state.size_usual_shoe_size,
+        "size_foot_width": state.size_foot_width,
+        "size_high_instep": state.size_high_instep,
+        "size_product_context": state.size_product_context,
+        "size_product_fit": state.size_product_fit,
+        "size_product_fit_source": state.size_product_fit_source,
+        "size_product_size_chart": state.size_product_size_chart,
+        "size_product_size_chart_source": state.size_product_size_chart_source,
+        "size_awaiting_foot_length": state.size_awaiting_foot_length,
+    }
+
+
+def _update_size_consultation_state(
+    previous_state: ConversationState,
+    decision: SizeConsultationDecision,
+    *,
+    question: str,
+    answer: str,
+    query_type: str,
+    contextual_query: str,
+    next_turn: int,
+    requires_backend: bool,
+) -> ConversationState:
+    state = ConversationState(**previous_state.to_dict())
+    parsed = decision.foot_length
+    if parsed and parsed.status == "valid" and parsed.normalized_cm is not None:
+        state.size_foot_length_cm = parsed.normalized_cm
+        state.size_foot_length_values_cm = parsed.values_cm or (parsed.normalized_cm,)
+        state.size_measurement_uncertain = parsed.uncertain or parsed.is_range
+    if decision.usual_shoe_size is not None:
+        state.size_usual_shoe_size = decision.usual_shoe_size
+    if decision.foot_width is not None:
+        state.size_foot_width = decision.foot_width
+    if decision.high_instep is not None:
+        state.size_high_instep = decision.high_instep
+    state.size_awaiting_foot_length = decision.awaiting_foot_length
+    state.current_topic = "size_consultation"
+    state.query_type = query_type
+    state.risk_type = "backend_operation" if requires_backend else "none"
+    state.requires_backend_api = requires_backend
+    state.last_safe_answer_type = "none"
+    state.last_user_query = question
+    state.last_assistant_answer = answer
+    state.last_contextual_query = contextual_query
+    state.state_confidence = 0.9
+    state.state_turn_count = (
+        previous_state.state_turn_count + 1
+        if previous_state.current_topic == "size_consultation"
+        else 1
+    )
+    state.updated_at_turn = next_turn
+    state.should_reset = False
+    return state
+
+
 def update_conversation_state(
     previous_state: ConversationState,
     result: dict,
@@ -3312,6 +4283,19 @@ def update_conversation_state(
     question = str(result.get("question", "")).strip()
     answer = str(result.get("final_answer", "")).strip()
     next_turn = previous_state.updated_at_turn + 1
+
+    if query_type.startswith("size_"):
+        size_decision = decide_size_consultation(question, previous_state)
+        return _update_size_consultation_state(
+            previous_state,
+            size_decision,
+            question=question,
+            answer=answer,
+            query_type=query_type,
+            contextual_query=followup.contextual_query,
+            next_turn=next_turn,
+            requires_backend=bool(result.get("requires_backend_api")),
+        )
 
     if query_type == "human_handover":
         return ConversationState(
@@ -3386,6 +4370,7 @@ def update_conversation_state(
         state_turn_count=previous_state.state_turn_count + 1 if same_state else 1,
         updated_at_turn=next_turn,
         should_reset=False,
+        **_size_state_kwargs(previous_state),
     )
 
 
@@ -3402,6 +4387,7 @@ def run_rag_query(
     previous_assistant_answer: str | None = None,
     conversation_state: ConversationState | dict | None = None,
     generation_config: GenerationConfig | None = None,
+    business_now: datetime | None = None,
 ) -> dict:
     question = str(user_question or "").strip()
     prior_state = coerce_conversation_state(
@@ -3414,9 +4400,17 @@ def run_rag_query(
         previous_assistant_answer or prior_state.last_assistant_answer or None
     )
     has_conversation_context = bool(str(previous_user_query or "").strip())
+    size_decision = decide_size_consultation(
+        question,
+        prior_state,
+        business_now=business_now,
+    )
     route_decision = decide_p0_s1_answer_route(
         question,
         has_conversation_context=has_conversation_context,
+        conversation_state=prior_state,
+        size_decision=size_decision,
+        business_now=business_now,
     )
     followup = resolve_followup_context(
         question,
@@ -3473,12 +4467,24 @@ def run_rag_query(
     skip_retrieval, guarded_type, guarded_answer = intent_guard(
         question,
         has_conversation_context=has_conversation_context,
+        conversation_state=prior_state,
+        size_decision=size_decision,
+        business_now=business_now,
     )
     if skip_retrieval:
-        backend_required = guarded_type == "backend_required"
+        backend_required = guarded_type in {"backend_required", "size_and_backend_handoff"}
+        preserve_policy_template = guarded_type in {
+            "prospective_shipping_policy",
+            "size_and_shipping_policy",
+        }
+        final_guarded_answer = (
+            str(guarded_answer or "").strip()
+            if preserve_policy_template
+            else finalize_answer(guarded_answer or "")
+        )
         return finish({
             "question": question,
-            "final_answer": finalize_answer(guarded_answer or ""),
+            "final_answer": final_guarded_answer,
             "requires_backend_api": backend_required,
             "invalid_input": guarded_type == "unclear",
             "skip_retrieval": True,
@@ -3638,10 +4644,15 @@ def run_rag_query(
         }, "aftersales_operation_guard")
 
     mixed_policy_handoff = route_decision.route is AnswerRoute.POLICY_PLUS_HANDOFF
+    size_policy_retrieval = size_decision.query_type == "size_and_policy_retrieval"
     retrieval_query = (
         route_decision.policy_query
         if mixed_policy_handoff and route_decision.policy_query
-        else followup.retrieval_query
+        else (
+            size_decision.secondary_policy_query
+            if size_policy_retrieval and size_decision.secondary_policy_query
+            else followup.retrieval_query
+        )
     )
     original_results = filter_quarantined_knowledge_results(retrieve(
         retrieval_query,
@@ -3665,7 +4676,7 @@ def run_rag_query(
         policy_category,
         domain_query=retrieval_query,
     )
-    generation_question = retrieval_query if mixed_policy_handoff else question
+    generation_question = retrieval_query if (mixed_policy_handoff or size_policy_retrieval) else question
     final_answer, _prompt = generate_final_answer(
         generation_question,
         original_results,
@@ -3685,6 +4696,8 @@ def run_rag_query(
         final_answer = finalize_answer(
             f"{final_answer} {p0_s1_status_handoff_boundary(route_decision)}"
         )
+    if size_policy_retrieval:
+        final_answer = finalize_answer(f"{size_decision.answer} {final_answer}")
     effective_backend_required = backend_required or mixed_policy_handoff
     provider_was_available = llm_config.has_api_key and llm_config.client is not None
     return finish({
@@ -3694,7 +4707,11 @@ def run_rag_query(
         "invalid_input": False,
         "skip_retrieval": False,
         "skip_llm": backend_required or (mixed_policy_handoff and not provider_was_available),
-        "query_type": "policy_plus_handoff" if mixed_policy_handoff else query_type,
+        "query_type": (
+            "policy_plus_handoff"
+            if mixed_policy_handoff
+            else ("size_and_policy_retrieval" if size_policy_retrieval else query_type)
+        ),
         "policy_category": policy_category,
         "original_results": original_results,
         "reranked_results": reranked_results,
