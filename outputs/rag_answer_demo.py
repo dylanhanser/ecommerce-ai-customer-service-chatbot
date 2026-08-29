@@ -8,7 +8,7 @@ import hashlib
 import os
 import re
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, time
 from enum import Enum
 from pathlib import Path
@@ -1158,6 +1158,202 @@ class AnswerRouteDecision:
     reason: str = "outside_p0_s1_scope"
 
 
+class CustomerPrimaryGoal(str, Enum):
+    PRODUCT_INFORMATION = "product_information"
+    PURCHASE_SUITABILITY = "purchase_suitability"
+    SIZE_RECOMMENDATION = "size_recommendation"
+    GENERAL_POLICY_INFORMATION = "general_policy_information"
+    RETURN_ELIGIBILITY = "return_eligibility"
+    EXCHANGE_ELIGIBILITY = "exchange_eligibility"
+    REFUND_REQUEST = "refund_request"
+    CANCELLATION_REQUEST = "cancellation_request"
+    AFTERSALES_PROBLEM_RESOLUTION = "aftersales_problem_resolution"
+    ORDER_OR_REFUND_STATUS = "order_or_refund_status"
+    BACKEND_OPERATION_REQUEST = "backend_operation_request"
+    COMPLAINT_OR_DESCRIPTION_MISMATCH = "complaint_or_description_mismatch"
+    AMBIGUOUS_HELP_REQUEST = "ambiguous_help_request"
+
+
+class CustomerRequestedResolution(str, Enum):
+    ANSWER_PRODUCT_QUESTION = "answer_product_question"
+    RETURN = "return"
+    EXCHANGE = "exchange"
+    REFUND = "refund"
+    CANCEL_ORDER = "cancel_order"
+    REPLACE_OR_RESEND = "replace_or_resend"
+    REPAIR_OR_AFTERSALES = "repair_or_aftersales"
+    CORRECT_WRONG_ITEM = "correct_wrong_item"
+    CHECK_STATUS = "check_status"
+    ESCALATE_TO_HUMAN = "escalate_to_human_service"
+
+
+class CustomerIssueType(str, Enum):
+    SUBJECTIVE_DISSATISFACTION = "subjective_dissatisfaction"
+    POOR_BREATHABILITY = "poor_breathability"
+    INSUFFICIENT_WARMTH = "insufficient_warmth"
+    SLIPPERY_EXPERIENCE = "slippery_experience"
+    UNCOMFORTABLE_HARD_OR_HEAVY = "uncomfortable_hard_or_heavy"
+    RUBBING_OR_PRESSURE = "rubbing_or_pressure"
+    WRONG_SIZE_OR_FIT = "wrong_size_or_fit"
+    WRONG_COLOR_STYLE_OR_ITEM = "wrong_color_style_or_item"
+    MISSING_ITEM = "missing_item"
+    DAMAGE = "damage"
+    SOLE_SEPARATION = "sole_separation"
+    DESCRIPTION_MISMATCH = "description_mismatch"
+    SUSPECTED_QUALITY_PROBLEM = "suspected_quality_problem"
+    SHIPPING_DELAY = "shipping_delay"
+    LOGISTICS_DELIVERY_ERROR = "logistics_delivery_error"
+    PREORDER_TIMING = "preorder_timing"
+    CHANGE_OF_MIND = "change_of_mind"
+    UNKNOWN_REASON = "unknown_reason"
+
+
+class CustomerLifecycleStage(str, Enum):
+    PRE_PURCHASE_HYPOTHETICAL = "pre_purchase_hypothetical"
+    ORDERED_NOT_SHIPPED = "ordered_not_shipped"
+    SHIPPED_IN_TRANSIT = "shipped_in_transit"
+    RECEIVED = "received"
+    RECEIVED_NOT_TRIED = "received_not_tried"
+    INDOOR_TRY_ON_ONLY = "indoor_try_on_only"
+    WORN_OUTDOORS = "worn_outdoors"
+    USED_FOR_A_PERIOD = "used_for_a_period"
+    RETURN_ALREADY_SUBMITTED = "return_already_submitted"
+    REFUND_PROCESSING = "refund_processing"
+    COMPLETED = "completed"
+    UNKNOWN = "unknown"
+
+
+class CustomerUsageState(str, Enum):
+    UNKNOWN = "unknown"
+    UNUSED = "unused"
+    INDOOR_TRY_ON = "indoor_try_on"
+    WORN_OUTDOORS = "worn_outdoors"
+    USED_FOR_MULTIPLE_DAYS = "used_for_multiple_days"
+    ALTERED = "altered"
+    DAMAGED = "damaged"
+    VISIBLY_DAMAGED_OR_ALTERED = "visibly_damaged_or_altered"
+    UNCLEAR = "unclear"
+
+
+class EvidenceStatus(str, Enum):
+    UNKNOWN = "unknown"
+    USER_REPORTED_POSITIVE = "user_reported_positive"
+    USER_REPORTED_NEGATIVE = "user_reported_negative"
+    TRUSTED_VERIFIED = "trusted_verified"
+
+
+class EvidenceProvenance(str, Enum):
+    UNKNOWN = "unknown"
+    EXPLICIT_USER_STATEMENT = "explicit_user_statement"
+    STRUCTURED_PRODUCT_DATA = "structured_product_data"
+    CANONICAL_POLICY = "canonical_policy"
+    TRUSTED_BACKEND_RECEIPT = "trusted_backend_receipt"
+    DERIVED_INFERENCE = "derived_inference"
+
+
+class EligibilityDecisionState(str, Enum):
+    UNKNOWN = "unknown"
+    GENERAL_POLICY_ONLY = "general_policy_only"
+    MAY_SUBMIT_REQUEST = "may_submit_request"
+    REQUIRES_POLICY_CHECK = "requires_policy_check"
+    REQUIRES_HUMAN_REVIEW = "requires_human_review"
+    REQUIRES_BACKEND_STATUS = "requires_backend_status"
+    APPROVED_WITH_RECEIPT = "approved_with_receipt"
+    REJECTED_WITH_RECEIPT = "rejected_with_receipt"
+
+
+class CommercialCostType(str, Enum):
+    NONE = "none"
+    RETURN_SHIPPING_FEE = "return_shipping_fee"
+    EXCHANGE_SHIPPING_FEE = "exchange_shipping_fee"
+    ORIGINAL_DELIVERY_FEE = "original_delivery_fee"
+    REFUND_PROCESSING_FEE = "refund_processing_fee"
+    REFUND_AMOUNT_DEDUCTION = "refund_amount_deduction"
+    INSURANCE_REIMBURSEMENT = "insurance_reimbursement"
+    COMPENSATION = "compensation"
+    UNKNOWN_COST_TYPE = "unknown_cost_type"
+
+
+@dataclass(frozen=True)
+class ExplicitStateFact:
+    value: str = "unknown"
+    status: EvidenceStatus = EvidenceStatus.UNKNOWN
+    provenance: EvidenceProvenance = EvidenceProvenance.UNKNOWN
+
+
+@dataclass(frozen=True)
+class ProductConditionEvidence:
+    cleanliness: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    visible_wear: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    outsole_wear: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    upper_condition: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    packaging_complete: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    shoe_box_complete: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    tags_complete: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    accessories_complete: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    alteration_status: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+
+
+@dataclass(frozen=True)
+class CustomerUsageEvidence:
+    has_been_worn: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    has_been_tried_on: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    indoor_use: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    outdoor_use: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    usage_duration: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    usage_occurrence: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    usage_extent: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    statement_confidence: ExplicitStateFact = field(default_factory=ExplicitStateFact)
+    evidence_provenance: EvidenceProvenance = EvidenceProvenance.UNKNOWN
+
+
+class CustomerRequestRoute(str, Enum):
+    PRODUCT_ONLY = "PRODUCT_ONLY"
+    POLICY_ONLY = "POLICY_ONLY"
+    PRODUCT_PLUS_POLICY = "PRODUCT_PLUS_POLICY"
+    POLICY_PLUS_CLARIFICATION = "POLICY_PLUS_CLARIFICATION"
+    POLICY_PLUS_HANDOFF = "POLICY_PLUS_HANDOFF"
+    BACKEND_STATUS = "BACKEND_STATUS"
+    BACKEND_OPERATION = "BACKEND_OPERATION"
+    FULL_HANDOFF = "FULL_HANDOFF"
+
+
+@dataclass(frozen=True)
+class CustomerRequestFrame:
+    original_text: str
+    normalized_text: str
+    primary_goal: CustomerPrimaryGoal
+    requested_resolution: tuple[CustomerRequestedResolution, ...]
+    product_facets: tuple[str, ...]
+    issue_type: CustomerIssueType
+    lifecycle_stage: CustomerLifecycleStage
+    usage_state: CustomerUsageState
+    lifecycle_provenance: EvidenceProvenance
+    usage_provenance: EvidenceProvenance
+    product_condition: ProductConditionEvidence
+    eligibility_state: EligibilityDecisionState
+    cost_type: CommercialCostType
+    policy_questions: tuple[str, ...]
+    backend_requirements: tuple[str, ...]
+    clarification_slots: tuple[str, ...]
+    supporting_product_context: tuple[str, ...]
+    route: CustomerRequestRoute
+    usage_evidence: CustomerUsageEvidence = field(default_factory=CustomerUsageEvidence)
+    inherited_service_context: bool = False
+
+
+@dataclass(frozen=True)
+class CustomerResolutionRule:
+    resolution: CustomerRequestedResolution
+    patterns: tuple[re.Pattern[str], ...]
+
+
+@dataclass(frozen=True)
+class CustomerIssueRule:
+    issue_type: CustomerIssueType
+    patterns: tuple[re.Pattern[str], ...]
+
+
 @dataclass(frozen=True)
 class FootLengthParse:
     status: str
@@ -1237,6 +1433,20 @@ class ConversationState:
     size_product_size_chart: tuple[tuple[float, float, str], ...] = ()
     size_product_size_chart_source: str = ""
     size_awaiting_foot_length: bool = False
+    service_primary_goal: str = "none"
+    service_requested_resolutions: tuple[str, ...] = ()
+    service_issue_type: str = CustomerIssueType.UNKNOWN_REASON.value
+    service_lifecycle_stage: str = CustomerLifecycleStage.UNKNOWN.value
+    service_usage_state: str = CustomerUsageState.UNKNOWN.value
+    service_lifecycle_provenance: str = EvidenceProvenance.UNKNOWN.value
+    service_usage_provenance: str = EvidenceProvenance.UNKNOWN.value
+    service_usage_evidence: dict[str, object] = field(default_factory=dict)
+    service_product_condition: dict[str, dict[str, str]] = field(default_factory=dict)
+    service_eligibility_state: str = EligibilityDecisionState.UNKNOWN.value
+    service_cost_type: str = CommercialCostType.NONE.value
+    service_clarification_count: int = 0
+    service_pending_clarification: tuple[str, ...] = ()
+    service_supporting_context: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -1271,6 +1481,1267 @@ class LLMConfig:
     @property
     def mode(self) -> str:
         return "DeepSeek API" if self.has_api_key and self.client is not None else "mock"
+
+
+def _request_patterns(*expressions: str) -> tuple[re.Pattern[str], ...]:
+    return tuple(re.compile(expression, re.IGNORECASE) for expression in expressions)
+
+
+CUSTOMER_RESOLUTION_RULES = (
+    CustomerResolutionRule(
+        CustomerRequestedResolution.RETURN,
+        _request_patterns(
+            r"退货",
+            r"(?:能不能|能否|能|可以|可不可以|是否|还能|想|要|申请|怎么|如何|只能).{0,5}退(?:吗|呢|掉|回去|了|$)",
+            r"(?:想|要)退(?:了|$)",
+        ),
+    ),
+    CustomerResolutionRule(
+        CustomerRequestedResolution.EXCHANGE,
+        _request_patterns(
+            r"换货|换尺码|换码",
+            r"(?:能不能|能否|能|可以|可不可以|是否|还能|想|要|申请|怎么|如何).{0,6}换(?:吗|呢|货|大|小|成|到|别的|颜色|款|\d{2}|$)",
+            r"(?:换|改成)\d{2}码|换大(?:一)?码|换小(?:一)?码|想换\d{2}|改码",
+        ),
+    ),
+    CustomerResolutionRule(
+        CustomerRequestedResolution.REFUND,
+        _request_patterns(r"退款|退钱|返款"),
+    ),
+    CustomerResolutionRule(
+        CustomerRequestedResolution.CANCEL_ORDER,
+        _request_patterns(r"取消(?:订单|这单|下单)?|撤销订单"),
+    ),
+    CustomerResolutionRule(
+        CustomerRequestedResolution.REPLACE_OR_RESEND,
+        _request_patterns(r"补发|重发|重新发|换新|再发一双"),
+    ),
+    CustomerResolutionRule(
+        CustomerRequestedResolution.ESCALATE_TO_HUMAN,
+        _request_patterns(r"转人工|人工客服|找客服"),
+    ),
+)
+
+
+CUSTOMER_ISSUE_RULES = (
+    CustomerIssueRule(
+        CustomerIssueType.DESCRIPTION_MISMATCH,
+        _request_patterns(
+            r"(?:页面|商品|详情|介绍|写|说|标注).{0,10}(?:实际|但是|但|怎么).{0,12}",
+            r"图片.{0,8}(?:收到|实物).{0,6}(?:不一样|不一致|有差别)",
+        ),
+    ),
+    CustomerIssueRule(
+        CustomerIssueType.WRONG_COLOR_STYLE_OR_ITEM,
+        _request_patterns(
+            r"(?:发错|寄错|送错)(?:颜色|尺码|码|款式|款|货|商品)",
+            r"收到的?不是我(?:买|拍|下单)的?(?:款|商品|货)?",
+            r"左右脚.{0,5}(?:尺码|码数).{0,3}(?:不一样|不同)",
+        ),
+    ),
+    CustomerIssueRule(CustomerIssueType.MISSING_ITEM, _request_patterns(r"少发|漏发|缺(?:了|少).{0,4}(?:一双|一件|商品)")),
+    CustomerIssueRule(CustomerIssueType.SOLE_SEPARATION, _request_patterns(r"开胶|脱胶|鞋底分离")),
+    CustomerIssueRule(CustomerIssueType.DAMAGE, _request_patterns(r"鞋底断|刚收到就破|破损|破了|断裂|裂开")),
+    CustomerIssueRule(CustomerIssueType.POOR_BREATHABILITY, _request_patterns(r"不透气|很闷|太闷|闷脚|捂脚")),
+    CustomerIssueRule(CustomerIssueType.INSUFFICIENT_WARMTH, _request_patterns(r"不够保暖|不保暖|太冷|冻脚")),
+    CustomerIssueRule(CustomerIssueType.SLIPPERY_EXPERIENCE, _request_patterns(r"走路打滑|穿着会滑|实际.{0,3}滑|容易滑")),
+    CustomerIssueRule(CustomerIssueType.RUBBING_OR_PRESSURE, _request_patterns(r"磨脚|压得难受|压脚|挤脚|顶脚|勒脚")),
+    CustomerIssueRule(CustomerIssueType.WRONG_SIZE_OR_FIT, _request_patterns(r"鞋.{0,2}(?:小了|大了)|大了一码|小了一码|\d{2}码不合适|尺码不合适|穿着挤|宽脚.{0,4}挤")),
+    CustomerIssueRule(CustomerIssueType.UNCOMFORTABLE_HARD_OR_HEAVY, _request_patterns(r"鞋底太硬|穿着太重|太重了|不舒服|不舒适|太硬了")),
+    CustomerIssueRule(CustomerIssueType.SHIPPING_DELAY, _request_patterns(r"迟迟不发货|一直没发货|发货太慢|物流太慢|快递太慢")),
+    CustomerIssueRule(CustomerIssueType.LOGISTICS_DELIVERY_ERROR, _request_patterns(r"物流显示.{0,6}(?:送错|投错).{0,4}(?:地方|位置|地点)|包裹.{0,4}(?:送错|投错)")),
+    CustomerIssueRule(CustomerIssueType.PREORDER_TIMING, _request_patterns(r"预售.{0,8}(?:什么时候|多久|发货|到货)")),
+    CustomerIssueRule(CustomerIssueType.CHANGE_OF_MIND, _request_patterns(r"不想要了|后悔了|改变主意")),
+    CustomerIssueRule(CustomerIssueType.SUBJECTIVE_DISSATISFACTION, _request_patterns(r"颜色不好看|不喜欢|不满意|不好看")),
+    CustomerIssueRule(CustomerIssueType.SUSPECTED_QUALITY_PROBLEM, _request_patterns(r"穿.{0,3}(?:天|次).{0,3}就坏|很大异味|质量问题|刚收到就坏|坏了")),
+)
+
+
+_STATUS_REQUEST_PATTERN = re.compile(
+    r"(?:退款|退货|换货|售后|订单).{0,10}(?:什么时候|多久|进度|处理到哪|到账|完成|状态)|"
+    r"(?:什么时候|多久|进度|处理到哪).{0,8}(?:退款|退货|换货|售后)"
+)
+_EXPLICIT_BACKEND_OPERATION_PATTERN = re.compile(
+    r"(?:帮我|给我|替我|直接|马上).{0,10}(?:退货|换货|退款|取消|改码|改成|补发|重发|换新)|"
+    r"(?:订单|这单).{0,6}(?:能不能|能|可以)?(?:帮我)?(?:改码|改成|取消)|"
+    r"还没发货.{0,10}(?:改码|取消)"
+)
+_SHIPPING_FEE_POLICY_PATTERN = re.compile(
+    r"(?:退货|换货|售后)?.{0,8}(?:运费|邮费).{0,10}(?:谁出|谁付|承担|怎么算|自己付|报销|退不退)|"
+    r"(?:退款).{0,6}(?:手续费|费用|扣费|少了|少退|全额)|"
+    r"(?:免费退货|运费险|保险赔付|补偿|赔偿)"
+)
+_SERVICE_FOLLOWUP_PATTERN = re.compile(
+    r"没脏|干净|弄脏|包装|鞋盒|吊牌|配件|鞋底.{0,4}磨损|"
+    r"鞋面.{0,4}(?:完好|破损)|没有明显破损|改动|已经提交申请|还没发货|已经发货|运输中|"
+    r"订单页.{0,6}(?:售后入口|申请售后)"
+)
+
+_PRODUCT_CONDITION_FIELDS = (
+    "cleanliness",
+    "visible_wear",
+    "outsole_wear",
+    "upper_condition",
+    "packaging_complete",
+    "shoe_box_complete",
+    "tags_complete",
+    "accessories_complete",
+    "alteration_status",
+)
+
+_USAGE_EVIDENCE_FIELDS = (
+    "has_been_worn",
+    "has_been_tried_on",
+    "indoor_use",
+    "outdoor_use",
+    "usage_duration",
+    "usage_occurrence",
+    "usage_extent",
+    "statement_confidence",
+)
+
+_USAGE_ACTION_WORN_PATTERNS = _request_patterns(
+    r"穿出去|穿出门|穿着|穿过|穿了|穿去|(?:每天都|一直)在穿|"
+    r"在(?:家里|家|室内|屋里|房间里)穿|上班穿|走过路|用过"
+)
+_USAGE_ACTION_TRY_PATTERNS = _request_patterns(r"试穿|试了|试过|试一下|试了试|套了|上脚")
+_USAGE_INDOOR_PATTERNS = _request_patterns(r"家里|在家|室内|屋里|房间里")
+_USAGE_OUTDOOR_PATTERNS = _request_patterns(
+    r"穿出去|穿出门|出门(?:后|时)?穿|外面.{0,5}(?:穿|走|试)|"
+    r"室外.{0,5}(?:穿|走|试)|户外.{0,5}(?:穿|走|试)|"
+    r"穿着?下楼|下楼(?:了|过)|下楼.{0,5}穿|上班.{0,5}穿|穿着?上了?.{0,4}班|"
+    r"通勤|上街|逛街|穿去(?:过)?外面|走过路"
+)
+_USAGE_OUTDOOR_NEGATIVE_PATTERNS = _request_patterns(
+    r"没穿出去|没有穿出去|未穿出去|没出门|没出过门|没有出过门|"
+    r"没到外面(?:穿|走)|没有到外面(?:穿|走)|没在外面(?:穿|走)"
+)
+_USAGE_INDOOR_NEGATIVE_PATTERNS = _request_patterns(r"没在家穿|没有在家穿|不是只在家穿|不只在家穿")
+_USAGE_INDOOR_LIMIT_PATTERNS = _request_patterns(
+    r"(?:只|就|就是|仅仅)(?:在)?(?:家里|家|室内|屋里|房间里)"
+)
+_USAGE_UNUSED_PATTERNS = _request_patterns(
+    r"(?:还)?没穿(?:过)?$|完全没穿|完全没试过|从来没穿|没上过脚|收到后一直没穿|"
+    r"一直没穿|未穿过|全新未用"
+)
+_USAGE_BRIEF_PATTERNS = _request_patterns(
+    r"试了?(?:一)?下|试了试|穿了一下|穿了一会儿|穿过一次|穿了一次|套了一下|"
+    r"上脚一下|试了一脚|穿了穿"
+)
+_USAGE_EXTENDED_PATTERNS = _request_patterns(
+    r"穿了?(?:半天|一天|[二两三四五六七八九十\d]+天|好几天|几天|一周|"
+    r"[二两三四五六七八九十\d]+周|[一二两三四五六七八九十\d]+个月)|"
+    r"连续穿|每天都在穿|一直在穿|上班穿了一天|穿着上了几天班|"
+    r"穿出去一天|穿出门一天"
+)
+_USAGE_ONCE_PATTERNS = _request_patterns(r"一次|一脚")
+_USAGE_UNCERTAIN_PATTERNS = _request_patterns(r"好像|可能|也许|记不清|记不得|不确定|忘了")
+
+
+def _reported_fact(value: str, *, positive: bool) -> ExplicitStateFact:
+    return ExplicitStateFact(
+        value=value,
+        status=(
+            EvidenceStatus.USER_REPORTED_POSITIVE
+            if positive
+            else EvidenceStatus.USER_REPORTED_NEGATIVE
+        ),
+        provenance=EvidenceProvenance.EXPLICIT_USER_STATEMENT,
+    )
+
+
+def _coerce_state_fact(value: object) -> ExplicitStateFact:
+    if isinstance(value, ExplicitStateFact):
+        return value
+    if not isinstance(value, dict):
+        return ExplicitStateFact()
+    try:
+        status = EvidenceStatus(str(value.get("status", EvidenceStatus.UNKNOWN.value)))
+    except ValueError:
+        status = EvidenceStatus.UNKNOWN
+    try:
+        provenance = EvidenceProvenance(
+            str(value.get("provenance", EvidenceProvenance.UNKNOWN.value))
+        )
+    except ValueError:
+        provenance = EvidenceProvenance.UNKNOWN
+    return ExplicitStateFact(
+        value=str(value.get("value", "unknown")),
+        status=status,
+        provenance=provenance,
+    )
+
+
+def _condition_from_state(state: ConversationState) -> ProductConditionEvidence:
+    stored = state.service_product_condition or {}
+    return ProductConditionEvidence(
+        **{
+            field_name: _coerce_state_fact(stored.get(field_name))
+            for field_name in _PRODUCT_CONDITION_FIELDS
+        }
+    )
+
+
+def _explicit_condition_updates(normalized: str) -> dict[str, ExplicitStateFact]:
+    updates: dict[str, ExplicitStateFact] = {}
+    if re.search(r"没脏|没有弄脏|未弄脏|很干净|是干净的", normalized):
+        updates["cleanliness"] = _reported_fact("clean", positive=True)
+    elif re.search(r"弄脏|脏了|有污渍", normalized):
+        updates["cleanliness"] = _reported_fact("dirty", positive=False)
+
+    if re.search(r"没有(?:明显)?(?:穿着)?痕迹|无(?:明显)?磨损", normalized):
+        updates["visible_wear"] = _reported_fact("no_visible_wear", positive=True)
+    elif re.search(r"有(?:明显)?(?:穿着)?痕迹|明显磨损", normalized):
+        updates["visible_wear"] = _reported_fact("visible_wear", positive=False)
+
+    if re.search(r"鞋底.{0,4}(?:没磨|无磨损|没有磨损)", normalized):
+        updates["outsole_wear"] = _reported_fact("no_wear", positive=True)
+    elif re.search(r"鞋底.{0,4}(?:有点|有|明显)?磨损", normalized):
+        updates["outsole_wear"] = _reported_fact("visible_wear", positive=False)
+
+    if re.search(r"鞋面.{0,4}(?:完好|没破|无破损)", normalized):
+        updates["upper_condition"] = _reported_fact("intact", positive=True)
+    elif re.search(r"鞋面.{0,4}(?:破损|破了|有损坏)", normalized):
+        updates["upper_condition"] = _reported_fact("damaged", positive=False)
+
+    if re.search(r"包装(?:都)?完整|包装齐全", normalized):
+        updates["packaging_complete"] = _reported_fact("complete", positive=True)
+    elif re.search(r"包装(?:不全|不完整|丢了|没有了)", normalized):
+        updates["packaging_complete"] = _reported_fact("incomplete", positive=False)
+
+    if re.search(r"鞋盒(?:还|都)?在|鞋盒(?:和|、)?吊牌都在|有鞋盒|鞋盒完整", normalized):
+        updates["shoe_box_complete"] = _reported_fact("present", positive=True)
+    elif re.search(r"鞋盒(?:丢了|没了|不在|破了|坏了)", normalized):
+        updates["shoe_box_complete"] = _reported_fact("missing_or_damaged", positive=False)
+
+    if re.search(r"吊牌(?:还|都)?在|鞋盒(?:和|、)?吊牌都在|有吊牌|吊牌完整", normalized):
+        updates["tags_complete"] = _reported_fact("present", positive=True)
+    elif re.search(r"吊牌(?:剪了|拆了|丢了|没了|不在)", normalized):
+        updates["tags_complete"] = _reported_fact("removed", positive=False)
+
+    if re.search(r"配件(?:都)?(?:在|齐全|完整)", normalized):
+        updates["accessories_complete"] = _reported_fact("complete", positive=True)
+    elif re.search(r"配件(?:不全|缺少|丢了)", normalized):
+        updates["accessories_complete"] = _reported_fact("incomplete", positive=False)
+
+    if re.search(r"没有改动|未改动|没改过", normalized):
+        updates["alteration_status"] = _reported_fact("unaltered", positive=True)
+    elif re.search(r"改过|改动过|自行修改", normalized):
+        updates["alteration_status"] = _reported_fact("altered", positive=False)
+    return updates
+
+
+def _merge_product_condition(
+    base: ProductConditionEvidence,
+    updates: dict[str, ExplicitStateFact],
+) -> ProductConditionEvidence:
+    values = {name: getattr(base, name) for name in _PRODUCT_CONDITION_FIELDS}
+    values.update(updates)
+    return ProductConditionEvidence(**values)
+
+
+def _usage_fact(
+    value: str,
+    *,
+    positive: bool = True,
+    provenance: EvidenceProvenance = EvidenceProvenance.EXPLICIT_USER_STATEMENT,
+) -> ExplicitStateFact:
+    return ExplicitStateFact(
+        value=value,
+        status=(
+            EvidenceStatus.USER_REPORTED_POSITIVE
+            if positive
+            else EvidenceStatus.USER_REPORTED_NEGATIVE
+        ),
+        provenance=provenance,
+    )
+
+
+def _last_signal_position(
+    normalized: str,
+    patterns: tuple[re.Pattern[str], ...],
+    *,
+    reject_negated: bool = False,
+) -> int:
+    positions: list[int] = []
+    for pattern in patterns:
+        for match in pattern.finditer(normalized):
+            if reject_negated:
+                prefix = normalized[max(0, match.start() - 4) : match.start()]
+                if (
+                    not prefix.endswith("有没有")
+                    and re.search(r"(?:没|未|无|不|没有|不是)(?:有|曾|到|在)?$", prefix)
+                ):
+                    continue
+            positions.append(match.end())
+    return max(positions, default=-1)
+
+
+def _usage_evidence_has_signal(evidence: CustomerUsageEvidence) -> bool:
+    return any(
+        getattr(evidence, field_name).provenance is not EvidenceProvenance.UNKNOWN
+        for field_name in _USAGE_EVIDENCE_FIELDS
+    )
+
+
+def _extract_usage_evidence(normalized: str) -> CustomerUsageEvidence:
+    """Compose usage facts from independent action, location, extent and certainty signals."""
+    values = {name: ExplicitStateFact() for name in _USAGE_EVIDENCE_FIELDS}
+    uncertain = _last_signal_position(normalized, _USAGE_UNCERTAIN_PATTERNS) >= 0
+
+    worn_positive = _last_signal_position(
+        normalized,
+        _USAGE_ACTION_WORN_PATTERNS,
+        reject_negated=True,
+    )
+    unused_position = _last_signal_position(normalized, _USAGE_UNUSED_PATTERNS)
+    if uncertain and worn_positive >= 0:
+        values["has_been_worn"] = _usage_fact("unknown")
+    elif worn_positive > unused_position:
+        values["has_been_worn"] = _usage_fact("yes")
+    elif unused_position >= 0:
+        values["has_been_worn"] = _usage_fact("no", positive=False)
+
+    tried_positive = _last_signal_position(
+        normalized,
+        _USAGE_ACTION_TRY_PATTERNS,
+        reject_negated=True,
+    )
+    tried_negative = _last_signal_position(
+        normalized,
+        _request_patterns(r"没试过|没有试过|未试过|没上过脚|没有上过脚"),
+    )
+    if uncertain and tried_positive >= 0:
+        values["has_been_tried_on"] = _usage_fact("unknown")
+    elif tried_positive > tried_negative:
+        values["has_been_tried_on"] = _usage_fact("yes")
+    elif tried_negative >= 0:
+        values["has_been_tried_on"] = _usage_fact("no", positive=False)
+
+    indoor_positive = _last_signal_position(
+        normalized,
+        _USAGE_INDOOR_PATTERNS,
+        reject_negated=True,
+    )
+    indoor_negative = _last_signal_position(normalized, _USAGE_INDOOR_NEGATIVE_PATTERNS)
+    if indoor_positive > indoor_negative:
+        values["indoor_use"] = _usage_fact("yes")
+    elif indoor_negative >= 0:
+        values["indoor_use"] = _usage_fact("no", positive=False)
+    elif tried_positive >= 0 and not uncertain:
+        values["indoor_use"] = _usage_fact(
+            "yes",
+            provenance=EvidenceProvenance.DERIVED_INFERENCE,
+        )
+
+    outdoor_positive = _last_signal_position(
+        normalized,
+        _USAGE_OUTDOOR_PATTERNS,
+        reject_negated=True,
+    )
+    outdoor_negative = _last_signal_position(normalized, _USAGE_OUTDOOR_NEGATIVE_PATTERNS)
+    indoor_limiter = _last_signal_position(normalized, _USAGE_INDOOR_LIMIT_PATTERNS)
+    if uncertain and outdoor_positive >= 0:
+        values["outdoor_use"] = _usage_fact("unknown")
+    elif outdoor_positive > max(outdoor_negative, indoor_limiter):
+        values["outdoor_use"] = _usage_fact("yes")
+    elif max(outdoor_negative, indoor_limiter) >= 0:
+        values["outdoor_use"] = _usage_fact("no", positive=False)
+
+    extended_position = _last_signal_position(normalized, _USAGE_EXTENDED_PATTERNS)
+    brief_position = _last_signal_position(normalized, _USAGE_BRIEF_PATTERNS)
+    if uncertain and max(extended_position, brief_position) >= 0:
+        values["usage_duration"] = _usage_fact("unknown")
+        values["usage_extent"] = _usage_fact("unknown")
+    elif extended_position >= 0:
+        duration = "one_day" if re.search(r"半天|一天", normalized) else "multiple_days"
+        values["usage_duration"] = _usage_fact(duration)
+        values["usage_extent"] = _usage_fact("extended")
+    elif brief_position >= 0:
+        values["usage_duration"] = _usage_fact("brief")
+        values["usage_extent"] = _usage_fact("brief")
+
+    if _last_signal_position(normalized, _USAGE_ONCE_PATTERNS) >= 0:
+        values["usage_occurrence"] = _usage_fact("once")
+
+    has_semantic_signal = any(
+        fact.provenance is not EvidenceProvenance.UNKNOWN
+        for field_name, fact in values.items()
+        if field_name != "statement_confidence"
+    )
+    if uncertain and has_semantic_signal:
+        values["statement_confidence"] = _usage_fact("uncertain")
+    elif has_semantic_signal:
+        values["statement_confidence"] = _usage_fact("certain")
+
+    provenance = (
+        EvidenceProvenance.EXPLICIT_USER_STATEMENT
+        if any(
+            fact.provenance is EvidenceProvenance.EXPLICIT_USER_STATEMENT
+            for fact in values.values()
+        )
+        else EvidenceProvenance.UNKNOWN
+    )
+    return CustomerUsageEvidence(**values, evidence_provenance=provenance)
+
+
+def _usage_evidence_from_state(state: ConversationState) -> CustomerUsageEvidence:
+    stored = state.service_usage_evidence or {}
+    if stored:
+        try:
+            provenance = EvidenceProvenance(
+                str(stored.get("evidence_provenance", EvidenceProvenance.UNKNOWN.value))
+            )
+        except ValueError:
+            provenance = EvidenceProvenance.UNKNOWN
+        return CustomerUsageEvidence(
+            **{
+                field_name: _coerce_state_fact(stored.get(field_name))
+                for field_name in _USAGE_EVIDENCE_FIELDS
+            },
+            evidence_provenance=provenance,
+        )
+
+    try:
+        legacy_usage = CustomerUsageState(state.service_usage_state)
+    except ValueError:
+        legacy_usage = CustomerUsageState.UNKNOWN
+    if legacy_usage is CustomerUsageState.INDOOR_TRY_ON:
+        return CustomerUsageEvidence(
+            has_been_tried_on=_usage_fact("yes"),
+            indoor_use=_usage_fact("yes"),
+            evidence_provenance=EvidenceProvenance.EXPLICIT_USER_STATEMENT,
+        )
+    if legacy_usage is CustomerUsageState.WORN_OUTDOORS:
+        return CustomerUsageEvidence(
+            has_been_worn=_usage_fact("yes"),
+            outdoor_use=_usage_fact("yes"),
+            evidence_provenance=EvidenceProvenance.EXPLICIT_USER_STATEMENT,
+        )
+    if legacy_usage is CustomerUsageState.UNUSED:
+        return CustomerUsageEvidence(
+            has_been_worn=_usage_fact("no", positive=False),
+            evidence_provenance=EvidenceProvenance.EXPLICIT_USER_STATEMENT,
+        )
+    return CustomerUsageEvidence()
+
+
+def _merge_usage_evidence(
+    base: CustomerUsageEvidence,
+    updates: CustomerUsageEvidence,
+) -> CustomerUsageEvidence:
+    values = {name: getattr(base, name) for name in _USAGE_EVIDENCE_FIELDS}
+    for field_name in _USAGE_EVIDENCE_FIELDS:
+        update = getattr(updates, field_name)
+        if update.provenance is not EvidenceProvenance.UNKNOWN:
+            values[field_name] = update
+    provenance = (
+        updates.evidence_provenance
+        if updates.evidence_provenance is not EvidenceProvenance.UNKNOWN
+        else base.evidence_provenance
+    )
+    return CustomerUsageEvidence(**values, evidence_provenance=provenance)
+
+
+def _compose_usage_state(
+    evidence: CustomerUsageEvidence,
+    normalized: str,
+) -> CustomerUsageState:
+    if evidence.statement_confidence.value == "uncertain":
+        return CustomerUsageState.UNCLEAR
+    if evidence.outdoor_use.value == "yes":
+        return CustomerUsageState.WORN_OUTDOORS
+    if evidence.usage_extent.value == "extended":
+        return CustomerUsageState.USED_FOR_MULTIPLE_DAYS
+    if evidence.has_been_worn.value == "no":
+        return CustomerUsageState.UNUSED
+    if evidence.indoor_use.value == "yes" or evidence.has_been_tried_on.value == "yes":
+        return CustomerUsageState.INDOOR_TRY_ON
+    if re.search(r"剪(?:了)?吊牌|改动|改过|自行修改", normalized):
+        return CustomerUsageState.ALTERED
+    if re.search(r"人为损坏|明显破损", normalized):
+        return CustomerUsageState.DAMAGED
+    return CustomerUsageState.UNKNOWN
+
+
+def _compose_lifecycle_from_usage(
+    detected: CustomerLifecycleStage,
+    usage: CustomerUsageState,
+) -> CustomerLifecycleStage:
+    if usage is CustomerUsageState.WORN_OUTDOORS:
+        return CustomerLifecycleStage.WORN_OUTDOORS
+    if usage is CustomerUsageState.USED_FOR_MULTIPLE_DAYS:
+        return CustomerLifecycleStage.USED_FOR_A_PERIOD
+    if usage is CustomerUsageState.INDOOR_TRY_ON:
+        return CustomerLifecycleStage.INDOOR_TRY_ON_ONLY
+    return detected
+
+
+def _detect_cost_type(normalized: str) -> CommercialCostType:
+    if re.search(r"运费险|保险.{0,4}(?:赔|报销|公司)", normalized):
+        return CommercialCostType.INSURANCE_REIMBURSEMENT
+    if re.search(r"补偿|赔偿", normalized):
+        return CommercialCostType.COMPENSATION
+    if re.search(r"退款.{0,8}(?:少了|少退|金额不对|差了|扣了)\d*|退款金额.{0,5}(?:少|不对|扣)", normalized):
+        return CommercialCostType.REFUND_AMOUNT_DEDUCTION
+    if re.search(r"退款.{0,6}(?:手续费|处理费|服务费|扣费)", normalized):
+        return CommercialCostType.REFUND_PROCESSING_FEE
+    if re.search(r"(?:发货时|原(?:来)?|下单时|购买时).{0,6}(?:运费|邮费).{0,5}(?:退不退|退吗|返还|退回)", normalized):
+        return CommercialCostType.ORIGINAL_DELIVERY_FEE
+    if re.search(r"换货.{0,8}(?:来回)?(?:运费|邮费)|(?:运费|邮费).{0,5}换货", normalized):
+        return CommercialCostType.EXCHANGE_SHIPPING_FEE
+    if re.search(r"退货.{0,8}(?:运费|邮费)|(?:发错货|寄错货).{0,8}(?:退回|寄回).{0,4}(?:运费|邮费)|免费退货", normalized):
+        return CommercialCostType.RETURN_SHIPPING_FEE
+    if re.search(r"退款.{0,4}费用.{0,5}(?:谁出|谁付|承担|怎么算)", normalized):
+        return CommercialCostType.UNKNOWN_COST_TYPE
+    return CommercialCostType.NONE
+
+
+def _first_issue(normalized: str) -> CustomerIssueType:
+    for rule in CUSTOMER_ISSUE_RULES:
+        if any(pattern.search(normalized) for pattern in rule.patterns):
+            return rule.issue_type
+    return CustomerIssueType.UNKNOWN_REASON
+
+
+def _detect_lifecycle(normalized: str) -> CustomerLifecycleStage:
+    if re.search(r"(?:退货|换货|退款|售后).{0,6}(?:已完成|完成了|已结束|已办结)", normalized):
+        return CustomerLifecycleStage.COMPLETED
+    if re.search(r"退款.{0,8}(?:到账|进度|处理中|什么时候|多久)", normalized):
+        return CustomerLifecycleStage.REFUND_PROCESSING
+    if re.search(r"退货.{0,5}(?:已经|已)?(?:申请|提交)", normalized) or "已经提交申请" in normalized:
+        return CustomerLifecycleStage.RETURN_ALREADY_SUBMITTED
+    if "还没发货" in normalized or "未发货" in normalized:
+        return CustomerLifecycleStage.ORDERED_NOT_SHIPPED
+    if "已经发货" in normalized or "已发货" in normalized or "运输中" in normalized:
+        return CustomerLifecycleStage.SHIPPED_IN_TRANSIT
+    if "刚收到" in normalized:
+        return CustomerLifecycleStage.RECEIVED_NOT_TRIED
+    if re.search(r"已经?收到|已签收|收到货", normalized):
+        return CustomerLifecycleStage.RECEIVED
+    if re.search(r"(?:如果|要是)?买了.{0,10}(?:能|可以|怎么).{0,5}(?:退|换)", normalized):
+        return CustomerLifecycleStage.PRE_PURCHASE_HYPOTHETICAL
+    if re.search(r"(?:试穿后|预售款).{0,8}(?:能|可以).{0,4}(?:退|换)", normalized):
+        return CustomerLifecycleStage.PRE_PURCHASE_HYPOTHETICAL
+    return CustomerLifecycleStage.UNKNOWN
+
+
+def _detect_usage(normalized: str) -> CustomerUsageState:
+    return _compose_usage_state(_extract_usage_evidence(normalized), normalized)
+
+
+def _resolution_values_from_state(state: ConversationState) -> tuple[CustomerRequestedResolution, ...]:
+    values: list[CustomerRequestedResolution] = []
+    for value in state.service_requested_resolutions:
+        try:
+            values.append(CustomerRequestedResolution(value))
+        except ValueError:
+            continue
+    return tuple(values)
+
+
+def analyze_customer_request(
+    question: str,
+    *,
+    product_facets: Iterable[str] = (),
+    conversation_state: ConversationState | dict | None = None,
+    has_selected_product: bool = False,
+) -> CustomerRequestFrame:
+    """Collect the complete request before any product or service fast path returns."""
+    original = str(question or "").strip()
+    normalized = re.sub(r"[\s，。！？!?、；;：:“”‘’\"'（）()【】\[\]]+", "", original).casefold()
+    facets = tuple(dict.fromkeys(str(item) for item in product_facets if str(item)))
+    state = coerce_conversation_state(conversation_state)
+    has_service_context = state.service_primary_goal not in {"", "none"}
+    empty_condition = ProductConditionEvidence()
+
+    if is_standalone_ambiguous_delivery_location_query(original, has_service_context):
+        return CustomerRequestFrame(
+            original_text=original,
+            normalized_text=normalized,
+            primary_goal=CustomerPrimaryGoal.AMBIGUOUS_HELP_REQUEST,
+            requested_resolution=(),
+            product_facets=facets,
+            issue_type=CustomerIssueType.LOGISTICS_DELIVERY_ERROR,
+            lifecycle_stage=CustomerLifecycleStage.UNKNOWN,
+            usage_state=CustomerUsageState.UNKNOWN,
+            lifecycle_provenance=EvidenceProvenance.UNKNOWN,
+            usage_provenance=EvidenceProvenance.UNKNOWN,
+            product_condition=empty_condition,
+            eligibility_state=EligibilityDecisionState.UNKNOWN,
+            cost_type=CommercialCostType.NONE,
+            policy_questions=(),
+            backend_requirements=(),
+            clarification_slots=("delivery_location_object",),
+            supporting_product_context=(),
+            route=CustomerRequestRoute.POLICY_PLUS_CLARIFICATION,
+        )
+    if normalized in {"退", "退款", "换", "换货", "发货"}:
+        return CustomerRequestFrame(
+            original_text=original,
+            normalized_text=normalized,
+            primary_goal=CustomerPrimaryGoal.AMBIGUOUS_HELP_REQUEST,
+            requested_resolution=(),
+            product_facets=facets,
+            issue_type=CustomerIssueType.UNKNOWN_REASON,
+            lifecycle_stage=CustomerLifecycleStage.UNKNOWN,
+            usage_state=CustomerUsageState.UNKNOWN,
+            lifecycle_provenance=EvidenceProvenance.UNKNOWN,
+            usage_provenance=EvidenceProvenance.UNKNOWN,
+            product_condition=empty_condition,
+            eligibility_state=EligibilityDecisionState.UNKNOWN,
+            cost_type=CommercialCostType.NONE,
+            policy_questions=(),
+            backend_requirements=(),
+            clarification_slots=("short_service_object",),
+            supporting_product_context=(),
+            route=CustomerRequestRoute.POLICY_PLUS_CLARIFICATION,
+        )
+
+    resolutions: list[CustomerRequestedResolution] = []
+    for rule in CUSTOMER_RESOLUTION_RULES:
+        if any(pattern.search(normalized) for pattern in rule.patterns):
+            resolutions.append(rule.resolution)
+
+    issue = _first_issue(normalized)
+    raw_lifecycle = _detect_lifecycle(normalized)
+    current_usage_evidence = _extract_usage_evidence(normalized)
+    current_usage_signal = _usage_evidence_has_signal(current_usage_evidence)
+    detected_usage = _compose_usage_state(current_usage_evidence, normalized)
+    detected_lifecycle = _compose_lifecycle_from_usage(raw_lifecycle, detected_usage)
+    lifecycle = detected_lifecycle
+    usage = detected_usage
+    usage_evidence = current_usage_evidence
+    lifecycle_provenance = (
+        EvidenceProvenance.EXPLICIT_USER_STATEMENT
+        if lifecycle is not CustomerLifecycleStage.UNKNOWN
+        else EvidenceProvenance.UNKNOWN
+    )
+    usage_provenance = (
+        EvidenceProvenance.EXPLICIT_USER_STATEMENT
+        if usage is not CustomerUsageState.UNKNOWN
+        else EvidenceProvenance.UNKNOWN
+    )
+    condition_updates = _explicit_condition_updates(normalized)
+    cost_type = _detect_cost_type(normalized)
+    inherited = False
+    if (
+        has_service_context
+        and not resolutions
+        and (_SERVICE_FOLLOWUP_PATTERN.search(normalized) or current_usage_signal)
+    ):
+        resolutions.extend(_resolution_values_from_state(state))
+        inherited = bool(resolutions)
+        if issue is CustomerIssueType.UNKNOWN_REASON:
+            try:
+                issue = CustomerIssueType(state.service_issue_type)
+            except ValueError:
+                pass
+        if lifecycle is CustomerLifecycleStage.UNKNOWN:
+            try:
+                lifecycle = CustomerLifecycleStage(state.service_lifecycle_stage)
+                lifecycle_provenance = EvidenceProvenance(
+                    state.service_lifecycle_provenance
+                )
+            except ValueError:
+                pass
+        if not current_usage_signal and usage is CustomerUsageState.UNKNOWN:
+            try:
+                usage = CustomerUsageState(state.service_usage_state)
+                usage_provenance = EvidenceProvenance(state.service_usage_provenance)
+            except ValueError:
+                pass
+
+    if inherited:
+        usage_evidence = _merge_usage_evidence(
+            _usage_evidence_from_state(state),
+            current_usage_evidence,
+        )
+        composed_usage = _compose_usage_state(usage_evidence, normalized)
+        if composed_usage is not CustomerUsageState.UNKNOWN or current_usage_signal:
+            usage = composed_usage
+            usage_provenance = usage_evidence.evidence_provenance
+        if current_usage_signal:
+            lifecycle = _compose_lifecycle_from_usage(raw_lifecycle, usage)
+            lifecycle_provenance = usage_evidence.evidence_provenance
+
+    product_condition = _merge_product_condition(
+        _condition_from_state(state) if inherited else empty_condition,
+        condition_updates,
+    )
+
+    if _STATUS_REQUEST_PATTERN.search(normalized):
+        resolutions.append(CustomerRequestedResolution.CHECK_STATUS)
+    if inherited and lifecycle is CustomerLifecycleStage.RETURN_ALREADY_SUBMITTED:
+        resolutions.append(CustomerRequestedResolution.CHECK_STATUS)
+    if issue in {
+        CustomerIssueType.SOLE_SEPARATION,
+        CustomerIssueType.DAMAGE,
+        CustomerIssueType.SUSPECTED_QUALITY_PROBLEM,
+        CustomerIssueType.DESCRIPTION_MISMATCH,
+    } and not resolutions:
+        resolutions.append(CustomerRequestedResolution.REPAIR_OR_AFTERSALES)
+    if issue is CustomerIssueType.WRONG_COLOR_STYLE_OR_ITEM and not resolutions:
+        resolutions.append(CustomerRequestedResolution.CORRECT_WRONG_ITEM)
+    if issue is CustomerIssueType.MISSING_ITEM and not resolutions:
+        resolutions.append(CustomerRequestedResolution.REPAIR_OR_AFTERSALES)
+    if facets and not resolutions:
+        resolutions.append(CustomerRequestedResolution.ANSWER_PRODUCT_QUESTION)
+
+    unique_resolutions = tuple(dict.fromkeys(resolutions))
+    commercial_resolutions = tuple(
+        item
+        for item in unique_resolutions
+        if item is not CustomerRequestedResolution.ANSWER_PRODUCT_QUESTION
+    )
+    shipping_fee_policy = cost_type is not CommercialCostType.NONE
+    backend_operation = bool(_EXPLICIT_BACKEND_OPERATION_PATTERN.search(normalized))
+    has_product_context = bool(facets) or issue is not CustomerIssueType.UNKNOWN_REASON
+    standalone_usage_statement = bool(
+        current_usage_signal
+        and not has_service_context
+        and not commercial_resolutions
+        and issue is CustomerIssueType.UNKNOWN_REASON
+        and not facets
+    )
+
+    primary_arbitration = (
+        (
+            CustomerPrimaryGoal.ORDER_OR_REFUND_STATUS,
+            CustomerRequestedResolution.CHECK_STATUS in commercial_resolutions
+            or cost_type is CommercialCostType.REFUND_AMOUNT_DEDUCTION,
+        ),
+        (CustomerPrimaryGoal.BACKEND_OPERATION_REQUEST, backend_operation),
+        (CustomerPrimaryGoal.GENERAL_POLICY_INFORMATION, shipping_fee_policy),
+        (
+            CustomerPrimaryGoal.AFTERSALES_PROBLEM_RESOLUTION,
+            issue is CustomerIssueType.WRONG_COLOR_STYLE_OR_ITEM
+            and len(commercial_resolutions) > 1,
+        ),
+        (
+            CustomerPrimaryGoal.RETURN_ELIGIBILITY,
+            CustomerRequestedResolution.RETURN in commercial_resolutions,
+        ),
+        (
+            CustomerPrimaryGoal.EXCHANGE_ELIGIBILITY,
+            CustomerRequestedResolution.EXCHANGE in commercial_resolutions,
+        ),
+        (
+            CustomerPrimaryGoal.CANCELLATION_REQUEST,
+            CustomerRequestedResolution.CANCEL_ORDER in commercial_resolutions,
+        ),
+        (
+            CustomerPrimaryGoal.REFUND_REQUEST,
+            CustomerRequestedResolution.REFUND in commercial_resolutions,
+        ),
+        (
+            CustomerPrimaryGoal.COMPLAINT_OR_DESCRIPTION_MISMATCH,
+            issue is CustomerIssueType.DESCRIPTION_MISMATCH,
+        ),
+        (CustomerPrimaryGoal.AFTERSALES_PROBLEM_RESOLUTION, bool(commercial_resolutions)),
+        (CustomerPrimaryGoal.SIZE_RECOMMENDATION, "size_recommendation" in facets),
+        (
+            CustomerPrimaryGoal.PRODUCT_INFORMATION,
+            bool(facets)
+            or bool(
+                re.search(
+                    r"褪色|掉色|换季|换气|颜色|(?:黑|白|红|蓝|绿|灰|棕|米|卡其|粉)色",
+                    normalized,
+                )
+            ),
+        ),
+        (CustomerPrimaryGoal.AMBIGUOUS_HELP_REQUEST, True),
+    )
+    primary = next(goal for goal, matches in primary_arbitration if matches)
+
+    policy_questions: list[str] = []
+    if CustomerRequestedResolution.RETURN in unique_resolutions:
+        policy_questions.append("return_eligibility")
+    if CustomerRequestedResolution.EXCHANGE in unique_resolutions:
+        policy_questions.append("exchange_eligibility")
+    if CustomerRequestedResolution.REFUND in unique_resolutions:
+        policy_questions.append("refund")
+    if shipping_fee_policy:
+        policy_questions.append(cost_type.value)
+
+    backend_requirements: list[str] = []
+    if primary is CustomerPrimaryGoal.ORDER_OR_REFUND_STATUS:
+        backend_requirements.append("order_or_refund_status")
+    if backend_operation:
+        backend_requirements.append("order_operation")
+    if issue in {
+        CustomerIssueType.WRONG_COLOR_STYLE_OR_ITEM,
+        CustomerIssueType.MISSING_ITEM,
+        CustomerIssueType.DAMAGE,
+        CustomerIssueType.SOLE_SEPARATION,
+        CustomerIssueType.SUSPECTED_QUALITY_PROBLEM,
+        CustomerIssueType.DESCRIPTION_MISMATCH,
+    }:
+        backend_requirements.append("order_and_evidence_verification")
+    if shipping_fee_policy:
+        backend_requirements.append("order_policy_verification")
+
+    clarification_slots: list[str] = []
+    if standalone_usage_statement:
+        clarification_slots.append("usage_help_object")
+    eligibility_goal = primary in {
+        CustomerPrimaryGoal.RETURN_ELIGIBILITY,
+        CustomerPrimaryGoal.EXCHANGE_ELIGIBILITY,
+    }
+    if (
+        eligibility_goal
+        and issue not in {
+            CustomerIssueType.WRONG_COLOR_STYLE_OR_ITEM,
+            CustomerIssueType.DAMAGE,
+            CustomerIssueType.SOLE_SEPARATION,
+        }
+        and lifecycle is CustomerLifecycleStage.UNKNOWN
+        and usage in {CustomerUsageState.UNKNOWN, CustomerUsageState.UNCLEAR}
+        and has_product_context
+    ):
+        clarification_slots.append("usage_state")
+    prior_clarification_count = state.service_clarification_count if inherited else 0
+    if (
+        eligibility_goal
+        and usage is not CustomerUsageState.UNKNOWN
+        and prior_clarification_count < 2
+        and product_condition.shoe_box_complete.value == "unknown"
+        and product_condition.tags_complete.value == "unknown"
+    ):
+        clarification_slots.append("packaging_and_tags")
+    if cost_type is CommercialCostType.UNKNOWN_COST_TYPE:
+        clarification_slots = ["cost_type"]
+
+    route_arbitration = (
+        (
+            CustomerRequestRoute.POLICY_PLUS_CLARIFICATION,
+            standalone_usage_statement,
+        ),
+        (
+            CustomerRequestRoute.PRODUCT_ONLY,
+            not commercial_resolutions and not policy_questions,
+        ),
+        (
+            CustomerRequestRoute.BACKEND_STATUS,
+            primary is CustomerPrimaryGoal.ORDER_OR_REFUND_STATUS,
+        ),
+        (CustomerRequestRoute.BACKEND_OPERATION, backend_operation),
+        (CustomerRequestRoute.POLICY_PLUS_HANDOFF, shipping_fee_policy),
+        (
+            CustomerRequestRoute.POLICY_PLUS_HANDOFF,
+            primary
+            in {
+                CustomerPrimaryGoal.COMPLAINT_OR_DESCRIPTION_MISMATCH,
+                CustomerPrimaryGoal.AFTERSALES_PROBLEM_RESOLUTION,
+            },
+        ),
+        (
+            CustomerRequestRoute.POLICY_ONLY,
+            lifecycle is CustomerLifecycleStage.PRE_PURCHASE_HYPOTHETICAL,
+        ),
+        (CustomerRequestRoute.POLICY_PLUS_CLARIFICATION, bool(clarification_slots)),
+        (CustomerRequestRoute.PRODUCT_PLUS_POLICY, has_product_context),
+        (CustomerRequestRoute.POLICY_ONLY, True),
+    )
+    route = next(candidate for candidate, matches in route_arbitration if matches)
+
+    if primary is CustomerPrimaryGoal.ORDER_OR_REFUND_STATUS:
+        eligibility_state = EligibilityDecisionState.REQUIRES_BACKEND_STATUS
+    elif eligibility_goal:
+        if lifecycle is CustomerLifecycleStage.PRE_PURCHASE_HYPOTHETICAL:
+            eligibility_state = EligibilityDecisionState.GENERAL_POLICY_ONLY
+        elif re.search(r"订单页.{0,6}(?:还有|存在|显示).{0,4}(?:售后入口|申请售后)", normalized):
+            eligibility_state = EligibilityDecisionState.MAY_SUBMIT_REQUEST
+        elif usage in {
+            CustomerUsageState.WORN_OUTDOORS,
+            CustomerUsageState.USED_FOR_MULTIPLE_DAYS,
+            CustomerUsageState.ALTERED,
+            CustomerUsageState.DAMAGED,
+            CustomerUsageState.VISIBLY_DAMAGED_OR_ALTERED,
+        }:
+            eligibility_state = EligibilityDecisionState.REQUIRES_HUMAN_REVIEW
+        else:
+            eligibility_state = EligibilityDecisionState.REQUIRES_POLICY_CHECK
+    elif shipping_fee_policy:
+        eligibility_state = EligibilityDecisionState.GENERAL_POLICY_ONLY
+    else:
+        eligibility_state = EligibilityDecisionState.UNKNOWN
+
+    supporting = list(facets)
+    if issue is not CustomerIssueType.UNKNOWN_REASON:
+        supporting.append(issue.value)
+    return CustomerRequestFrame(
+        original_text=original,
+        normalized_text=normalized,
+        primary_goal=primary,
+        requested_resolution=unique_resolutions,
+        product_facets=facets,
+        issue_type=issue,
+        lifecycle_stage=lifecycle,
+        usage_state=usage,
+        lifecycle_provenance=lifecycle_provenance,
+        usage_provenance=usage_provenance,
+        product_condition=product_condition,
+        eligibility_state=eligibility_state,
+        cost_type=cost_type,
+        policy_questions=tuple(dict.fromkeys(policy_questions)),
+        backend_requirements=tuple(dict.fromkeys(backend_requirements)),
+        clarification_slots=tuple(clarification_slots),
+        supporting_product_context=tuple(dict.fromkeys(supporting)),
+        route=route,
+        usage_evidence=usage_evidence,
+        inherited_service_context=inherited,
+    )
+
+
+_CUSTOMER_COMPLAINT_REASON_LABELS = {
+    CustomerIssueType.POOR_BREATHABILITY: "不透气",
+    CustomerIssueType.INSUFFICIENT_WARMTH: "不够保暖",
+    CustomerIssueType.SLIPPERY_EXPERIENCE: "走路打滑",
+    CustomerIssueType.UNCOMFORTABLE_HARD_OR_HEAVY: "穿着不舒服",
+    CustomerIssueType.RUBBING_OR_PRESSURE: "磨脚或受压",
+    CustomerIssueType.WRONG_SIZE_OR_FIT: "尺码或版型不合适",
+    CustomerIssueType.SUBJECTIVE_DISSATISFACTION: "颜色不合心意",
+}
+
+
+def _customer_complaint_reason(frame: CustomerRequestFrame) -> str:
+    normalized = frame.normalized_text
+    if frame.issue_type is CustomerIssueType.UNCOMFORTABLE_HARD_OR_HEAVY:
+        if "鞋底太硬" in normalized or "太硬" in normalized:
+            return "鞋底太硬"
+        if "太重" in normalized:
+            return "穿着太重"
+        return "穿着不舒服"
+    if frame.issue_type is CustomerIssueType.RUBBING_OR_PRESSURE:
+        if "磨脚" in normalized:
+            return "磨脚"
+        return "穿着受压或拥挤"
+    return _CUSTOMER_COMPLAINT_REASON_LABELS.get(
+        frame.issue_type,
+        "您反馈的使用感受",
+    )
+
+
+def plan_customer_service_answer(frame: CustomerRequestFrame) -> str | None:
+    """Render a short, policy-bounded answer with the requested action first."""
+    if frame.route is CustomerRequestRoute.PRODUCT_ONLY:
+        return None
+    if "delivery_location_object" in frame.clarification_slots:
+        return AMBIGUOUS_DELIVERY_LOCATION_CLARIFICATION
+    if "short_service_object" in frame.clarification_slots:
+        if "退" in frame.normalized_text:
+            return "请问您想咨询退货流程、退款进度，还是其他售后问题？"
+        return "请问您想了解一般流程、当前处理状态，还是需要人工执行操作？"
+    if "usage_help_object" in frame.clarification_slots:
+        return "请问您是想咨询退换货条件，还是想了解商品的穿着体验呢？"
+
+    normalized = frame.normalized_text
+    resolutions = set(frame.requested_resolution)
+    issue = frame.issue_type
+    if frame.cost_type is CommercialCostType.UNKNOWN_COST_TYPE:
+        return (
+            "亲，请问您想确认的是退货寄回的运费由谁承担，还是退款时是否会扣手续费呢？"
+            "这两项规则不同，需要结合订单原因和订单页保障确认哦。"
+        )
+    if frame.cost_type is CommercialCostType.INSURANCE_REIMBURSEMENT:
+        return (
+            "亲，是否有相应保险保障、具体承保方和可报销金额，需要以当前商品详情页、订单页和保障说明为准哦。"
+            "当前无法直接确认是否可赔或具体金额，页面没有明确标注时请按当前店铺规则或联系人工客服核验。"
+        )
+    if frame.cost_type is CommercialCostType.REFUND_AMOUNT_DEDUCTION:
+        return (
+            "亲，我无法查询这笔订单实际退款金额或扣减明细哦。"
+            "请先核对订单页的退款记录和费用明细，仍不一致时联系人工客服核验。"
+        )
+    if frame.cost_type is CommercialCostType.RETURN_SHIPPING_FEE:
+        return (
+            "亲，退货寄回运费由谁承担，需要结合售后原因、订单页规则和实际核验结果确认哦。"
+            "请先查看订单页的售后说明；页面无法确认时再联系人工客服。"
+        )
+    if frame.cost_type is CommercialCostType.EXCHANGE_SHIPPING_FEE:
+        return (
+            "亲，换货产生的寄回和再次寄出费用，需要结合换货原因、订单页规则和实际核验结果确认哦。"
+            "当前不能直接判定由哪一方承担，请先查看订单页售后说明。"
+        )
+    if frame.cost_type is CommercialCostType.ORIGINAL_DELIVERY_FEE:
+        return (
+            "亲，下单时支付的原配送费是否随退款退回，需要结合订单页费用明细、售后原因和当前规则确认哦。"
+            "页面没有说明时请联系人工客服核验。"
+        )
+    if frame.cost_type is CommercialCostType.REFUND_PROCESSING_FEE:
+        return (
+            "亲，退款是否涉及手续费或金额扣减，需要以订单页退款明细和当前规则为准哦。"
+            "当前不能直接确认会收费或全额退回，页面不明确时请联系人工客服核验。"
+        )
+    if frame.cost_type is CommercialCostType.COMPENSATION:
+        return (
+            "亲，是否涉及补偿及具体金额，需要结合订单原因、相关凭证和平台核验结果确认哦。"
+            "当前不能预先承诺补偿，请通过订单页售后入口提交核验。"
+        )
+    if frame.primary_goal is CustomerPrimaryGoal.ORDER_OR_REFUND_STATUS:
+        if "退款" in normalized or frame.lifecycle_stage is CustomerLifecycleStage.REFUND_PROCESSING:
+            return (
+                "亲，我无法查询这笔订单当前的退款进度或到账状态。"
+                "请先查看订单页的退款记录，如仍不明确请联系人工客服核验。"
+            )
+        return (
+            "亲，我无法查询这笔订单当前的售后处理状态。"
+            "请先查看订单页的售后进度，如仍不明确请联系人工客服核验。"
+        )
+    if frame.route is CustomerRequestRoute.BACKEND_OPERATION:
+        requested = "、".join(
+            {
+                CustomerRequestedResolution.EXCHANGE: "改码或换货",
+                CustomerRequestedResolution.CANCEL_ORDER: "取消订单",
+                CustomerRequestedResolution.REFUND: "退款",
+                CustomerRequestedResolution.REPLACE_OR_RESEND: "补发",
+                CustomerRequestedResolution.RETURN: "退货",
+            }.get(item, item.value)
+            for item in frame.requested_resolution
+        ) or "该订单操作"
+        return (
+            f"亲，{requested}都需要结合订单当前状态在后台处理，我无法直接替您完成哦。"
+            "请先在订单页查看可用操作；页面无法办理时请联系人工客服。"
+        )
+    if len(resolutions) > 1:
+        labels = []
+        for resolution, label in (
+            (CustomerRequestedResolution.EXCHANGE, "换货"),
+            (CustomerRequestedResolution.RETURN, "退货"),
+            (CustomerRequestedResolution.REPLACE_OR_RESEND, "补发"),
+            (CustomerRequestedResolution.REFUND, "退款"),
+            (CustomerRequestedResolution.CANCEL_ORDER, "取消订单"),
+        ):
+            if resolution in resolutions:
+                labels.append(label)
+        choices = "或".join(labels)
+        return (
+            f"亲，您提到的{choices}需要结合订单状态、商品情况和订单页售后规则核验，当前不能直接确认哪一种已经获批哦。"
+            "建议保留相关商品和订单凭证，先从订单页售后入口提交；无法选择对应方式时请联系人工客服。"
+        )
+    if frame.primary_goal is CustomerPrimaryGoal.COMPLAINT_OR_DESCRIPTION_MISMATCH:
+        return (
+            "亲，如果实际商品体验或外观与页面描述不一致，建议先保留商品页截图、实物照片和订单等相关凭证哦。"
+            "是否构成描述不一致或责任归属仍需核验，请通过订单页售后入口提交，必要时联系人工客服。"
+        )
+    if issue in {
+        CustomerIssueType.WRONG_COLOR_STYLE_OR_ITEM,
+        CustomerIssueType.MISSING_ITEM,
+    }:
+        return (
+            "亲，您反馈的是收到商品与订单不一致或数量异常，需要结合订单和实物凭证核验哦。"
+            "请保留商品、包装和订单信息，通过订单页售后入口提交；无法操作时请联系人工客服。"
+        )
+    if issue in {
+        CustomerIssueType.DAMAGE,
+        CustomerIssueType.SOLE_SEPARATION,
+        CustomerIssueType.SUSPECTED_QUALITY_PROBLEM,
+    }:
+        return (
+            "亲，您反馈的商品异常需要结合订单、商品状态和相关凭证核验，当前不能直接判定为质量问题哦。"
+            "建议保留实物照片和订单信息，通过订单页售后入口申请处理；无法操作时请联系人工客服。"
+        )
+    if frame.primary_goal is CustomerPrimaryGoal.RETURN_ELIGIBILITY:
+        if frame.lifecycle_stage is CustomerLifecycleStage.PRE_PURCHASE_HYPOTHETICAL:
+            return (
+                "亲，购买后是否可以退货要以商品详情页和订单页的售后规则为准哦。"
+                "下单前建议先查看页面标注的退货条件，当前不能预先确认具体订单一定符合。"
+            )
+        if (
+            frame.product_condition.cleanliness.value == "clean"
+            and frame.product_condition.cleanliness.provenance
+            is EvidenceProvenance.EXPLICIT_USER_STATEMENT
+        ):
+            return (
+                "了解，您反馈商品没有弄脏。"
+                "不过“没脏”只是其中一项，是否符合退货条件还需要结合鞋盒、吊牌、配件、穿着痕迹和订单页规则确认哦。"
+                "建议先查看订单页是否仍可申请售后；页面无法确认时再联系人工客服核验。"
+            )
+        if (
+            frame.usage_state is CustomerUsageState.INDOOR_TRY_ON
+            and "packaging_and_tags" in frame.clarification_slots
+        ):
+            evidence = frame.usage_evidence
+            if evidence.indoor_use.value == "yes" and evidence.outdoor_use.value == "no":
+                if evidence.has_been_tried_on.value == "yes":
+                    acknowledgement = "了解，您反馈是室内试穿，且没有外出使用哦。"
+                elif evidence.has_been_worn.value == "yes":
+                    acknowledgement = "了解，您反馈只在家里穿过，没有外出使用哦。"
+                else:
+                    acknowledgement = "了解，您反馈只在室内使用过，没有外出使用哦。"
+            elif evidence.indoor_use.value == "yes":
+                if evidence.has_been_tried_on.value == "yes":
+                    acknowledgement = "了解，您反馈的是室内试穿哦。"
+                else:
+                    acknowledgement = "了解，您反馈在室内穿过哦。"
+            else:
+                acknowledgement = "了解，您反馈简单试穿过哦。"
+            return (
+                acknowledgement
+                +
+                "是否符合退货条件还要结合商品、鞋盒、吊牌和配件状态以及订单页规则确认；"
+                "请问鞋盒和吊牌是否还完整保留呢？"
+            )
+        if frame.usage_state is CustomerUsageState.INDOOR_TRY_ON:
+            return (
+                "亲，已了解您反馈的是室内试穿；是否符合退货条件仍需结合订单规则和商品各项状态核验哦。"
+                "请先查看订单页售后入口，页面无法确认时再联系人工客服。"
+            )
+        if frame.usage_state is CustomerUsageState.UNUSED:
+            return (
+                "亲，已了解商品目前尚未穿着；能否退货仍需结合订单售后规则和商品状态确认哦。"
+                "请先查看订单页售后入口，并按页面要求提交。"
+            )
+        if frame.usage_state is CustomerUsageState.WORN_OUTDOORS:
+            return (
+                "亲，您反馈已经外出穿着过，能否退货需要结合订单售后规则和商品实际状态核验，当前不能直接确认哦。"
+                "请在订单页查看售后入口，必要时联系人工客服。"
+            )
+        if frame.usage_state is CustomerUsageState.USED_FOR_MULTIPLE_DAYS:
+            if frame.usage_evidence.outdoor_use.value == "no":
+                acknowledgement = "您反馈没有外出使用，但在室内穿了较长时间"
+            else:
+                acknowledgement = "您反馈已经穿着或使用了较长时间"
+            return (
+                f"亲，{acknowledgement}，能否退货需要结合订单售后规则和商品实际状态核验，当前不能直接确认哦。"
+                "请在订单页查看售后入口，必要时联系人工客服。"
+            )
+        if frame.usage_state in {
+            CustomerUsageState.ALTERED,
+            CustomerUsageState.DAMAGED,
+            CustomerUsageState.VISIBLY_DAMAGED_OR_ALTERED,
+        }:
+            return (
+                "亲，您反馈商品存在使用状态变化，能否退货需要结合订单售后规则和商品实际状态核验，当前不能直接确认哦。"
+                "请在订单页查看售后入口，必要时联系人工客服。"
+            )
+        if "usage_state" in frame.clarification_slots:
+            complaint_reason = _customer_complaint_reason(frame)
+            return (
+                "亲，能否退货需要结合订单的售后规则、商品状态和实际穿着情况确认，"
+                f"不能只根据“{complaint_reason}”这一点直接判断哦。"
+                "您可以先查看订单页是否仍可申请售后；请问这双鞋只是室内试穿，还是已经外出穿过了呢？"
+            )
+        return (
+            "亲，能否退货需要结合订单售后规则、商品状态和当前订单页信息确认哦。"
+            "请先查看订单页是否仍可申请售后，页面无法确认时请联系人工客服。"
+        )
+    if frame.primary_goal is CustomerPrimaryGoal.EXCHANGE_ELIGIBILITY:
+        if frame.lifecycle_stage is CustomerLifecycleStage.PRE_PURCHASE_HYPOTHETICAL:
+            return (
+                "亲，购买后是否可以换货要以商品详情页和订单页的售后规则为准哦。"
+                "下单前建议先核对尺码信息和页面标注的换货条件。"
+            )
+        question = "；请问目前只是室内试穿，还是已经外出穿过了呢？" if "usage_state" in frame.clarification_slots else "。"
+        return (
+            "亲，能否换货需要结合订单售后规则、商品状态和可选库存确认，当前不能直接确认已经可以换哦。"
+            f"请先查看订单页售后入口{question}"
+        )
+    if frame.primary_goal is CustomerPrimaryGoal.CANCELLATION_REQUEST:
+        return (
+            "亲，订单能否取消取决于当前订单状态，我无法直接替您取消或确认已经取消哦。"
+            "请先在订单页查看是否有取消入口，无法操作时请联系人工客服。"
+        )
+    if frame.primary_goal is CustomerPrimaryGoal.REFUND_REQUEST:
+        return (
+            "亲，退款需要通过订单页售后入口按页面提示申请，我无法直接替您发起或确认退款哦。"
+            "如果订单页没有对应入口，请联系人工客服核验。"
+        )
+    return (
+        "亲，这个问题需要结合订单状态、商品情况和当前售后规则核验哦。"
+        "请先查看订单页的售后入口，仍不明确时联系人工客服。"
+    )
+
+
+def update_customer_request_state(
+    previous_state: ConversationState | dict | None,
+    frame: CustomerRequestFrame,
+    *,
+    answer: str,
+) -> dict[str, object]:
+    """Persist only bounded service slots for short, isolated follow-ups."""
+    state = coerce_conversation_state(previous_state)
+    state.service_primary_goal = frame.primary_goal.value
+    state.service_requested_resolutions = tuple(item.value for item in frame.requested_resolution)
+    state.service_issue_type = frame.issue_type.value
+    state.service_lifecycle_stage = frame.lifecycle_stage.value
+    state.service_usage_state = frame.usage_state.value
+    state.service_lifecycle_provenance = frame.lifecycle_provenance.value
+    state.service_usage_provenance = frame.usage_provenance.value
+    state.service_usage_evidence = {
+        **{
+            field_name: {
+                "value": getattr(frame.usage_evidence, field_name).value,
+                "status": getattr(frame.usage_evidence, field_name).status.value,
+                "provenance": getattr(frame.usage_evidence, field_name).provenance.value,
+            }
+            for field_name in _USAGE_EVIDENCE_FIELDS
+        },
+        "evidence_provenance": frame.usage_evidence.evidence_provenance.value,
+    }
+    state.service_product_condition = {
+        field_name: {
+            "value": getattr(frame.product_condition, field_name).value,
+            "status": getattr(frame.product_condition, field_name).status.value,
+            "provenance": getattr(frame.product_condition, field_name).provenance.value,
+        }
+        for field_name in _PRODUCT_CONDITION_FIELDS
+    }
+    state.service_eligibility_state = frame.eligibility_state.value
+    state.service_cost_type = frame.cost_type.value
+    asked_question = "？" in answer or "?" in answer
+    if frame.inherited_service_context:
+        state.service_clarification_count = min(
+            2,
+            state.service_clarification_count + (1 if asked_question else 0),
+        )
+    else:
+        state.service_clarification_count = 1 if asked_question else 0
+    state.service_pending_clarification = frame.clarification_slots
+    state.service_supporting_context = frame.supporting_product_context
+    state.current_topic = f"service:{frame.primary_goal.value}"
+    state.query_type = f"customer_request_{frame.route.value.casefold()}"
+    state.requires_backend_api = frame.route in {
+        CustomerRequestRoute.BACKEND_STATUS,
+        CustomerRequestRoute.BACKEND_OPERATION,
+        CustomerRequestRoute.POLICY_PLUS_HANDOFF,
+        CustomerRequestRoute.FULL_HANDOFF,
+    }
+    state.last_user_query = frame.original_text
+    state.last_assistant_answer = answer
+    state.last_safe_answer_type = "customer_service_boundary"
+    state.state_confidence = 0.95
+    state.state_turn_count = state.state_turn_count + 1 if frame.inherited_service_context else 1
+    state.updated_at_turn += 1
+    state.should_reset = False
+    return state.to_dict()
+
+
+def clear_customer_service_context(
+    previous_state: ConversationState | dict | None,
+) -> dict[str, object] | None:
+    """Reset service-only slots when an explicit product topic takes over."""
+    if previous_state is None:
+        return None
+    state = coerce_conversation_state(previous_state)
+    state.service_primary_goal = "none"
+    state.service_requested_resolutions = ()
+    state.service_issue_type = CustomerIssueType.UNKNOWN_REASON.value
+    state.service_lifecycle_stage = CustomerLifecycleStage.UNKNOWN.value
+    state.service_usage_state = CustomerUsageState.UNKNOWN.value
+    state.service_lifecycle_provenance = EvidenceProvenance.UNKNOWN.value
+    state.service_usage_provenance = EvidenceProvenance.UNKNOWN.value
+    state.service_usage_evidence = {}
+    state.service_product_condition = {}
+    state.service_eligibility_state = EligibilityDecisionState.UNKNOWN.value
+    state.service_cost_type = CommercialCostType.NONE.value
+    state.service_clarification_count = 0
+    state.service_pending_clarification = ()
+    state.service_supporting_context = ()
+    if state.current_topic.startswith("service:"):
+        state.current_topic = "none"
+    return state.to_dict()
 
 
 def load_dependencies():
@@ -3735,11 +5206,53 @@ INSURANCE_ENDORSEMENT_CLAIM_PATTERNS = (
     re.compile(r"\bPICC\b", flags=re.IGNORECASE),
     re.compile(r"正品险|正品保险|保险公司承保"),
 )
+COMMERCIAL_ELIGIBILITY_CLAIM_PATTERNS = (
+    re.compile(r"(?:一定|肯定|确认|符合条件|审核通过)?.{0,4}(?:可以|能够|可直接)(?:办理|申请)?(?:退货|换货)"),
+    re.compile(r"(?:退货|换货).{0,5}(?:一定|肯定)?(?:能办|可以办|没问题)"),
+    re.compile(r"(?:不能|不可以|不予|无法)(?:办理|申请)?(?:退货|换货)"),
+    re.compile(r"(?:不符合|符合)(?:退货|换货|售后)(?:条件|要求)"),
+)
+SECONDARY_SALE_CLAIM_PATTERNS = (
+    re.compile(r"(?:不影响|没有影响|已影响|已经影响|影响了|会影响)(?:商品)?二次销售"),
+    re.compile(r"(?:符合|不符合|满足|不满足)二次销售(?:条件|要求)?"),
+)
+ORDER_OPERATION_OUTCOME_CLAIM_PATTERNS = (
+    re.compile(r"(?:退货|换货|退款|售后).{0,6}(?:已经|已)(?:批准|通过|受理)"),
+    re.compile(r"(?:退货|换货|退款|售后).{0,8}(?:已被|已经|已)(?:拒绝|驳回|拒收)"),
+    re.compile(r"(?:订单|这单).{0,5}(?:已经|已)(?:取消|关闭)"),
+)
+FEE_RESPONSIBILITY_CLAIM_PATTERNS = (
+    re.compile(r"(?:退货|换货|售后)?.{0,6}(?:运费|邮费).{0,6}(?:由)?(?:卖家|商家|平台|买家|用户|您)(?:承担|支付|负责)"),
+    re.compile(r"(?:卖家|商家|平台|买家|用户|您).{0,5}(?:承担|支付|负责).{0,4}(?:运费|邮费)"),
+)
+INSURANCE_COVERAGE_CLAIM_PATTERNS = (
+    re.compile(r"(?:这单|订单|商品|本店).{0,5}(?:有|含有|包含|赠送|已投保)(?:运费险|正品险|保险)"),
+    re.compile(r"(?:运费险|正品险).{0,4}(?:已经生效|可赔|会赔|负责赔付)"),
+    re.compile(r"(?:运费险|保险).{0,6}(?:赔|报销|返还)\s*\d+(?:\.\d+)?\s*元"),
+)
+REFUND_FINANCIAL_OUTCOME_CLAIM_PATTERNS = (
+    re.compile(r"退款.{0,5}(?:不会收|不收|免|没有)(?:取)?(?:手续费|处理费|服务费)"),
+    re.compile(r"(?:款项|退款).{0,5}(?:会|将|可以)?全额(?:退回|退款|返还)"),
+    re.compile(r"退款.{0,5}(?:会|将|要)?扣(?:除)?\s*\d+(?:\.\d+)?\s*元"),
+)
+QUALITY_OR_FAULT_CLAIM_PATTERNS = (
+    re.compile(r"(?:这|该|就是|属于|确认是).{0,4}(?:质量问题|商品缺陷)"),
+    re.compile(r"(?:卖家|商家|店铺).{0,4}(?:存在|属于|应负|负有).{0,4}(?:责任|过错)"),
+    re.compile(r"(?:这是|属于|确认是)?(?:卖家|商家).{0,3}(?:发错|寄错|漏发).{0,8}(?:责任|负责|过错)"),
+    re.compile(r"(?:发错|寄错|漏发).{0,8}(?:责任在|由).{0,3}(?:卖家|商家|店铺)"),
+    re.compile(r"(?:这是|属于|确认是)?(?:卖家|商家|店铺).{0,3}(?:发错货|寄错货|漏发)"),
+)
+FALSE_ADVERTISING_CLAIM_PATTERNS = (
+    re.compile(r"(?:卖家|商家|店铺).{0,5}(?:存在|属于|构成).{0,4}(?:虚假宣传|欺诈)"),
+    re.compile(r"(?:这|该).{0,3}(?:就是|属于|构成)(?:虚假宣传|欺诈)"),
+)
 SAFE_CLAIM_CONTEXT_MARKERS = (
     "无法",
     "不能",
     "不可",
     "未能",
+    "未",
+    "尚未",
     "不会",
     "不应",
     "禁止",
@@ -3786,6 +5299,30 @@ def _claim_validation_boundary(
             "运费险或正品保障以当前商品详情页、订单页和店铺规则为准，"
             "当前无法确认具体承保机构。"
         )
+    if blocked & {
+        "commercial_eligibility",
+        "secondary_sale_condition",
+        "order_operation_outcome",
+    }:
+        boundaries.append(
+            "是否符合退换货条件或相关申请是否获批，需要结合订单页规则、商品状态和后台记录核验。"
+        )
+    if "fee_responsibility" in blocked:
+        boundaries.append(
+            "退换货运费承担方式需要以订单页售后规则和实际保障情况为准，当前无法直接确认。"
+        )
+    if "insurance_coverage" in blocked:
+        boundaries.append(
+            "是否有运费险或其他保险保障，需要以当前商品详情页和订单页显示为准。"
+        )
+    if "refund_financial_outcome" in blocked:
+        boundaries.append(
+            "退款是否收取费用、是否全额退回或是否存在扣减，需要以订单页退款明细和当前规则核验。"
+        )
+    if blocked & {"quality_or_seller_fault", "false_advertising"}:
+        boundaries.append(
+            "是否属于质量问题、责任归属或描述不一致，需要结合商品、页面信息和相关凭证核验。"
+        )
     return boundaries
 
 
@@ -3822,6 +5359,38 @@ def validate_final_answer_claims(
             chunk, INSURANCE_ENDORSEMENT_CLAIM_PATTERNS
         ):
             chunk_claims.append("insurance_endorsement")
+        if "commercial_eligibility" not in supported and _has_unqualified_claim(
+            chunk, COMMERCIAL_ELIGIBILITY_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("commercial_eligibility")
+        if "secondary_sale_condition" not in supported and _has_unqualified_claim(
+            chunk, SECONDARY_SALE_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("secondary_sale_condition")
+        if not backend_receipt_verified and _has_unqualified_claim(
+            chunk, ORDER_OPERATION_OUTCOME_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("order_operation_outcome")
+        if "fee_responsibility" not in supported and _has_unqualified_claim(
+            chunk, FEE_RESPONSIBILITY_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("fee_responsibility")
+        if "insurance_coverage" not in supported and _has_unqualified_claim(
+            chunk, INSURANCE_COVERAGE_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("insurance_coverage")
+        if "refund_financial_outcome" not in supported and _has_unqualified_claim(
+            chunk, REFUND_FINANCIAL_OUTCOME_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("refund_financial_outcome")
+        if "quality_or_seller_fault" not in supported and _has_unqualified_claim(
+            chunk, QUALITY_OR_FAULT_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("quality_or_seller_fault")
+        if "false_advertising" not in supported and _has_unqualified_claim(
+            chunk, FALSE_ADVERTISING_CLAIM_PATTERNS
+        ):
+            chunk_claims.append("false_advertising")
         if chunk_claims:
             for claim_type in chunk_claims:
                 if claim_type not in blocked:
@@ -4071,6 +5640,15 @@ def coerce_conversation_state(
         if lower <= upper and label:
             normalized_chart.append((lower, upper, label))
     state.size_product_size_chart = tuple(normalized_chart)
+    state.service_requested_resolutions = tuple(
+        str(item) for item in (state.service_requested_resolutions or ()) if str(item)
+    )
+    state.service_pending_clarification = tuple(
+        str(item) for item in (state.service_pending_clarification or ()) if str(item)
+    )
+    state.service_supporting_context = tuple(
+        str(item) for item in (state.service_supporting_context or ()) if str(item)
+    )
     return state
 
 

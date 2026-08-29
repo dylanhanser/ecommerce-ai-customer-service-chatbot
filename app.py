@@ -25,6 +25,7 @@ from demo_catalog import (
     MISSING_PRODUCT_SELECTION_ANSWER,
     UNKNOWN_PRODUCT_LINK_ANSWER,
     answer_product_question,
+    analyze_product_question,
     extract_demo_product_link,
     is_product_specific_query,
     load_catalog,
@@ -195,6 +196,60 @@ class RAGEngine:
             "reranked_results": [],
         }
 
+    def _deterministic_service_result(
+        self,
+        question: str,
+        answer: str,
+        *,
+        session_id: str,
+        frame: rag.CustomerRequestFrame,
+        previous_state: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        validation = rag.validate_final_answer_claims(answer)
+        final_answer = validation.answer
+        conversation_state = rag.update_customer_request_state(
+            previous_state,
+            frame,
+            answer=final_answer,
+        )
+        self._store_conversation_state(session_id, conversation_state)
+        self._append_turn(session_id, question, final_answer)
+        requires_backend = frame.route in {
+            rag.CustomerRequestRoute.BACKEND_STATUS,
+            rag.CustomerRequestRoute.BACKEND_OPERATION,
+            rag.CustomerRequestRoute.POLICY_PLUS_HANDOFF,
+            rag.CustomerRequestRoute.FULL_HANDOFF,
+        }
+        return {
+            "question": question,
+            "final_answer": final_answer,
+            "requires_backend_api": requires_backend,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": f"customer_request_{frame.route.value.casefold()}",
+            "policy_category": None,
+            "original_query": question,
+            "is_followup_query": frame.inherited_service_context,
+            "contextual_query": question,
+            "previous_user_query": str((previous_state or {}).get("last_user_query", "")),
+            "retrieval_query": question,
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": (
+                str((previous_state or {}).get("last_user_query", ""))
+                if frame.inherited_service_context
+                else ""
+            ),
+            "inherited_aftersales_operation": frame.inherited_service_context,
+            "inherited_backend_required": False,
+            "conversation_state": conversation_state,
+            "state_update_reason": "customer_request_arbitration",
+            "retrieved_results": [],
+            "reranked_results": [],
+            "claim_validation_rewritten": validation.rewritten,
+            "blocked_claim_types": list(validation.blocked_claims),
+        }
+
     def chat(self, question: str, *, session_id: str) -> dict[str, Any]:
         link_reference = extract_demo_product_link(question, demo_catalog)
         if link_reference.matched:
@@ -209,8 +264,39 @@ class RAGEngine:
 
         selected_product_id = self.get_selected_product_id(session_id)
         selected_product = demo_catalog.lookup(selected_product_id)
+        previous_state = self._get_conversation_state(session_id)
+        product_analysis = analyze_product_question(question)
+        request_frame = rag.analyze_customer_request(
+            question,
+            product_facets=tuple(facet.value for facet in product_analysis.facets),
+            conversation_state=previous_state,
+            has_selected_product=selected_product is not None,
+        )
+        service_answer = rag.plan_customer_service_answer(request_frame)
+        if service_answer is not None:
+            return self._deterministic_service_result(
+                question,
+                service_answer,
+                session_id=session_id,
+                frame=request_frame,
+                previous_state=previous_state,
+            )
         product_answer = answer_product_question(question, selected_product)
+        if (
+            product_answer is None
+            and selected_product is not None
+            and request_frame.primary_goal is rag.CustomerPrimaryGoal.PRODUCT_INFORMATION
+            and re.search(
+                r"(?:这款|这双|该款).{0,6}(?:有|还有|提供|可选).{0,4}"
+                r"(?:黑|白|红|蓝|绿|灰|棕|米|卡其|粉)(?:色)?(?:吗|嘛|么|没有)?[？?]?$",
+                question.strip(),
+            )
+        ):
+            product_answer = answer_product_question("这款有什么颜色", selected_product)
         if product_answer:
+            reset_state = rag.clear_customer_service_context(previous_state)
+            if reset_state is not None:
+                self._store_conversation_state(session_id, reset_state)
             return self._deterministic_product_result(
                 question,
                 product_answer,
