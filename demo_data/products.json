@@ -1,0 +1,134 @@
+{
+  "schema_version": 2,
+  "products": [
+    {
+      "product_id": "DEMO-CASUAL-001",
+      "data_classification": "synthetic_demo_data",
+      "identity": {"name": "基础款日常休闲鞋", "short_description": "标准版型的低帮日常休闲鞋，适合通勤与轻松步行。", "category": "casual_shoe", "synthetic_sku": "SYN-CASUAL-001", "target_gender": "unisex", "target_audience": "成人日常穿着", "seasons": ["春季", "夏季", "秋季"], "scenarios": ["通勤", "日常步行"]},
+      "pricing": {"currency": "CNY", "display_price": 89.0, "classification": "synthetic_demo_price"},
+      "construction": {"upper_material": "PU", "lining_material": "织物", "sole_material": "橡胶", "toe_shape": "round", "upper_height": "low", "closure_type": "lace_up", "manufacturing_process": "cemented", "heel_type": "low", "heel_height_cm": 2.5, "platform_height_cm": 1.5, "thickness": "medium", "single_shoe_weight_g": 310},
+      "style": {"style_name": "日常休闲", "pattern": "纯色", "fashion_elements": ["简约拼接"]},
+      "functions": {
+        "lightweight": {"level": "standard", "description": "常规轻便度，适合日常步行"},
+        "breathability": {"level": "moderate", "description": "织物内里提供日常透气体验"},
+        "slip_resistance": {"level": "basic_daily", "description": "橡胶外底提供日常防滑表现，不属于专业防滑鞋"},
+        "wear_resistance": {"level": "standard_daily", "description": "适合一般城市路面的日常耐磨需求"},
+        "water_resistance": {"level": "none", "description": "未标注防水，建议在干燥环境穿着"}
+      },
+      "sizing": {"fit": "standard", "fit_note": "标准版型，请按本款明确尺码表选择。", "size_chart": [{"foot_length_cm": 24.5, "recommended_size": 39}, {"foot_length_cm": 25.0, "recommended_size": 40}, {"foot_length_cm": 25.5, "recommended_size": 41}, {"foot_length_cm": 26.0, "recommended_size": 42}, {"foot_length_cm": 26.5, "recommended_size": 43}, {"foot_length_cm": 27.0, "recommended_size": 44}]},
+      "sale": {"sale_type": "in_stock", "preorder_note": null},
+      "variants": [
+        {"variant_id": "DEMO-CASUAL-001-OAT", "color_name": "米白", "variant_label": "米白基础款", "available_sizes": [39, 40, 41, 42, 43, 44], "image_asset_ref": null},
+        {"variant_id": "DEMO-CASUAL-001-GRAY", "color_name": "深灰", "variant_label": "深灰基础款", "available_sizes": [40, 41, 42, 43, 44], "image_asset_ref": null}
+      ],
+      "media": {"primary_image": {"asset_ref": "DEMO-CASUAL-001/cover.webp", "alt": "基础款日常休闲鞋模拟商品主图"}, "gallery": [], "detail_images": []}
+    },
+    {
+      "product_id": "DEMO-RUN-002",
+      "data_classification": "synthetic_demo_data",
+      "identity": {"name": "复古拼色运动休闲鞋", "short_description": "偏小版型的复古运动休闲鞋，采用独立尺码表。", "category": "retro_running_shoe", "synthetic_sku": "SYN-RUN-002", "target_gender": "unisex", "target_audience": "成人运动休闲穿着", "seasons": ["春季", "夏季", "秋季"], "scenarios": ["休闲运动", "日常步行"]},
+      "pricing": {"currency": "CNY", "display_price": 109.0, "classification": "synthetic_demo_price"},
+      "construction": {"upper_material": "织物", "lining_material": "织物", "sole_material": "复合底", "toe_shape": "round", "upper_height": "low", "closure_type": "lace_up", "manufacturing_process": "cemented", "heel_type": "low", "heel_height_cm": 3.0, "platform_height_cm": 2.0, "thickness": "medium", "single_shoe_weight_g": 255},
+      "style": {"style_name": "复古运动", "pattern": "撞色", "fashion_elements": ["层次拼接", "流线侧片"]},
+      "functions": {
+        "lightweight": {"level": "light", "description": "单只模拟重量较轻，适合日常轻量穿着"},
+        "breathability": {"level": "high", "description": "织物鞋面具有较好的日常透气性"},
+        "slip_resistance": {"level": "enhanced_daily", "description": "复合外底提供日常运动抓地，不代表专业防滑等级"},
+        "wear_resistance": {"level": "standard_daily", "description": "适合普通路面的日常耐磨需求"},
+        "water_resistance": {"level": "none", "description": "织物鞋面不具备防水功能"}
+      },
+      "sizing": {"fit": "runs_small", "fit_note": "版型偏小，请直接按本款明确尺码表选择，不机械加码。", "size_chart": [{"foot_length_cm": 24.0, "recommended_size": 39}, {"foot_length_cm": 24.5, "recommended_size": 40}, {"foot_length_cm": 25.0, "recommended_size": 41}, {"foot_length_cm": 25.5, "recommended_size": 42}, {"foot_length_cm": 26.0, "recommended_size": 43}, {"foot_length_cm": 26.5, "recommended_size": 44}, {"foot_length_cm": 27.0, "recommended_size": 45}]},
+      "sale": {"sale_type": "in_stock", "preorder_note": null},
+      "variants": [
+        {"variant_id": "DEMO-RUN-002-BLACK", "color_name": "岩黑", "variant_label": "岩黑复古款", "available_sizes": [39, 40, 41, 42, 43, 44, 45], "image_asset_ref": null},
+        {"variant_id": "DEMO-RUN-002-BLUE", "color_name": "云蓝", "variant_label": "云蓝复古款", "available_sizes": [40, 41, 42, 43, 44], "image_asset_ref": null}
+      ],
+      "media": {"primary_image": {"asset_ref": "DEMO-RUN-002/cover.webp", "alt": "复古拼色运动休闲鞋模拟商品主图"}, "gallery": [], "detail_images": []}
+    },
+    {
+      "product_id": "DEMO-WIDE-003",
+      "data_classification": "synthetic_demo_data",
+      "identity": {"name": "宽楦魔术贴运动鞋", "short_description": "前掌空间相对充足的宽楦友好运动休闲鞋。", "category": "wide_casual_shoe", "synthetic_sku": "SYN-WIDE-003", "target_gender": "unisex", "target_audience": "偏好宽松前掌空间的成人", "seasons": ["春季", "秋季"], "scenarios": ["日常步行", "轻运动"]},
+      "pricing": {"currency": "CNY", "display_price": 99.0, "classification": "synthetic_demo_price"},
+      "construction": {"upper_material": "混合材料", "lining_material": "织物", "sole_material": "PU", "toe_shape": "wide_round", "upper_height": "low", "closure_type": "hook_and_loop", "manufacturing_process": "cemented", "heel_type": "flat", "heel_height_cm": 2.0, "platform_height_cm": 1.8, "thickness": "medium", "single_shoe_weight_g": null},
+      "style": {"style_name": "运动休闲", "pattern": "拼色", "fashion_elements": ["宽头轮廓", "魔术贴"]},
+      "functions": {
+        "lightweight": {"level": "standard", "description": "常规轻便度，适合日常活动"},
+        "breathability": {"level": "moderate", "description": "织物拼接区域提供日常透气表现"},
+        "slip_resistance": {"level": "basic_daily", "description": "纹理鞋底提供日常防滑表现"},
+        "wear_resistance": {"level": "standard_daily", "description": "适合一般路面的日常耐磨需求"},
+        "water_resistance": {"level": "none", "description": "未标注防水"}
+      },
+      "sizing": {"fit": "wide_friendly", "fit_note": "宽楦友好版型，前掌空间相对充足，仍请按本款尺码表选择。", "size_chart": [{"foot_length_cm": 25.0, "recommended_size": 40}, {"foot_length_cm": 25.5, "recommended_size": 41}, {"foot_length_cm": 26.0, "recommended_size": 42}, {"foot_length_cm": 26.5, "recommended_size": 43}, {"foot_length_cm": 27.0, "recommended_size": 44}, {"foot_length_cm": 27.5, "recommended_size": 45}]},
+      "sale": {"sale_type": "in_stock", "preorder_note": null},
+      "variants": [
+        {"variant_id": "DEMO-WIDE-003-FOG", "color_name": "雾灰", "variant_label": "雾灰宽楦款", "available_sizes": [40, 41, 42, 43, 44, 45], "image_asset_ref": null},
+        {"variant_id": "DEMO-WIDE-003-GREEN", "color_name": "松绿", "variant_label": "松绿宽楦款", "available_sizes": [40, 41, 42, 43, 44], "image_asset_ref": null}
+      ],
+      "media": {"primary_image": {"asset_ref": "DEMO-WIDE-003/cover.webp", "alt": "宽楦魔术贴运动鞋模拟商品主图"}, "gallery": [], "detail_images": []}
+    },
+    {
+      "product_id": "DEMO-WORK-004",
+      "data_classification": "synthetic_demo_data",
+      "identity": {"name": "防滑闭口工作鞋", "short_description": "闭口套脚设计，面向一般室内工作场景的日常防滑鞋。", "category": "work_shoe", "synthetic_sku": "SYN-WORK-004", "target_gender": "unisex", "target_audience": "一般室内工作场景成人", "seasons": ["春季", "夏季", "秋季"], "scenarios": ["室内工作", "日常站立"]},
+      "pricing": {"currency": "CNY", "display_price": 79.0, "classification": "synthetic_demo_price"},
+      "construction": {"upper_material": "PVC", "lining_material": "PU", "sole_material": "橡胶", "toe_shape": "wide_round", "upper_height": "low", "closure_type": "slip_on", "manufacturing_process": "injection_molded", "heel_type": "flat", "heel_height_cm": 2.0, "platform_height_cm": 1.5, "thickness": "medium", "single_shoe_weight_g": 335},
+      "style": {"style_name": "简洁工作", "pattern": "纯色", "fashion_elements": ["闭口鞋头"]},
+      "functions": {
+        "lightweight": {"level": "standard", "description": "常规重量，适合一般室内穿着"},
+        "breathability": {"level": "low", "description": "闭口鞋面透气性有限"},
+        "slip_resistance": {"level": "high_daily", "description": "深纹橡胶外底提供较强的日常防滑表现，但无专业认证"},
+        "wear_resistance": {"level": "enhanced_daily", "description": "橡胶外底适合较频繁的日常行走"},
+        "water_resistance": {"level": "daily_splash", "description": "鞋面可应对轻微泼溅，不适合浸水或暴雨"}
+      },
+      "sizing": {"fit": "standard", "fit_note": "标准工作鞋版型，请按本款明确尺码表选择。", "size_chart": [{"foot_length_cm": 24.5, "recommended_size": 39}, {"foot_length_cm": 25.0, "recommended_size": 40}, {"foot_length_cm": 25.5, "recommended_size": 41}, {"foot_length_cm": 26.0, "recommended_size": 42}, {"foot_length_cm": 26.5, "recommended_size": 43}, {"foot_length_cm": 27.0, "recommended_size": 44}, {"foot_length_cm": 27.5, "recommended_size": 45}]},
+      "sale": {"sale_type": "in_stock", "preorder_note": null},
+      "variants": [{"variant_id": "DEMO-WORK-004-BLACK", "color_name": "黑色", "variant_label": "黑色闭口款", "available_sizes": [39, 40, 41, 42, 43, 44, 45], "image_asset_ref": null}],
+      "media": {"primary_image": {"asset_ref": "DEMO-WORK-004/cover.webp", "alt": "防滑闭口工作鞋模拟商品主图"}, "gallery": [], "detail_images": []}
+    },
+    {
+      "product_id": "DEMO-RAIN-005",
+      "data_classification": "synthetic_demo_data",
+      "identity": {"name": "轻便防泼水休闲鞋", "short_description": "适合小雨和轻微泼溅场景的轻便女式休闲鞋。", "category": "lightweight_casual_shoe", "synthetic_sku": "SYN-RAIN-005", "target_gender": "women", "target_audience": "成人女式日常穿着", "seasons": ["春季", "夏季", "秋季"], "scenarios": ["轻雨通勤", "日常休闲"]},
+      "pricing": {"currency": "CNY", "display_price": 85.0, "classification": "synthetic_demo_price"},
+      "construction": {"upper_material": "混合材料", "lining_material": "合成革", "sole_material": "PVC", "toe_shape": "almond", "upper_height": "low", "closure_type": "buckle", "manufacturing_process": "cemented", "heel_type": "low", "heel_height_cm": 2.8, "platform_height_cm": 1.2, "thickness": "thin", "single_shoe_weight_g": 225},
+      "style": {"style_name": "轻便休闲", "pattern": "纯色", "fashion_elements": ["侧搭扣", "杏仁鞋头"]},
+      "functions": {
+        "lightweight": {"level": "light", "description": "单只模拟重量较轻，适合日常通勤"},
+        "breathability": {"level": "moderate", "description": "低帮结构提供一般日常透气体验"},
+        "slip_resistance": {"level": "basic_daily", "description": "PVC纹理鞋底提供日常防滑表现"},
+        "wear_resistance": {"level": "standard_daily", "description": "适合一般城市路面的日常耐磨需求"},
+        "water_resistance": {"level": "light_rain", "description": "可应对小雨和轻微泼溅，不等同于专业防水"}
+      },
+      "sizing": {"fit": "standard", "fit_note": "标准女鞋版型，请按本款明确尺码表选择。", "size_chart": [{"foot_length_cm": 22.5, "recommended_size": 35}, {"foot_length_cm": 23.0, "recommended_size": 36}, {"foot_length_cm": 23.5, "recommended_size": 37}, {"foot_length_cm": 24.0, "recommended_size": 38}, {"foot_length_cm": 24.5, "recommended_size": 39}, {"foot_length_cm": 25.0, "recommended_size": 40}]},
+      "sale": {"sale_type": "in_stock", "preorder_note": null},
+      "variants": [
+        {"variant_id": "DEMO-RAIN-005-SAND", "color_name": "砂岩色", "variant_label": "砂岩色搭扣款", "available_sizes": [35, 36, 37, 38, 39, 40], "image_asset_ref": null},
+        {"variant_id": "DEMO-RAIN-005-NAVY", "color_name": "夜蓝", "variant_label": "夜蓝搭扣款", "available_sizes": [35, 36, 37, 38, 39], "image_asset_ref": null}
+      ],
+      "media": {"primary_image": {"asset_ref": "DEMO-RAIN-005/cover.webp", "alt": "轻便防泼水休闲鞋模拟商品主图"}, "gallery": [], "detail_images": []}
+    },
+    {
+      "product_id": "DEMO-PREORDER-006",
+      "data_classification": "synthetic_demo_data",
+      "identity": {"name": "加绒保暖冬季鞋（预售款）", "short_description": "中帮保暖织物内里的冬季预售休闲鞋。", "category": "winter_shoe", "synthetic_sku": "SYN-WINTER-006", "target_gender": "unisex", "target_audience": "成人冬季日常穿着", "seasons": ["冬季"], "scenarios": ["冬季通勤", "日常保暖"]},
+      "pricing": {"currency": "CNY", "display_price": 129.0, "classification": "synthetic_demo_price"},
+      "construction": {"upper_material": "合成革", "lining_material": "保暖织物", "sole_material": "PU", "toe_shape": "round", "upper_height": "mid", "closure_type": "lace_up", "manufacturing_process": "cemented", "heel_type": "platform", "heel_height_cm": 3.5, "platform_height_cm": 2.8, "thickness": "thick", "single_shoe_weight_g": 390},
+      "style": {"style_name": "冬季休闲", "pattern": "纯色", "fashion_elements": ["绒里", "中帮轮廓"]},
+      "functions": {
+        "lightweight": {"level": "standard", "description": "保暖结构下为常规重量"},
+        "breathability": {"level": "low", "description": "保暖内里以冬季保温为主，透气性有限"},
+        "slip_resistance": {"level": "enhanced_daily", "description": "纹理外底提供冬季日常抓地，不代表冰雪专业防滑"},
+        "wear_resistance": {"level": "enhanced_daily", "description": "适合冬季一般路面的日常耐磨需求"},
+        "water_resistance": {"level": "daily_splash", "description": "可应对轻微泼溅，不具备专业防水能力"}
+      },
+      "sizing": {"fit": "standard", "fit_note": "标准冬季鞋版型，请按本款明确尺码表选择。", "size_chart": [{"foot_length_cm": 24.5, "recommended_size": 39}, {"foot_length_cm": 25.0, "recommended_size": 40}, {"foot_length_cm": 25.5, "recommended_size": 41}, {"foot_length_cm": 26.0, "recommended_size": 42}, {"foot_length_cm": 26.5, "recommended_size": 43}, {"foot_length_cm": 27.0, "recommended_size": 44}, {"foot_length_cm": 27.5, "recommended_size": 45}]},
+      "sale": {"sale_type": "preorder", "preorder_note": "该模拟商品为预售款，将按商品详情页标注的预售排期安排发货。"},
+      "variants": [
+        {"variant_id": "DEMO-PREORDER-006-BROWN", "color_name": "暖棕", "variant_label": "暖棕绒里款", "available_sizes": [39, 40, 41, 42, 43, 44, 45], "image_asset_ref": null},
+        {"variant_id": "DEMO-PREORDER-006-BLACK", "color_name": "曜石黑", "variant_label": "曜石黑绒里款", "available_sizes": [40, 41, 42, 43, 44, 45], "image_asset_ref": null}
+      ],
+      "media": {"primary_image": {"asset_ref": "DEMO-PREORDER-006/cover.webp", "alt": "加绒保暖冬季鞋（预售款）模拟商品主图"}, "gallery": [], "detail_images": []}
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import mimetypes
 import os
 import re
 import secrets
@@ -19,6 +20,15 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import Response
+
+from demo_catalog import (
+    MISSING_PRODUCT_SELECTION_ANSWER,
+    UNKNOWN_PRODUCT_LINK_ANSWER,
+    answer_product_question,
+    extract_demo_product_link,
+    is_product_specific_query,
+    load_catalog,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -39,12 +49,17 @@ GENERIC_CHAT_ERROR = "暂时无法处理，请稍后重试。"
 GENERIC_CHAT_ERROR_CODE = "CHAT_UNAVAILABLE"
 INVALID_REQUEST_ERROR = "请输入有效的问题。"
 INVALID_REQUEST_ERROR_CODE = "INVALID_REQUEST"
+INVALID_PRODUCT_ERROR = "演示商品不存在。"
 
 
 class ChatRequest(BaseModel):
     question: str
     # Accepted only for backward-compatible request parsing. The server cookie is authoritative.
     session_id: str | None = None
+
+
+class DemoProductSelectionRequest(BaseModel):
+    product_id: str
 
 
 class RAGEngine:
@@ -61,6 +76,7 @@ class RAGEngine:
         self.llm_config = None
         self.session_history: dict[str, list[dict[str, str]]] = {}
         self.session_states: dict[str, dict[str, Any]] = {}
+        self.session_products: dict[str, str] = {}
 
     def load(self) -> None:
         with self.lock:
@@ -135,7 +151,80 @@ class RAGEngine:
         with self.session_lock:
             self.session_states[session_id] = dict(state)
 
+    def select_product(self, session_id: str, product_id: str) -> bool:
+        if demo_catalog.lookup(product_id) is None:
+            return False
+        with self.session_lock:
+            self.session_products[session_id] = product_id
+        return True
+
+    def get_selected_product_id(self, session_id: str) -> str | None:
+        with self.session_lock:
+            return self.session_products.get(session_id)
+
+    def _deterministic_product_result(
+        self,
+        question: str,
+        answer: str,
+        *,
+        session_id: str,
+        query_type: str,
+    ) -> dict[str, Any]:
+        self._append_turn(session_id, question, answer)
+        return {
+            "question": question,
+            "final_answer": answer,
+            "requires_backend_api": False,
+            "invalid_input": False,
+            "skip_retrieval": True,
+            "skip_llm": True,
+            "query_type": query_type,
+            "policy_category": None,
+            "original_query": question,
+            "is_followup_query": False,
+            "contextual_query": question,
+            "previous_user_query": "",
+            "retrieval_query": question,
+            "inherited_financial_risk": False,
+            "inherited_from_previous_query": "",
+            "inherited_aftersales_operation": False,
+            "inherited_backend_required": False,
+            "conversation_state": {},
+            "state_update_reason": "",
+            "retrieved_results": [],
+            "reranked_results": [],
+        }
+
     def chat(self, question: str, *, session_id: str) -> dict[str, Any]:
+        link_reference = extract_demo_product_link(question, demo_catalog)
+        if link_reference.matched:
+            if not link_reference.is_known or not link_reference.product_id:
+                return self._deterministic_product_result(
+                    question,
+                    UNKNOWN_PRODUCT_LINK_ANSWER,
+                    session_id=session_id,
+                    query_type="demo_product_not_found",
+                )
+            self.select_product(session_id, link_reference.product_id)
+
+        selected_product_id = self.get_selected_product_id(session_id)
+        selected_product = demo_catalog.lookup(selected_product_id)
+        product_answer = answer_product_question(question, selected_product)
+        if product_answer:
+            return self._deterministic_product_result(
+                question,
+                product_answer,
+                session_id=session_id,
+                query_type="demo_product_answer",
+            )
+        if selected_product is None and is_product_specific_query(question):
+            return self._deterministic_product_result(
+                question,
+                MISSING_PRODUCT_SELECTION_ANSWER,
+                session_id=session_id,
+                query_type="demo_product_clarification",
+            )
+
         self.load()
         top_k = int(os.getenv("RAG_TOP_K", "10"))
         threshold = float(
@@ -255,7 +344,9 @@ def _public_success_payload(result: dict[str, Any]) -> dict[str, str]:
 
 app = FastAPI(title="JD QA + Knowledge Base RAG Web Demo")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+mimetypes.add_type("image/webp", ".webp")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+demo_catalog = load_catalog()
 engine = RAGEngine()
 
 
@@ -277,11 +368,65 @@ async def request_validation_error(request: Request, _exc: RequestValidationErro
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     session_token, rotate_cookie = _server_session(request)
+    selected_product_lookup = getattr(engine, "get_selected_product_id", None)
+    selected_product_id = (
+        selected_product_lookup(session_token) if selected_product_lookup else None
+    )
     response = templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={},
+        context={"selected_product": demo_catalog.public_product(selected_product_id)},
     )
+    if rotate_cookie:
+        _set_session_cookie(response, session_token)
+    return response
+
+
+@app.get("/products/{product_id}", response_class=HTMLResponse)
+def product_page(product_id: str, request: Request):
+    product = demo_catalog.public_product(product_id)
+    if product is None:
+        return HTMLResponse(
+            "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'>"
+            "<title>演示商品不存在</title></head><body><main>演示商品不存在。"
+            "请返回首页重新选择。</main></body></html>",
+            status_code=404,
+        )
+    session_token, rotate_cookie = _server_session(request)
+    engine.select_product(session_token, product_id)
+    response = templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={"selected_product": product},
+    )
+    if rotate_cookie:
+        _set_session_cookie(response, session_token)
+    return response
+
+
+@app.get("/api/demo-products")
+def list_demo_products(request: Request):
+    session_token, rotate_cookie = _server_session(request)
+    response = JSONResponse(
+        {
+            "products": demo_catalog.public_products(),
+            "selected_product_id": engine.get_selected_product_id(session_token),
+        }
+    )
+    if rotate_cookie:
+        _set_session_cookie(response, session_token)
+    return response
+
+
+@app.post("/api/demo-products/select")
+def select_demo_product(selection: DemoProductSelectionRequest, request: Request):
+    session_token, rotate_cookie = _server_session(request)
+    product = demo_catalog.public_product(selection.product_id)
+    if product is None:
+        response = JSONResponse({"error": INVALID_PRODUCT_ERROR}, status_code=404)
+    else:
+        engine.select_product(session_token, selection.product_id)
+        response = JSONResponse({"selected_product": product})
     if rotate_cookie:
         _set_session_cookie(response, session_token)
     return response

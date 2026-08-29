@@ -17,6 +17,41 @@
           <span class="status-pill">FastAPI</span>
         </header>
 
+        <section class="demo-catalog" aria-labelledby="demoCatalogTitle">
+          <div class="demo-catalog-heading">
+            <div>
+              <h2 id="demoCatalogTitle">演示商品</h2>
+              <p>模拟商品数据，仅用于功能演示</p>
+            </div>
+            <button
+              class="demo-catalog-toggle"
+              id="demoCatalogToggle"
+              type="button"
+              aria-controls="demoCatalogBody"
+              aria-expanded="true"
+            >
+              收起商品
+            </button>
+          </div>
+          <div class="demo-catalog-body" id="demoCatalogBody">
+            <div
+              class="selected-product{% if not selected_product %} is-empty{% endif %}"
+              id="selectedProduct"
+              data-selected-product-id="{{ selected_product.product_id if selected_product else '' }}"
+            >
+              {% if selected_product %}
+                <strong>当前：{{ selected_product.name }}</strong>
+                <span class="demo-data-label">模拟商品数据，仅用于功能演示</span>
+              {% else %}
+                当前未选择商品
+              {% endif %}
+            </div>
+            <div class="demo-product-list" id="demoProductList" aria-live="polite">
+              <p class="demo-product-loading">正在加载演示商品...</p>
+            </div>
+          </div>
+        </section>
+
         <section class="chat-window" id="chatWindow">
           <div class="message bot">
             <div class="avatar">AI</div>
@@ -39,38 +74,6 @@
           <button id="sendButton" type="submit">发送</button>
         </form>
       </section>
-
-      <aside class="debug-card">
-        <div class="debug-header">
-          <h2>调试信息</h2>
-          <div class="flag-group">
-            <div id="invalidFlag" class="backend-flag">Invalid input: -</div>
-            <div id="skipFlag" class="backend-flag">Skip retrieval: -</div>
-            <div id="queryTypeFlag" class="backend-flag">Query type: -</div>
-            <div id="backendFlag" class="backend-flag">Requires backend API: -</div>
-          </div>
-        </div>
-
-        <section class="debug-section">
-          <h3>Structured conversation state (V2.1b)</h3>
-          <pre id="followupDebug">等待输入问题...</pre>
-        </section>
-
-        <section class="debug-section">
-          <h3>AI final answer</h3>
-          <pre id="finalAnswer">等待输入问题...</pre>
-        </section>
-
-        <section class="debug-section">
-          <h3>Top 5 retrieved context</h3>
-          <div id="retrievedResults" class="result-list empty">暂无检索结果</div>
-        </section>
-
-        <section class="debug-section">
-          <h3>Reranked context</h3>
-          <div id="rerankedResults" class="result-list empty">暂无重排结果</div>
-        </section>
-      </aside>
     </main>
 
     <script src="/static/main.js"></script>
